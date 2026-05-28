@@ -1,0 +1,6 @@
+@HorseRacingProject_HostAddress = http://localhost:5035
+
+GET {{HorseRacingProject_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
