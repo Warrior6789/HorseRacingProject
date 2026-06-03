@@ -17,5 +17,9 @@ public partial class JockeyProfile
 
     public DateTime? UpdatedAt { get; set; }
 
+    public bool IsDeleted { get; set; }
+
+    public DateTime? DeletedAt { get; set; }
+
     public virtual Account Account { get; set; } = null!;
 }

@@ -27,7 +27,9 @@ public partial class Horse
 
     public DateTime? UpdatedAt { get; set; }
 
-    public virtual Account Owner { get; set; } = null!;
+    public bool IsDeleted { get; set; }
 
-    public virtual ICollection<Registration> Registrations { get; set; } = new List<Registration>();
+    public DateTime? DeletedAt { get; set; }
+
+    public virtual Account Owner { get; set; } = null!;
 }

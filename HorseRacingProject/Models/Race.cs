@@ -23,11 +23,11 @@ public partial class Race
 
     public DateTime? CreateAt { get; set; }
 
+    public bool IsDeleted { get; set; }
+
+    public DateTime? DeletedAt { get; set; }
+
     public virtual Racecourse Racecourse { get; set; } = null!;
-
-    public virtual ICollection<RefereeReport> RefereeReports { get; set; } = new List<RefereeReport>();
-
-    public virtual ICollection<Registration> Registrations { get; set; } = new List<Registration>();
 
     public virtual Tournament Tournament { get; set; } = null!;
 }

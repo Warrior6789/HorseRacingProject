@@ -19,5 +19,9 @@ public partial class Tournament
 
     public DateTime? CreateAt { get; set; }
 
+    public bool IsDeleted { get; set; }
+
+    public DateTime? DeletedAt { get; set; }
+
     public virtual ICollection<Race> Races { get; set; } = new List<Race>();
 }

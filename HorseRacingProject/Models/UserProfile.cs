@@ -19,5 +19,9 @@ public partial class UserProfile
 
     public DateTime? UpdatedAt { get; set; }
 
+    public bool IsDeleted { get; set; }
+
+    public DateTime? DeletedAt { get; set; }
+
     public virtual Account Account { get; set; } = null!;
 }
