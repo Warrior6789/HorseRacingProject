@@ -45,7 +45,7 @@ public partial class HorseRacingDataContext : DbContext
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
 #warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see https://go.microsoft.com/fwlink/?LinkId=723263.
-        => optionsBuilder.UseNpgsql("Host=ep-young-poetry-aoaklwv8-pooler.c-2.ap-southeast-1.aws.neon.tech; Port=5432; Database=neondb; Username=neondb_owner; Password=npg_7CBlyeraZN6q; Ssl Mode=Require; Channel Binding=Require");
+        => optionsBuilder.UseNpgsql("Server=ep-young-poetry-aoaklwv8.c-2.ap-southeast-1.aws.neon.tech;Database=neondb;User Id=neondb_owner;Password=npg_7CBlyeraZN6q;SSL Mode=Require;");
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

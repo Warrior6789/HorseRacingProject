@@ -23,13 +23,15 @@ public partial class Horse
 
     public string? Color { get; set; }
 
-    public DateTime? CreateAt { get; set; }
+    public DateTimeOffset? CreateAt { get; set; }
 
-    public DateTime? UpdatedAt { get; set; }
+    public DateTimeOffset? UpdatedAt { get; set; }
 
     public bool IsDeleted { get; set; }
 
-    public DateTime? DeletedAt { get; set; }
+    public DateTimeOffset? DeletedAt { get; set; }
 
     public virtual Account Owner { get; set; } = null!;
+
+    public virtual ICollection<Registration> Registrations { get; set; } = new List<Registration>();
 }

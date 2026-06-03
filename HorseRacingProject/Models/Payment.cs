@@ -15,7 +15,7 @@ public partial class Payment
 
     public string? Status { get; set; }
 
-    public DateTime? CreateAt { get; set; }
+    public DateTimeOffset? CreateAt { get; set; }
 
     public virtual ConversionRate ConversionRate { get; set; } = null!;
 }

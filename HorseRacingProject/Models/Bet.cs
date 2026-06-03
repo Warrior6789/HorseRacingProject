@@ -19,7 +19,7 @@ public partial class Bet
 
     public string? Status { get; set; }
 
-    public DateTime? CreatedAt { get; set; }
+    public DateTimeOffset? CreatedAt { get; set; }
 
     public virtual Registration Registration { get; set; } = null!;
 
