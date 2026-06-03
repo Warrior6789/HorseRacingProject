@@ -5,11 +5,11 @@ namespace HorseRacingAPI.Models;
 
 public partial class Bet
 {
-    public string BetId { get; set; } = null!;
+    public Guid BetId { get; set; }
 
-    public string SpectatorId { get; set; } = null!;
+    public Guid SpectatorId { get; set; }
 
-    public string RegistrationId { get; set; } = null!;
+    public Guid RegistrationId { get; set; }
 
     public decimal BetAmount { get; set; }
 

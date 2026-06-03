@@ -5,11 +5,11 @@ namespace HorseRacingAPI.Models;
 
 public partial class Race
 {
-    public string RaceId { get; set; } = null!;
+    public Guid RaceId { get; set; }
 
-    public string TournamentId { get; set; } = null!;
+    public Guid TournamentId { get; set; }
 
-    public string RacecourseId { get; set; } = null!;
+    public Guid RacecourseId { get; set; }
 
     public int? RaceNumber { get; set; }
 

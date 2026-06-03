@@ -5,7 +5,7 @@ namespace HorseRacingAPI.Models;
 
 public partial class Account
 {
-    public string Id { get; set; } = null!;
+    public Guid Id { get; set; }
 
     public string PasswordHash { get; set; } = null!;
 
@@ -24,8 +24,6 @@ public partial class Account
     public virtual ICollection<Horse> Horses { get; set; } = new List<Horse>();
 
     public virtual ICollection<JockeyProfile> JockeyProfiles { get; set; } = new List<JockeyProfile>();
-
-    public virtual ICollection<Payment> Payments { get; set; } = new List<Payment>();
 
     public virtual ICollection<RefereeReport> RefereeReports { get; set; } = new List<RefereeReport>();
 

@@ -5,9 +5,9 @@ namespace HorseRacingAPI.Models;
 
 public partial class Horse
 {
-    public string Id { get; set; } = null!;
+    public Guid Id { get; set; }
 
-    public string OwnerId { get; set; } = null!;
+    public Guid OwnerId { get; set; }
 
     public string HorseName { get; set; } = null!;
 

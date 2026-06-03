@@ -5,7 +5,7 @@ namespace HorseRacingAPI.Models;
 
 public partial class Tournament
 {
-    public string Id { get; set; } = null!;
+    public Guid Id { get; set; }
 
     public string TournamentName { get; set; } = null!;
 

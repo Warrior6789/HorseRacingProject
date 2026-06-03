@@ -5,9 +5,9 @@ namespace HorseRacingAPI.Models;
 
 public partial class UserProfile
 {
-    public string ProfileId { get; set; } = null!;
+    public Guid ProfileId { get; set; }
 
-    public string AccountId { get; set; } = null!;
+    public Guid AccountId { get; set; }
 
     public string? FullName { get; set; }
 

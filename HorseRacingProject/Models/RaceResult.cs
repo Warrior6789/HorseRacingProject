@@ -5,9 +5,9 @@ namespace HorseRacingAPI.Models;
 
 public partial class RaceResult
 {
-    public string ResultId { get; set; } = null!;
+    public Guid ResultId { get; set; }
 
-    public string RegistrationId { get; set; } = null!;
+    public Guid RegistrationId { get; set; }
 
     public int? FinishPosition { get; set; }
 

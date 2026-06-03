@@ -5,7 +5,7 @@ namespace HorseRacingAPI.Models;
 
 public partial class ConversionRate
 {
-    public float ConversionRateId { get; set; }
+    public Guid ConversionRateId { get; set; }
 
     public float ConversionRate1 { get; set; }
 

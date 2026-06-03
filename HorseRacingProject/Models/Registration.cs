@@ -5,13 +5,13 @@ namespace HorseRacingAPI.Models;
 
 public partial class Registration
 {
-    public string RegistrationId { get; set; } = null!;
+    public Guid RegistrationId { get; set; }
 
-    public string RaceId { get; set; } = null!;
+    public Guid RaceId { get; set; }
 
-    public string HorseId { get; set; } = null!;
+    public Guid HorseId { get; set; }
 
-    public string JockeyId { get; set; } = null!;
+    public Guid JockeyId { get; set; }
 
     public int? GateNumber { get; set; }
 

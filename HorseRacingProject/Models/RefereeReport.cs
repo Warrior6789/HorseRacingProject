@@ -5,11 +5,11 @@ namespace HorseRacingAPI.Models;
 
 public partial class RefereeReport
 {
-    public string ReportId { get; set; } = null!;
+    public Guid ReportId { get; set; }
 
-    public string RaceId { get; set; } = null!;
+    public Guid RaceId { get; set; }
 
-    public string RefereeId { get; set; } = null!;
+    public Guid RefereeId { get; set; }
 
     public string? IncidentDescription { get; set; }
 

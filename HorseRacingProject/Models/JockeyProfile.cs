@@ -5,9 +5,9 @@ namespace HorseRacingAPI.Models;
 
 public partial class JockeyProfile
 {
-    public string JockeyProfileId { get; set; } = null!;
+    public Guid JockeyProfileId { get; set; }
 
-    public string AccountId { get; set; } = null!;
+    public Guid AccountId { get; set; }
 
     public int? ExperienceYears { get; set; }
 

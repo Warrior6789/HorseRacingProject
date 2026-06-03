@@ -5,9 +5,9 @@ namespace HorseRacingAPI.Models;
 
 public partial class Prize
 {
-    public string PrizeId { get; set; } = null!;
+    public Guid PrizeId { get; set; }
 
-    public string RegistrationId { get; set; } = null!;
+    public Guid RegistrationId { get; set; }
 
     public string? PrizeType { get; set; }
 
