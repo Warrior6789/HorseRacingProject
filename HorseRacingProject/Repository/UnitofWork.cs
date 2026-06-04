@@ -14,7 +14,7 @@ namespace HorseRacingAPI.Repository
 
         public UnitofWork(DbContext context)
         {
-            _context = context ? throw new ArgumentNullException(nameof(context));
+            _context = context ?? throw new ArgumentNullException(nameof(context));
         }
 
         public IGenericRepository<T> GetRepository<T>() where T : class
