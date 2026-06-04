@@ -8,8 +8,8 @@ namespace HorseRacingAPI.Repositories
 {
     public interface IGenericRepository<T> where T : class
     {
-      
 
+        IQueryable<T> Entities { get; }
         Task<IEnumerable<T>> GetAllAsync();
 
         Task<T?> GetByIdAsync(Guid id);

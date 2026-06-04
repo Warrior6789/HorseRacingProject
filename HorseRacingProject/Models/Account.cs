@@ -1,4 +1,5 @@
-﻿using System;
+﻿using HorseRacingAPI.Enums;
+using System;
 using System.Collections.Generic;
 
 namespace HorseRacingAPI.Models;
@@ -11,9 +12,9 @@ public partial class Account
 
     public string Email { get; set; } = null!;
 
-    public string Role { get; set; } = null!;
+    public AccountRole Role { get; set; } = AccountRole.Spectator!;
 
-    public string Status { get; set; } = null!;
+    public AccountStatus Status { get; set; }
 
     public DateTimeOffset? CreateAt { get; set; }
 

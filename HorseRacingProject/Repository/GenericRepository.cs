@@ -19,6 +19,7 @@ namespace HorseRacingAPI.Repositories
             _dbSet = _context.Set<T>();
         }
 
+        public IQueryable<T> Entities => _dbSet;
         public async Task<IEnumerable<T>> GetAllAsync()
         {
             return await _dbSet.ToListAsync();
