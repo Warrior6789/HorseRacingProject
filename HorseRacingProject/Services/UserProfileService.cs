@@ -14,21 +14,16 @@ namespace HorseRacingAPI.Services
         {
             _uow = uow;
         }
-        public async Task<UserProfileResponse> CreateUserProfileAsync(UserProfileCreateRequest req)
+        public async Task<UserProfileResponse> CreateUserProfileAsync(Guid accountId, UserProfileCreateRequest req)
         {
             IGenericRepository<UserProfile> userProfileRepo = _uow.GetRepository<UserProfile>();
 
-            if (req.AccountId == Guid.Empty)
-            {
-                throw new Exception("AccountId is required.");
-            }
             IGenericRepository<Account> accRepo = _uow.GetRepository<Account>();
-            bool accountExsit = await accRepo.Entities.AnyAsync(a => a.Id == req.AccountId && !a.IsDeleted);
-            if(!accountExsit)
+            bool accountExsit = await accRepo.Entities.AnyAsync(a => a.Id == accountId && !a.IsDeleted);
+            if (!accountExsit)
             {
                 throw new Exception("Account does not exist.");
             }
-            Guid accountId = req.AccountId;
             int existingCount = await userProfileRepo.Entities.CountAsync(p => p.AccountId == accountId);
             if (existingCount > 0)
             {
@@ -37,7 +32,7 @@ namespace HorseRacingAPI.Services
             UserProfile userProfile = new UserProfile
             {
                 ProfileId = Guid.NewGuid(),
-                AccountId = req.AccountId,
+                AccountId = accountId,
                 FullName = req.FullName,
                 Phone = req.Phone,
                 Balance = 0,

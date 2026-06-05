@@ -16,14 +16,11 @@ namespace HorseRacingAPI.Services
             _uow = uow;
         }
 
-        public async Task<JockeyProfileResponse> CreateJockeyProfileAsync(JockeyProfileCreateRequest req)
+        public async Task<JockeyProfileResponse> CreateJockeyProfileAsync(Guid accountId, JockeyProfileCreateRequest req)
         {
-            if (req.AccountId == Guid.Empty)
-                throw new InvalidOperationException("AccountId is required.");
-
             IGenericRepository<Account> accRepo = _uow.GetRepository<Account>();
             Account? account = await accRepo.Entities
-                .FirstOrDefaultAsync(a => a.Id == req.AccountId && !a.IsDeleted);
+                .FirstOrDefaultAsync(a => a.Id == accountId && !a.IsDeleted);
             if (account == null)
                 throw new InvalidOperationException("Account does not exist.");
 
@@ -31,7 +28,6 @@ namespace HorseRacingAPI.Services
                 throw new InvalidOperationException("Only accounts with role Jockey can have a JockeyProfile.");
 
             IGenericRepository<JockeyProfile> repo = _uow.GetRepository<JockeyProfile>();
-            Guid accountId = req.AccountId;
             int existingCount = await repo.Entities.CountAsync(p => p.AccountId == accountId);
             if (existingCount > 0)
                 throw new InvalidOperationException("A jockey profile already exists for this account.");
@@ -39,7 +35,7 @@ namespace HorseRacingAPI.Services
             JockeyProfile jockeyProfile = new JockeyProfile
             {
                 JockeyProfileId = Guid.NewGuid(),
-                AccountId = req.AccountId,
+                AccountId = accountId,
                 FullName = req.FullName,
                 DateOfBirth = req.DateOfBirth,
                 Nationality = req.Nationality,

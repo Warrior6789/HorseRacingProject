@@ -22,7 +22,14 @@ namespace HorseRacingAPI.Controllers
         [HttpPost]
         public async Task<IActionResult> CreateJockeyProfile([FromBody] JockeyProfileCreateRequest req)
         {
-            JockeyProfileResponse response = await _jockeyProfileService.CreateJockeyProfileAsync(req);
+            string tokenAccountId = HttpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? string.Empty;
+            if (!Guid.TryParse(tokenAccountId, out Guid accountId))
+            {
+                ApiResponse<object> errorResponse = ApiResponse<object>.FailResponse("Invalid token.");
+                return StatusCode(StatusCodes.Status401Unauthorized, errorResponse);
+            }
+
+            JockeyProfileResponse response = await _jockeyProfileService.CreateJockeyProfileAsync(accountId, req);
 
             ApiResponse<JockeyProfileResponse> apiResponse = ApiResponse<JockeyProfileResponse>.SuccessResponse(response, "Create jockey profile successfully.");
             return StatusCode(StatusCodes.Status201Created, apiResponse);

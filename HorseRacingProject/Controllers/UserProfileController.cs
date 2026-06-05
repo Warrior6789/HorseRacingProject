@@ -24,7 +24,14 @@ namespace HorseRacingAPI.Controllers
         [HttpPost]
         public async Task<IActionResult> CreateUserProfile([FromBody] UserProfileCreateRequest req)
         {
-            UserProfileResponse response = await _userProfileService.CreateUserProfileAsync(req);
+            string tokenAccountId = HttpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? string.Empty;
+            if (!Guid.TryParse(tokenAccountId, out Guid accountId))
+            {
+                ApiResponse<object> errorResponse = ApiResponse<object>.FailResponse("Invalid token.");
+                return StatusCode(StatusCodes.Status401Unauthorized, errorResponse);
+            }
+
+            UserProfileResponse response = await _userProfileService.CreateUserProfileAsync(accountId, req);
 
             ApiResponse<UserProfileResponse> apiResponse = ApiResponse<UserProfileResponse>.SuccessResponse(response, "Create user profile successfully.");
             return StatusCode(StatusCodes.Status201Created, apiResponse);
