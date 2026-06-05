@@ -62,6 +62,13 @@ public partial class HorseRacingDataContext : DbContext
                 .HasColumnName("ID");
             entity.Property(e => e.CreateAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
             entity.Property(e => e.Email).HasMaxLength(100);
+            entity.Property(e => e.Role)
+        .HasMaxLength(20)
+        .HasConversion<string>(); 
+
+            entity.Property(e => e.Status)
+                .HasMaxLength(20)
+                .HasConversion<string>();
             entity.Property(e => e.Role).HasMaxLength(20);
             entity.Property(e => e.Status).HasMaxLength(20);
             entity.Property(e => e.UpdatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
