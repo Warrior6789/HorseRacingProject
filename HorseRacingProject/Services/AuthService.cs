@@ -79,7 +79,7 @@ namespace HorseRacingAPI.Services
             var key = _configuration["Jwt:Key"] ?? throw new Exception("Missing config: Jwt:Key");
             string? issuer = _configuration["Jwt:Issuer"];
             string? audience = _configuration["Jwt:Audience"];
-            var expireMinutes = int.TryParse(_configuration["Jwt:ExpireMinutes"], out var m) ? m : 60;
+            var expireMinutes = int.TryParse(_configuration["Jwt:DurationInMinutes"], out var m) ? m : 180;
 
             var claims = new List<Claim>
     {
