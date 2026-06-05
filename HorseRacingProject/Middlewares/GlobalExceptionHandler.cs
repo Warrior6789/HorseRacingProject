@@ -14,9 +14,11 @@ namespace HorseRacingAPI.Middlewares
 
         public async ValueTask<bool> TryHandleAsync(HttpContext httpContext, Exception exception, CancellationToken cancellationToken)
         {
-           _logger.LogError(exception,$"An error occurred while processing the request: {exception.Message}");
+            _logger.LogError(exception, $"An error occurred while processing the request: {exception.Message}");
+
             var statusCode = HttpStatusCode.InternalServerError;
             var message = "An unexpected error occurred. Please try again later.";
+
             switch (exception)
             {
                 case InvalidOperationException:
@@ -33,17 +35,20 @@ namespace HorseRacingAPI.Middlewares
                     break;
                 case UnauthorizedAccessException:
                     statusCode = HttpStatusCode.Unauthorized;
-                    message = "Phiên làm việc đã hết hạn. Vui lòng đăng nhập lại!";
+                    message = "Session has expired. Please log in again.";
                     break;
                 case Microsoft.EntityFrameworkCore.DbUpdateException:
                     statusCode = HttpStatusCode.InternalServerError;
-                    message = "Lỗi đồng bộ dữ liệu xuống cơ sở dữ liệu. Vui lòng kiểm tra lại!";
+                    message = "Database synchronization error. Please try again later.";
                     break;
             }
+
             httpContext.Response.StatusCode = (int)statusCode;
             httpContext.Response.ContentType = "application/json";
-            var respose = ApiResponse<object>.FailResponse(message);
-            await httpContext.Response.WriteAsJsonAsync(respose, cancellationToken);
+
+            var response = ApiResponse<object>.FailResponse(message);
+            await httpContext.Response.WriteAsJsonAsync(response, cancellationToken);
+
             return true;
         }
     }
