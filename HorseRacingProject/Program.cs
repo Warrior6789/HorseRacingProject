@@ -12,7 +12,6 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
 
 var builder = WebApplication.CreateBuilder(args);
 

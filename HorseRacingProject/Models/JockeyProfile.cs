@@ -9,10 +9,6 @@ public partial class JockeyProfile
 
     public Guid AccountId { get; set; }
 
-    public int? ExperienceYears { get; set; }
-
-    public decimal? JockeyRating { get; set; }
-
     public DateTimeOffset? CreateAt { get; set; }
 
     public DateTimeOffset? UpdatedAt { get; set; }
@@ -20,6 +16,18 @@ public partial class JockeyProfile
     public bool IsDeleted { get; set; }
 
     public DateTimeOffset? DeletedAt { get; set; }
+
+    public string? FullName { get; set; }
+
+    public DateOnly? DateOfBirth { get; set; }
+
+    public string? Nationality { get; set; }
+
+    public string? LicenseNumber { get; set; }
+
+    public int? TotalRaces { get; set; }
+
+    public int? TotalWins { get; set; }
 
     public virtual Account Account { get; set; } = null!;
 }

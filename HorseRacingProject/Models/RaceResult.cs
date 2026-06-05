@@ -15,7 +15,7 @@ public partial class RaceResult
 
     public bool? IsDisqualified { get; set; }
 
-    public DateTimeOffset? CreateAt { get; set; }
+    public DateTime? CreateAt { get; set; }
 
     public virtual Registration Registration { get; set; } = null!;
 }

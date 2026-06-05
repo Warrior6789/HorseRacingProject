@@ -13,7 +13,7 @@ public partial class Prize
 
     public decimal? Amount { get; set; }
 
-    public DateTimeOffset? DistributedAt { get; set; }
+    public DateTime? DistributedAt { get; set; }
 
     public virtual Registration Registration { get; set; } = null!;
 }

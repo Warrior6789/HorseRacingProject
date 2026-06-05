@@ -21,9 +21,9 @@ public partial class Registration
 
     public string? Status { get; set; }
 
-    public DateTimeOffset? CreateAt { get; set; }
+    public DateTime? CreateAt { get; set; }
 
-    public DateTimeOffset? UpdatedAt { get; set; }
+    public DateTime? UpdatedAt { get; set; }
 
     public virtual ICollection<Bet> Bets { get; set; } = new List<Bet>();
 

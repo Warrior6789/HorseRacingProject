@@ -30,9 +30,9 @@ namespace HorseRacingAPI.Services
             if (account.Role != AccountRole.Jockey)
                 throw new InvalidOperationException("Only accounts with role Jockey can have a JockeyProfile.");
 
-            IGenericRepository<JockeyProfile> jockeyProfileRepo = _uow.GetRepository<JockeyProfile>();
+            IGenericRepository<JockeyProfile> repo = _uow.GetRepository<JockeyProfile>();
             Guid accountId = req.AccountId;
-            int existingCount = await jockeyProfileRepo.Entities.CountAsync(p => p.AccountId == accountId);
+            int existingCount = await repo.Entities.CountAsync(p => p.AccountId == accountId);
             if (existingCount > 0)
                 throw new InvalidOperationException("A jockey profile already exists for this account.");
 
@@ -40,37 +40,37 @@ namespace HorseRacingAPI.Services
             {
                 JockeyProfileId = Guid.NewGuid(),
                 AccountId = req.AccountId,
-                ExperienceYears = req.ExperienceYears,
-                JockeyRating = req.JockeyRating,
+                FullName = req.FullName,
+                DateOfBirth = req.DateOfBirth,
+                Nationality = req.Nationality,
+                LicenseNumber = req.LicenseNumber,
+                TotalRaces = 0,
+                TotalWins = 0,
                 CreateAt = DateTimeOffset.UtcNow,
                 UpdatedAt = DateTimeOffset.UtcNow,
                 IsDeleted = false
             };
-            await jockeyProfileRepo.AddAsync(jockeyProfile);
+            await repo.AddAsync(jockeyProfile);
             await _uow.SaveAsync();
 
-            return new JockeyProfileResponse
-            {
-                JockeyProfileId = jockeyProfile.JockeyProfileId,
-                AccountId = jockeyProfile.AccountId,
-                ExperienceYears = jockeyProfile.ExperienceYears,
-                JockeyRating = jockeyProfile.JockeyRating,
-                CreateAt = jockeyProfile.CreateAt,
-                UpdatedAt = jockeyProfile.UpdatedAt
-            };
+            return MapToResponse(jockeyProfile);
         }
 
         public async Task<List<JockeyProfileResponse>> GetAllJockeyProfilesAsync()
         {
-            IGenericRepository<JockeyProfile> jockeyProfileRepo = _uow.GetRepository<JockeyProfile>();
-            return await jockeyProfileRepo.Entities
+            IGenericRepository<JockeyProfile> repo = _uow.GetRepository<JockeyProfile>();
+            return await repo.Entities
                 .Where(p => !p.IsDeleted)
                 .Select(p => new JockeyProfileResponse
                 {
                     JockeyProfileId = p.JockeyProfileId,
                     AccountId = p.AccountId,
-                    ExperienceYears = p.ExperienceYears,
-                    JockeyRating = p.JockeyRating,
+                    FullName = p.FullName,
+                    DateOfBirth = p.DateOfBirth,
+                    Nationality = p.Nationality,
+                    LicenseNumber = p.LicenseNumber,
+                    TotalRaces = p.TotalRaces,
+                    TotalWins = p.TotalWins,
                     CreateAt = p.CreateAt,
                     UpdatedAt = p.UpdatedAt
                 }).ToListAsync();
@@ -81,15 +81,19 @@ namespace HorseRacingAPI.Services
             if (accountId == Guid.Empty)
                 throw new InvalidOperationException("AccountId is required.");
 
-            IGenericRepository<JockeyProfile> jockeyProfileRepo = _uow.GetRepository<JockeyProfile>();
-            JockeyProfileResponse? response = await jockeyProfileRepo.Entities
+            IGenericRepository<JockeyProfile> repo = _uow.GetRepository<JockeyProfile>();
+            JockeyProfileResponse? response = await repo.Entities
                 .Where(p => p.AccountId == accountId && !p.IsDeleted)
                 .Select(p => new JockeyProfileResponse
                 {
                     JockeyProfileId = p.JockeyProfileId,
                     AccountId = p.AccountId,
-                    ExperienceYears = p.ExperienceYears,
-                    JockeyRating = p.JockeyRating,
+                    FullName = p.FullName,
+                    DateOfBirth = p.DateOfBirth,
+                    Nationality = p.Nationality,
+                    LicenseNumber = p.LicenseNumber,
+                    TotalRaces = p.TotalRaces,
+                    TotalWins = p.TotalWins,
                     CreateAt = p.CreateAt,
                     UpdatedAt = p.UpdatedAt
                 }).FirstOrDefaultAsync();
@@ -105,20 +109,40 @@ namespace HorseRacingAPI.Services
             if (accountId == Guid.Empty)
                 throw new InvalidOperationException("AccountId is required.");
 
-            IGenericRepository<JockeyProfile> jockeyProfileRepo = _uow.GetRepository<JockeyProfile>();
-            JockeyProfile? jockeyProfile = await jockeyProfileRepo.Entities
+            IGenericRepository<JockeyProfile> repo = _uow.GetRepository<JockeyProfile>();
+            JockeyProfile? jockeyProfile = await repo.Entities
                 .FirstOrDefaultAsync(p => p.AccountId == accountId && !p.IsDeleted);
             if (jockeyProfile == null)
                 throw new InvalidOperationException("JockeyProfile not found.");
 
-            if (req.ExperienceYears.HasValue)
-                jockeyProfile.ExperienceYears = req.ExperienceYears;
+            if (!string.IsNullOrEmpty(req.FullName))
+                jockeyProfile.FullName = req.FullName;
 
-            if (req.JockeyRating.HasValue)
-                jockeyProfile.JockeyRating = req.JockeyRating;
+            if (req.DateOfBirth.HasValue)
+                jockeyProfile.DateOfBirth = req.DateOfBirth;
+
+            if (!string.IsNullOrEmpty(req.Nationality))
+                jockeyProfile.Nationality = req.Nationality;
+
+            if (!string.IsNullOrEmpty(req.LicenseNumber))
+                jockeyProfile.LicenseNumber = req.LicenseNumber;
 
             jockeyProfile.UpdatedAt = DateTimeOffset.UtcNow;
             await _uow.SaveAsync();
         }
+
+        private static JockeyProfileResponse MapToResponse(JockeyProfile p) => new JockeyProfileResponse
+        {
+            JockeyProfileId = p.JockeyProfileId,
+            AccountId = p.AccountId,
+            FullName = p.FullName,
+            DateOfBirth = p.DateOfBirth,
+            Nationality = p.Nationality,
+            LicenseNumber = p.LicenseNumber,
+            TotalRaces = p.TotalRaces,
+            TotalWins = p.TotalWins,
+            CreateAt = p.CreateAt,
+            UpdatedAt = p.UpdatedAt
+        };
     }
 }

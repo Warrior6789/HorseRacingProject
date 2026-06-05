@@ -15,7 +15,7 @@ public partial class RefereeReport
 
     public string? PenaltyApplied { get; set; }
 
-    public DateTimeOffset? CreatedAt { get; set; }
+    public DateTime? CreatedAt { get; set; }
 
     public virtual Race Race { get; set; } = null!;
 

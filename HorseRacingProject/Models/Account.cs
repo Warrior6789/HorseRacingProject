@@ -1,6 +1,6 @@
-﻿using HorseRacingAPI.Enums;
-using System;
+﻿using System;
 using System.Collections.Generic;
+using HorseRacingAPI.Enums;
 
 namespace HorseRacingAPI.Models;
 
@@ -12,7 +12,7 @@ public partial class Account
 
     public string Email { get; set; } = null!;
 
-    public AccountRole Role { get; set; } = AccountRole.Spectator!;
+    public AccountRole Role { get; set; } = AccountRole.Spectator;
 
     public AccountStatus Status { get; set; }
 
