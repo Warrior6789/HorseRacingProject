@@ -63,6 +63,7 @@ builder.Services.AddScoped<IUnitofWork, UnitofWork>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IUserProfileService, UserProfileService>();
 builder.Services.AddScoped<IJockeyProfileService, JockeyProfileService>();
+builder.Services.AddScoped<IAccountService, AccountService>();
 
 var jwtKey = builder.Configuration["Jwt:Key"]
     ?? throw new Exception("Missing System Config: Jwt:Key in appsettings.json");
