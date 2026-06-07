@@ -67,6 +67,43 @@ namespace HorseRacingAPI.Services
                 }).ToListAsync();
         }
 
+        public async Task<PagedResponse<AccountResponse>> GetAccountByStatusPagedAsync(string status, int page, int pageSize)
+        {
+            IGenericRepository<Account> accRepo = _uow.GetRepository<Account>();
+
+            if (!Enum.TryParse<AccountStatus>(status, ignoreCase: true, out var accountStatus))
+            {
+                throw new ArgumentException("Invalid account status");
+            }
+
+            int totalCount = await accRepo.Entities
+                .Where(a => a.Status == accountStatus && !a.IsDeleted)
+                .CountAsync();
+
+            IEnumerable<AccountResponse> items = await accRepo.FindAsync<AccountResponse>(
+                predicate: a => a.Status == accountStatus && !a.IsDeleted,
+                orderBy: null,
+                selector: a => new AccountResponse
+                {
+                    Id = a.Id,
+                    Email = a.Email,
+                    Role = a.Role.ToString(),
+                    Status = a.Status.ToString(),
+                    CreateAt = a.CreateAt
+                },
+                pageIndex: page - 1,
+                pageSize: pageSize
+            );
+
+            return new PagedResponse<AccountResponse>
+            {
+                Items = items.ToList(),
+                Page = page,
+                PageSize = pageSize,
+                TotalCount = totalCount
+            };
+        }
+
         public async Task RestoreAccountAsync(Guid id)
         {
             Account? account = await _uow.GetRepository<Account>().Entities.FirstOrDefaultAsync(a => a.Id == id && a.IsDeleted == false);
