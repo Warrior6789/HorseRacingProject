@@ -66,6 +66,8 @@ builder.Services.AddScoped<IJockeyProfileService, JockeyProfileService>();
 builder.Services.AddScoped<IAccountService, AccountService>();
 builder.Services.AddScoped<IRegistrationService, RegistrationService>();
 builder.Services.AddScoped<ITournamentService, TournamentService>();
+builder.Services.AddScoped<IHorseService, HorseService>();
+builder.Services.AddScoped<IDashboardService, DashboardService>();
 
 var jwtKey = builder.Configuration["Jwt:Key"]
     ?? throw new Exception("Missing System Config: Jwt:Key in appsettings.json");
