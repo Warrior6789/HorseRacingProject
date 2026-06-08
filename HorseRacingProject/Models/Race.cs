@@ -13,7 +13,7 @@ public partial class Race
 
     public int? RaceNumber { get; set; }
 
-    public DateTime? StartTime { get; set; }
+    public DateTimeOffset? StartTime { get; set; }
 
     public float? TrackLength { get; set; }
 
@@ -21,11 +21,11 @@ public partial class Race
 
     public string? Status { get; set; }
 
-    public DateTime? CreateAt { get; set; }
+    public DateTimeOffset? CreateAt { get; set; }
 
     public bool IsDeleted { get; set; }
 
-    public DateTime? DeletedAt { get; set; }
+    public DateTimeOffset? DeletedAt { get; set; }
 
     public virtual Racecourse Racecourse { get; set; } = null!;
 
