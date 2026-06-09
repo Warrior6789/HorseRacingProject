@@ -1,5 +1,6 @@
 ﻿using HorseRacingAPI.Dtos;
 using HorseRacingAPI.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System;
 using System.Threading.Tasks;
@@ -45,6 +46,14 @@ namespace HorseRacingAPI.Controllers
 
             var result = new { token = token };
             return Ok(ApiResponse<object>.SuccessResponse(result, "Login successful."));
+        }
+
+        [Authorize]
+        [HttpPost("logout")]
+        public IActionResult Logout()
+        {
+            // Stateless JWT logout only confirms the request; the client must remove the token.
+            return Ok(ApiResponse<object>.SuccessResponse("Logout successful."));
         }
     }
 }
