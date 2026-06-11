@@ -126,6 +126,7 @@ public partial class HorseRacingDataContext : DbContext
             entity.Property(e => e.OwnerId).HasColumnName("OwnerID");
             entity.Property(e => e.RecordWins).HasDefaultValue(0);
             entity.Property(e => e.Status).HasMaxLength(20);
+            entity.Property(e => e.ImageUrl).HasMaxLength(500);
             entity.Property(e => e.UpdatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
 
             entity.HasOne(d => d.Owner).WithMany(p => p.Horses)
@@ -150,6 +151,7 @@ public partial class HorseRacingDataContext : DbContext
             entity.Property(e => e.Nationality).HasMaxLength(50);
             entity.Property(e => e.TotalRaces).HasDefaultValue(0);
             entity.Property(e => e.TotalWins).HasDefaultValue(0);
+            entity.Property(e => e.ImageUrl).HasMaxLength(500);
             entity.Property(e => e.UpdatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
 
             entity.HasOne(d => d.Account).WithMany(p => p.JockeyProfiles)
@@ -327,6 +329,7 @@ public partial class HorseRacingDataContext : DbContext
             entity.Property(e => e.CreateAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
             entity.Property(e => e.FullName).HasMaxLength(150);
             entity.Property(e => e.Phone).HasMaxLength(15);
+            entity.Property(e => e.ImageUrl).HasMaxLength(500);
             entity.Property(e => e.UpdatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
 
             entity.HasOne(d => d.Account).WithMany(p => p.UserProfiles)

@@ -10,5 +10,6 @@
         public float? Weight { get; set; }
         public int? RecordWins { get; set; }
         public string? Status { get; set; }
+        public string? ImageUrl { get; set; }
     }
 }

@@ -18,23 +18,29 @@ namespace HorseRacingAPI.Services
         {
             IGenericRepository<Registration> registrationRepo = _uow.GetRepository<Registration>();
 
-            Registration? registration = await registrationRepo.Entities.FirstOrDefaultAsync(r => r.RegistrationId == registrationId);
-            if(registration == null)
-            {
+            Registration? registration = await registrationRepo.Entities
+                .Include(r => r.Race)
+                .FirstOrDefaultAsync(r => r.RegistrationId == registrationId);
+            if (registration == null)
                 throw new ArgumentException("Registration not found.");
-            }
-            if(registration.JockeyId != jockeyAccountId)
-            {
+
+            if (registration.JockeyId != jockeyAccountId)
                 throw new InvalidOperationException("You are not authorized to accept this registration.");
-            }
-            if(registration.Status != "Pending")
-            {
+
+            if (registration.Status != "Pending")
                 throw new InvalidOperationException("Only pending registrations can be accepted.");
+
+            if (registration.Race.MaxParticipants.HasValue)
+            {
+                int confirmedCount = await registrationRepo.Entities
+                    .CountAsync(r => r.RaceId == registration.RaceId && r.Status == "Confirmed");
+                if (confirmedCount >= registration.Race.MaxParticipants.Value)
+                    throw new InvalidOperationException($"Race has reached the maximum number of participants ({registration.Race.MaxParticipants}).");
             }
+
             registration.JockeyConfirmation = true;
             registration.Status = "Confirmed";
             registration.UpdatedAt = DateTimeOffset.UtcNow;
-
             await _uow.SaveAsync();
         }
 

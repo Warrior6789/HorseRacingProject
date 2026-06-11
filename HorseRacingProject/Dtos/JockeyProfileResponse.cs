@@ -10,6 +10,7 @@ namespace HorseRacingAPI.Dtos
         public string? LicenseNumber { get; set; }
         public int? TotalRaces { get; set; }
         public int? TotalWins { get; set; }
+        public string? ImageUrl { get; set; }
         public DateTimeOffset? CreateAt { get; set; }
         public DateTimeOffset? UpdatedAt { get; set; }
     }

@@ -78,5 +78,22 @@ namespace HorseRacingAPI.Controllers
             ApiResponse<object> apiResponse = ApiResponse<object>.SuccessResponse(null!, "Update user profile successfully.");
             return Ok(apiResponse);
         }
+
+        [Authorize]
+        [HttpPut("image")]
+        public async Task<IActionResult> UploadImage(IFormFile file)
+        {
+            string tokenAccountId = HttpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? string.Empty;
+            if (!Guid.TryParse(tokenAccountId, out Guid accountId))
+            {
+                ApiResponse<object> errorResponse = ApiResponse<object>.FailResponse("Invalid token.");
+                return StatusCode(StatusCodes.Status401Unauthorized, errorResponse);
+            }
+
+            string imageUrl = await _userProfileService.UploadImageAsync(accountId, file);
+
+            ApiResponse<object> apiResponse = ApiResponse<object>.SuccessResponse(new { imageUrl }, "Upload image successfully.");
+            return Ok(apiResponse);
+        }
     }
 }
