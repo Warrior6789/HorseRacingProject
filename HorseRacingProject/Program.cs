@@ -13,6 +13,8 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 
 
+AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers()
@@ -60,12 +62,15 @@ builder.Services.AddDbContext<DbContext, HorseRacingDataContext>(options =>
     options.UseNpgsql(connectionString));
 
 builder.Services.AddScoped<IUnitofWork, UnitofWork>();
+builder.Services.AddScoped<ICloudinaryService, CloudinaryService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IUserProfileService, UserProfileService>();
 builder.Services.AddScoped<IJockeyProfileService, JockeyProfileService>();
 builder.Services.AddScoped<IAccountService, AccountService>();
 builder.Services.AddScoped<IRegistrationService, RegistrationService>();
 builder.Services.AddScoped<ITournamentService, TournamentService>();
+builder.Services.AddScoped<IRacecourseService, RacecourseService>();
+builder.Services.AddScoped<IRaceService, RaceService>();
 
 var jwtKey = builder.Configuration["Jwt:Key"]
     ?? throw new Exception("Missing System Config: Jwt:Key in appsettings.json");

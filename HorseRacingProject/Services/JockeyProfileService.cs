@@ -10,10 +10,12 @@ namespace HorseRacingAPI.Services
     public class JockeyProfileService : IJockeyProfileService
     {
         private readonly IUnitofWork _uow;
+        private readonly ICloudinaryService _cloudinaryService;
 
-        public JockeyProfileService(IUnitofWork uow)
+        public JockeyProfileService(IUnitofWork uow, ICloudinaryService cloudinaryService)
         {
             _uow = uow;
+            _cloudinaryService = cloudinaryService;
         }
 
         public async Task<JockeyProfileResponse> CreateJockeyProfileAsync(Guid accountId, JockeyProfileCreateRequest req)
@@ -67,6 +69,7 @@ namespace HorseRacingAPI.Services
                     LicenseNumber = p.LicenseNumber,
                     TotalRaces = p.TotalRaces,
                     TotalWins = p.TotalWins,
+                    ImageUrl = p.ImageUrl,
                     CreateAt = p.CreateAt,
                     UpdatedAt = p.UpdatedAt
                 }).ToListAsync();
@@ -90,6 +93,7 @@ namespace HorseRacingAPI.Services
                     LicenseNumber = p.LicenseNumber,
                     TotalRaces = p.TotalRaces,
                     TotalWins = p.TotalWins,
+                    ImageUrl = p.ImageUrl,
                     CreateAt = p.CreateAt,
                     UpdatedAt = p.UpdatedAt
                 }).FirstOrDefaultAsync();
@@ -137,8 +141,24 @@ namespace HorseRacingAPI.Services
             LicenseNumber = p.LicenseNumber,
             TotalRaces = p.TotalRaces,
             TotalWins = p.TotalWins,
+            ImageUrl = p.ImageUrl,
             CreateAt = p.CreateAt,
             UpdatedAt = p.UpdatedAt
         };
+
+        public async Task<string> UploadImageAsync(Guid accountId, IFormFile file)
+        {
+            IGenericRepository<JockeyProfile> jockeyProfileRepo = _uow.GetRepository<JockeyProfile>();
+            JockeyProfile? profile = await jockeyProfileRepo.Entities.FirstOrDefaultAsync(p => p.AccountId == accountId && !p.IsDeleted);
+            if (profile == null)
+            {
+                throw new KeyNotFoundException("JockeyProfile not found.");
+            }
+            string imageUrl = await _cloudinaryService.UploadImageAsync(file, "jockey-profiles");
+            profile.ImageUrl = imageUrl;
+            profile.UpdatedAt = DateTimeOffset.UtcNow;
+            await _uow.SaveAsync();
+            return imageUrl;
+        }
     }
 }

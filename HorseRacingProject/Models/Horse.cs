@@ -23,6 +23,8 @@ public partial class Horse
 
     public string? Color { get; set; }
 
+    public string? ImageUrl { get; set; }
+
     public DateTimeOffset? CreateAt { get; set; }
 
     public DateTimeOffset? UpdatedAt { get; set; }

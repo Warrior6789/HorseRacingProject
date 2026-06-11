@@ -8,5 +8,6 @@ namespace HorseRacingAPI.Services
         Task<JockeyProfileResponse> GetJockeyProfileByAccountIdAsync(Guid accountId);
         Task<List<JockeyProfileResponse>> GetAllJockeyProfilesAsync();
         Task UpdateJockeyProfileAsync(Guid accountId, JockeyProfileUpdateRequest req);
+        Task<string> UploadImageAsync(Guid accountId, IFormFile file);
     }
 }

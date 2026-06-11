@@ -10,9 +10,11 @@ namespace HorseRacingAPI.Services
     public class UserProfileService : IUserProfileService
     {
         private readonly IUnitofWork _uow;
-        public UserProfileService(IUnitofWork uow)
+        private readonly ICloudinaryService _cloudinaryService;
+        public UserProfileService(IUnitofWork uow, ICloudinaryService cloudinaryService)
         {
             _uow = uow;
+            _cloudinaryService = cloudinaryService;
         }
         public async Task<UserProfileResponse> CreateUserProfileAsync(Guid accountId, UserProfileCreateRequest req)
         {
@@ -120,6 +122,20 @@ namespace HorseRacingAPI.Services
             }
 
             userProfile.UpdatedAt = DateTimeOffset.UtcNow;
+        }
+
+        public async Task<string> UploadImageAsync(Guid accountId, IFormFile file)
+        {
+            IGenericRepository<UserProfile> userProfileRepo = _uow.GetRepository<UserProfile>();
+            UserProfile? userProfile = await userProfileRepo.Entities.FirstOrDefaultAsync(u => u.AccountId == accountId && !u.IsDeleted);
+            if (userProfile == null)
+            {
+                throw new KeyNotFoundException("User profile not found.");
+            }
+            string imageUrl = await _cloudinaryService.UploadImageAsync(file, "user-profiles");
+            userProfile.ImageUrl = imageUrl;
+            await _uow.SaveAsync();
+            return imageUrl;
         }
     }
 }

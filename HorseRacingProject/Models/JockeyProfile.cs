@@ -29,5 +29,7 @@ public partial class JockeyProfile
 
     public int? TotalWins { get; set; }
 
+    public string? ImageUrl { get; set; }
+
     public virtual Account Account { get; set; } = null!;
 }
