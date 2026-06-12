@@ -26,15 +26,16 @@ jobs:
 
       - name: Render PlantUML diagrams
         run: |
-          find HorseRacingProject/Docs -name "*.puml" -exec \
-            java -jar /tmp/plantuml.jar -v -tpng {} \;
+          mkdir -p HorseRacingProject/Docs/png
+          find HorseRacingProject/Docs/puml -name "*.puml" -exec \
+            java -jar /tmp/plantuml.jar -v -tpng -o "$(pwd)/HorseRacingProject/Docs/png" {} \;
 
       - name: Commit and Push
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
 
-          git add HorseRacingProject/Docs/*.png 2>/dev/null || true
+          git add HorseRacingProject/Docs/png/*.png 2>/dev/null || true
 
           if [ -n "$(git status --porcelain)" ]; then
             git commit -m "Bot: Automatically updated architecture diagrams [skip ci]"
