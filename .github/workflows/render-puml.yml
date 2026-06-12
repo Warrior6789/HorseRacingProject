@@ -13,18 +13,23 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: dev
+          token: ${{ secrets.GITHUB_TOKEN }}
 
-      # SỬA DÒNG NÀY: Chỉ định rõ vào đúng thư mục lồng chứa file .puml
-      - name: Process PlantUML Files
-        uses: cloudbees/plantuml-github-action@master
+      - name: Render PlantUML
+        uses: gruberma/plantuml-action-docker@v1
         with:
-          args: -v -tpng -o "" "HorseRacingProject/HorseRacingAPI/Docs/*.puml"
+          args: -v -tpng "HorseRacingProject/HorseRacingAPI/Docs/*.puml"
 
-      # SỬA DÒNG NÀY: Cho phép bot add tất cả file png được tạo ra
-      - name: Commit and Push the New Generated Images
+      - name: Commit and Push
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
-          git add HorseRacingProject/HorseRacingAPI/Docs/*.png
-          git diff-index --quiet HEAD || git commit -m "Bot: Automatically updated architecture diagrams [skip ci]"
-          git push origin dev
+          
+          git add "HorseRacingProject/HorseRacingAPI/Docs/*.png" || true
+          
+          if [ -n "$(git status --porcelain)" ]; then
+            git commit -m "Bot: Automatically updated architecture diagrams [skip ci]"
+            git push origin dev
+          else
+            echo "No changes to commit"
+          fi
