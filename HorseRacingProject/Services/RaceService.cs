@@ -201,6 +201,7 @@ public RaceService(IUnitofWork uow)
             if (request.MaxParticipants.HasValue)
                 race.MaxParticipants = request.MaxParticipants;
 
+            race.UpdatedAt = DateTimeOffset.UtcNow;
             await _uow.GetRepository<Race>().UpdateAsync(race);
             await _uow.SaveAsync();
 

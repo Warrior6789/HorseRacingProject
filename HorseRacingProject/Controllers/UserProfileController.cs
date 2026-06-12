@@ -69,7 +69,7 @@ namespace HorseRacingAPI.Controllers
                 string tokenAccountId = HttpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? string.Empty;
                 if(tokenAccountId != accountId.ToString())
                 {
-                    ApiResponse<object> forbiddenResponse = ApiResponse<object>.SuccessResponse(null!, "You do not have permission to modify this profile.");
+                    ApiResponse<object> forbiddenResponse = ApiResponse<object>.FailResponse("You do not have permission to modify this profile.");
                     return StatusCode(StatusCodes.Status403Forbidden, forbiddenResponse);
                 }
             }

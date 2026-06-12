@@ -66,6 +66,7 @@ namespace HorseRacingAPI.Services
                 FullName = u.FullName,
                 Phone = u.Phone,
                 Balance = u.Balance,
+                ImageUrl = u.ImageUrl,
                 CreateAt = u.CreateAt,
                 UpdatedAt = u.UpdatedAt,
             }).ToListAsync();
@@ -87,6 +88,7 @@ namespace HorseRacingAPI.Services
                     FullName = u.FullName,
                     Phone = u.Phone,
                     Balance = u.Balance,
+                    ImageUrl = u.ImageUrl,
                     CreateAt = u.CreateAt,
                     UpdatedAt = u.UpdatedAt,
                 }).FirstOrDefaultAsync();
@@ -122,6 +124,7 @@ namespace HorseRacingAPI.Services
             }
 
             userProfile.UpdatedAt = DateTimeOffset.UtcNow;
+            await _uow.SaveAsync();
         }
 
         public async Task<string> UploadImageAsync(Guid accountId, IFormFile file)
@@ -134,6 +137,7 @@ namespace HorseRacingAPI.Services
             }
             string imageUrl = await _cloudinaryService.UploadImageAsync(file, "user-profiles");
             userProfile.ImageUrl = imageUrl;
+            userProfile.UpdatedAt = DateTimeOffset.UtcNow;
             await _uow.SaveAsync();
             return imageUrl;
         }
