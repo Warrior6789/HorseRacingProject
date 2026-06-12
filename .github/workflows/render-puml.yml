@@ -8,6 +8,9 @@ on:
 jobs:
   render_diagrams:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
     steps:
       - name: Checkout Source Code
         uses: actions/checkout@v4
@@ -15,18 +18,24 @@ jobs:
           ref: dev
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Render PlantUML
-        uses: gruberma/plantuml-action-docker@v1
-        with:
-          args: -v -tpng "HorseRacingProject/HorseRacingAPI/Docs/*.puml"
+      - name: Install PlantUML dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y graphviz default-jre-headless
+          wget -q https://github.com/plantuml/plantuml/releases/latest/download/plantuml.jar -O /tmp/plantuml.jar
+
+      - name: Render PlantUML diagrams
+        run: |
+          find HorseRacingProject/Docs -name "*.puml" -exec \
+            java -jar /tmp/plantuml.jar -v -tpng {} \;
 
       - name: Commit and Push
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
-          
-          git add "HorseRacingProject/HorseRacingAPI/Docs/*.png" || true
-          
+
+          git add HorseRacingProject/Docs/*.png 2>/dev/null || true
+
           if [ -n "$(git status --porcelain)" ]; then
             git commit -m "Bot: Automatically updated architecture diagrams [skip ci]"
             git push origin dev
