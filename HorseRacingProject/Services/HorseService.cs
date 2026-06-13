@@ -10,6 +10,13 @@ namespace HorseRacingAPI.Services
 {
     public class HorseService : IHorseService
     {
+        private static readonly string[] InactiveRaceStatuses =
+        {
+            "Cancelled",
+            "Completed",
+            "Finished"
+        };
+
         private readonly IUnitofWork _uow;
 
         public HorseService(IUnitofWork uow)
@@ -145,6 +152,101 @@ namespace HorseRacingAPI.Services
             await _uow.SaveAsync();
         }
 
+        public async Task<List<HorseResponse>> GetActiveHorsesAsync(Guid accountId, bool isAdmin)
+        {
+            return await BuildHorseScope(accountId, isAdmin)
+                .Where(h => h.Status != null && h.Status.ToLower() == "active")
+                .OrderBy(h => h.HorseName)
+                .Select(h => new HorseResponse
+                {
+                    Id = h.Id,
+                    HorseName = h.HorseName,
+                    Age = h.Age,
+                    Breed = h.Breed,
+                    Weight = h.Weight,
+                    Status = h.Status,
+                    RecordWins = h.RecordWins,
+                    Color = h.Color
+                })
+                .ToListAsync();
+        }
+
+        public async Task<ActiveRunnersResponse> GetActiveRunnersStatsAsync(Guid accountId, bool isAdmin)
+        {
+            IQueryable<Horse> horseScope = BuildHorseScope(accountId, isAdmin);
+
+            IQueryable<Registration> activeRegistrations = BuildRegistrationScope(accountId, isAdmin)
+                .Where(r =>
+                    r.Status != "Rejected" &&
+                    r.Race.Status != null &&
+                    !InactiveRaceStatuses.Contains(r.Race.Status));
+
+            return new ActiveRunnersResponse
+            {
+                TotalHorses = await horseScope.CountAsync(),
+                ActiveRegistrations = await activeRegistrations.CountAsync(),
+                ActiveRunners = await activeRegistrations.Select(r => r.HorseId).Distinct().CountAsync()
+            };
+        }
+
+        public async Task<WinRateResponse> GetWinRateStatsAsync(Guid accountId, bool isAdmin)
+        {
+            IQueryable<RaceResult> resultScope = _uow.GetRepository<RaceResult>().Entities
+                .Where(r => !r.Registration.Horse.IsDeleted);
+
+            if (!isAdmin)
+                resultScope = resultScope.Where(r => r.Registration.Horse.OwnerId == accountId);
+
+            int totalRaces = await resultScope.CountAsync(r => r.IsDisqualified != true);
+            int totalWins = await resultScope.CountAsync(r => r.IsDisqualified != true && r.FinishPosition == 1);
+
+            return new WinRateResponse
+            {
+                TotalRaces = totalRaces,
+                TotalWins = totalWins,
+                WinRate = totalRaces == 0 ? 0 : Math.Round((double)totalWins / totalRaces * 100, 2)
+            };
+        }
+
+        public async Task<RecentRewardsResponse> GetRecentRewardsStatsAsync(Guid accountId, bool isAdmin)
+        {
+            IQueryable<Prize> rewardScope = _uow.GetRepository<Prize>().Entities
+                .Where(p => !p.Registration.Horse.IsDeleted);
+
+            if (!isAdmin)
+                rewardScope = rewardScope.Where(p => p.Registration.Horse.OwnerId == accountId);
+
+            decimal totalRewardAmount = await rewardScope.SumAsync(p => p.Amount ?? 0);
+            int rewardCount = await rewardScope.CountAsync();
+
+            List<RecentRewardItemResponse> recentRewards = await rewardScope
+                .OrderByDescending(p => p.DistributedAt ?? DateTimeOffset.MinValue)
+                .ThenByDescending(p => p.PrizeId)
+                .Take(10)
+                .Select(p => new RecentRewardItemResponse
+                {
+                    PrizeId = p.PrizeId,
+                    RegistrationId = p.RegistrationId,
+                    HorseId = p.Registration.HorseId,
+                    HorseName = p.Registration.Horse.HorseName,
+                    RaceId = p.Registration.RaceId,
+                    RaceNumber = p.Registration.Race.RaceNumber,
+                    TournamentId = p.Registration.Race.TournamentId,
+                    TournamentName = p.Registration.Race.Tournament.TournamentName,
+                    PrizeType = p.PrizeType,
+                    Amount = p.Amount,
+                    DistributedAt = p.DistributedAt
+                })
+                .ToListAsync();
+
+            return new RecentRewardsResponse
+            {
+                TotalRewardAmount = totalRewardAmount,
+                RewardCount = rewardCount,
+                RecentRewards = recentRewards
+            };
+        }
+
         public async Task<List<HorseScheduleResponse>> GetMyScheduleAsync(Guid ownerId)
         {
             return await BuildScheduleQuery()
@@ -165,6 +267,53 @@ namespace HorseRacingAPI.Services
                 .ToListAsync();
         }
 
+        public async Task<HorseRewardsResponse> GetHorseRewardsAsync(Guid horseId, Guid accountId, bool isAdmin, HorseRewardsQueryRequest query)
+        {
+            NormalizePaging(query);
+
+            Horse horse = await GetHorseEntityAsync(horseId, accountId, isAdmin);
+
+            IQueryable<Prize> rewardQuery = _uow.GetRepository<Prize>().Entities
+                .Where(p => p.Registration.HorseId == horseId && !p.Registration.Horse.IsDeleted);
+
+            int rewardCount = await rewardQuery.CountAsync();
+            decimal totalRewardAmount = await rewardQuery.SumAsync(p => p.Amount ?? 0);
+
+            List<HorseRewardItemResponse> items = await rewardQuery
+                .OrderByDescending(p => p.DistributedAt ?? DateTimeOffset.MinValue)
+                .ThenByDescending(p => p.PrizeId)
+                .Skip((query.Page - 1) * query.PageSize)
+                .Take(query.PageSize)
+                .Select(p => new HorseRewardItemResponse
+                {
+                    PrizeId = p.PrizeId,
+                    RegistrationId = p.RegistrationId,
+                    RaceId = p.Registration.RaceId,
+                    RaceNumber = p.Registration.Race.RaceNumber,
+                    TournamentId = p.Registration.Race.TournamentId,
+                    TournamentName = p.Registration.Race.Tournament.TournamentName,
+                    PrizeType = p.PrizeType,
+                    Amount = p.Amount,
+                    DistributedAt = p.DistributedAt
+                })
+                .ToListAsync();
+
+            return new HorseRewardsResponse
+            {
+                HorseId = horse.Id,
+                HorseName = horse.HorseName,
+                TotalRewardAmount = totalRewardAmount,
+                RewardCount = rewardCount,
+                Rewards = new PagedResponse<HorseRewardItemResponse>
+                {
+                    Items = items,
+                    Page = query.Page,
+                    PageSize = query.PageSize,
+                    TotalCount = rewardCount
+                }
+            };
+        }
+
         private IQueryable<Horse> BuildHorseScope(Guid accountId, bool isAdmin)
         {
             IQueryable<Horse> query = _uow.GetRepository<Horse>().Entities
@@ -172,6 +321,17 @@ namespace HorseRacingAPI.Services
 
             if (!isAdmin)
                 query = query.Where(h => h.OwnerId == accountId);
+
+            return query;
+        }
+
+        private IQueryable<Registration> BuildRegistrationScope(Guid accountId, bool isAdmin)
+        {
+            IQueryable<Registration> query = _uow.GetRepository<Registration>().Entities
+                .Where(r => !r.Horse.IsDeleted && !r.Race.IsDeleted);
+
+            if (!isAdmin)
+                query = query.Where(r => r.Horse.OwnerId == accountId);
 
             return query;
         }
@@ -225,6 +385,18 @@ namespace HorseRacingAPI.Services
                 query.PageSize = 100;
         }
 
+        private static void NormalizePaging(HorseRewardsQueryRequest query)
+        {
+            if (query.Page < 1)
+                query.Page = 1;
+
+            if (query.PageSize < 1)
+                query.PageSize = 10;
+
+            if (query.PageSize > 100)
+                query.PageSize = 100;
+        }
+
         private static HorseDetailResponse MapToResponse(Horse horse) => new HorseDetailResponse
         {
             Id = horse.Id,
@@ -261,5 +433,6 @@ namespace HorseRacingAPI.Services
             TournamentId = registration.Race.TournamentId,
             TournamentName = registration.Race.Tournament.TournamentName
         };
+
     }
 }

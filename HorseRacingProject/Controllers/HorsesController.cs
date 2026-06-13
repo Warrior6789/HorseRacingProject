@@ -29,6 +29,46 @@ namespace HorseRacingAPI.Controllers
             return Ok(ApiResponse<PagedResponse<HorseDetailResponse>>.SuccessResponse(horses, "Get horses successfully."));
         }
 
+        [HttpGet("active")]
+        public async Task<IActionResult> GetActiveHorses()
+        {
+            Guid accountId = GetAccountIdFromToken();
+            bool isAdmin = IsAdmin();
+
+            List<HorseResponse> horses = await _horseService.GetActiveHorsesAsync(accountId, isAdmin);
+            return Ok(ApiResponse<List<HorseResponse>>.SuccessResponse(horses, "Get active horses successfully."));
+        }
+
+        [HttpGet("stats/active-runners")]
+        public async Task<IActionResult> GetActiveRunnersStats()
+        {
+            Guid accountId = GetAccountIdFromToken();
+            bool isAdmin = IsAdmin();
+
+            ActiveRunnersResponse response = await _horseService.GetActiveRunnersStatsAsync(accountId, isAdmin);
+            return Ok(ApiResponse<ActiveRunnersResponse>.SuccessResponse(response, "Get active runners successfully."));
+        }
+
+        [HttpGet("stats/win-rate")]
+        public async Task<IActionResult> GetWinRateStats()
+        {
+            Guid accountId = GetAccountIdFromToken();
+            bool isAdmin = IsAdmin();
+
+            WinRateResponse response = await _horseService.GetWinRateStatsAsync(accountId, isAdmin);
+            return Ok(ApiResponse<WinRateResponse>.SuccessResponse(response, "Get win rate successfully."));
+        }
+
+        [HttpGet("stats/recent-rewards")]
+        public async Task<IActionResult> GetRecentRewardsStats()
+        {
+            Guid accountId = GetAccountIdFromToken();
+            bool isAdmin = IsAdmin();
+
+            RecentRewardsResponse response = await _horseService.GetRecentRewardsStatsAsync(accountId, isAdmin);
+            return Ok(ApiResponse<RecentRewardsResponse>.SuccessResponse(response, "Get recent rewards successfully."));
+        }
+
         [Authorize(Roles = "HorseOwner")]
         [HttpGet("my-schedule")]
         public async Task<IActionResult> GetMySchedule()
@@ -86,6 +126,16 @@ namespace HorseRacingAPI.Controllers
 
             List<HorseScheduleResponse> schedule = await _horseService.GetHorseScheduleAsync(horseId, accountId, isAdmin);
             return Ok(ApiResponse<List<HorseScheduleResponse>>.SuccessResponse(schedule, "Get horse schedule successfully."));
+        }
+
+        [HttpGet("{horseId:guid}/rewards")]
+        public async Task<IActionResult> GetHorseRewards(Guid horseId, [FromQuery] HorseRewardsQueryRequest query)
+        {
+            Guid accountId = GetAccountIdFromToken();
+            bool isAdmin = IsAdmin();
+
+            HorseRewardsResponse rewards = await _horseService.GetHorseRewardsAsync(horseId, accountId, isAdmin, query);
+            return Ok(ApiResponse<HorseRewardsResponse>.SuccessResponse(rewards, "Get horse rewards successfully."));
         }
 
         private Guid GetAccountIdFromToken()
