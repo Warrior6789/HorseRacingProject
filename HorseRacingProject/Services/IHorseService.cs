@@ -10,9 +10,6 @@ namespace HorseRacingAPI.Services
         Task<HorseDetailResponse> UpdateHorseAsync(Guid horseId, Guid accountId, bool isAdmin, HorseUpdateRequest request);
         Task DeleteHorseAsync(Guid horseId, Guid accountId, bool isAdmin);
         Task<List<HorseResponse>> GetActiveHorsesAsync(Guid accountId, bool isAdmin);
-        Task<ActiveRunnersResponse> GetActiveRunnersStatsAsync(Guid accountId, bool isAdmin);
-        Task<WinRateResponse> GetWinRateStatsAsync(Guid accountId, bool isAdmin);
-        Task<RecentRewardsResponse> GetRecentRewardsStatsAsync(Guid accountId, bool isAdmin);
         Task<List<HorseScheduleResponse>> GetMyScheduleAsync(Guid ownerId);
         Task<List<HorseScheduleResponse>> GetHorseScheduleAsync(Guid horseId, Guid accountId, bool isAdmin);
         Task<HorseRewardsResponse> GetHorseRewardsAsync(Guid horseId, Guid accountId, bool isAdmin, HorseRewardsQueryRequest query);
