@@ -94,6 +94,7 @@ namespace HorseRacingAPI.Services
                 Status = string.IsNullOrWhiteSpace(request.Status) ? HorseStatus.Healthy.ToString() : request.Status,
                 RecordWins = request.RecordWins ?? 0,
                 Color = request.Color,
+                ImageUrl = request.ImageUrl,
                 CreateAt = DateTimeOffset.UtcNow,
                 UpdatedAt = DateTimeOffset.UtcNow,
                 IsDeleted = false
@@ -159,7 +160,8 @@ namespace HorseRacingAPI.Services
                     Weight = h.Weight,
                     Status = h.Status,
                     RecordWins = h.RecordWins,
-                    Color = h.Color
+                    Color = h.Color,
+                    ImageUrl = h.ImageUrl
                 })
                 .ToListAsync();
         }
@@ -314,6 +316,7 @@ namespace HorseRacingAPI.Services
             Status = horse.Status,
             RecordWins = horse.RecordWins,
             Color = horse.Color,
+            ImageUrl = horse.ImageUrl,
             CreateAt = horse.CreateAt,
             UpdatedAt = horse.UpdatedAt
         };

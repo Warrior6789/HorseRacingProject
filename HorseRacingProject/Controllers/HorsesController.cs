@@ -13,10 +13,12 @@ namespace HorseRacingAPI.Controllers
     public class HorsesController : ControllerBase
     {
         private readonly IHorseService _horseService;
+        private readonly IHorseImageStorageService _horseImageStorageService;
 
-        public HorsesController(IHorseService horseService)
+        public HorsesController(IHorseService horseService, IHorseImageStorageService horseImageStorageService)
         {
             _horseService = horseService;
+            _horseImageStorageService = horseImageStorageService;
         }
 
         [HttpGet]
@@ -59,10 +61,14 @@ namespace HorseRacingAPI.Controllers
         }
 
         [HttpPost]
-        public async Task<IActionResult> CreateHorse([FromBody] HorseCreateRequest request)
+        [Consumes("multipart/form-data")]
+        public async Task<IActionResult> CreateHorse([FromForm] HorseCreateRequest request)
         {
             Guid accountId = GetAccountIdFromToken();
             bool isAdmin = IsAdmin();
+
+            if (request.Image != null)
+                request.ImageUrl = await _horseImageStorageService.SaveImageAsync(request.Image);
 
             HorseDetailResponse horse = await _horseService.CreateHorseAsync(accountId, isAdmin, request);
             return StatusCode(StatusCodes.Status201Created, ApiResponse<HorseDetailResponse>.SuccessResponse(horse, "Horse created successfully."));

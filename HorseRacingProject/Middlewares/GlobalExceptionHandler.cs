@@ -37,10 +37,6 @@ namespace HorseRacingAPI.Middlewares
                     statusCode = HttpStatusCode.BadRequest;
                     message = exception.Message;
                     break;
-                case ForbiddenAccessException:
-                    statusCode = HttpStatusCode.Forbidden;
-                    message = exception.Message;
-                    break;
                 case UnauthorizedAccessException:
                     statusCode = HttpStatusCode.Unauthorized;
                     message = exception.Message;

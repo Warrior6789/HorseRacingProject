@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.Http;
 
 namespace HorseRacingAPI.Dtos
 {
@@ -26,5 +27,10 @@ namespace HorseRacingAPI.Dtos
 
         [MaxLength(20)]
         public string? Color { get; set; }
+
+        [MaxLength(500)]
+        public string? ImageUrl { get; set; }
+
+        public IFormFile? Image { get; set; }
     }
 }
