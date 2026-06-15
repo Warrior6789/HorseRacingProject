@@ -16,6 +16,8 @@ namespace HorseRacingAPI.Controllers
             _raceService = raceService;
         }
 
+      
+
         [HttpGet]
         public async Task<IActionResult> GetRaces(
             [FromQuery] int page = 1,
@@ -35,12 +37,44 @@ namespace HorseRacingAPI.Controllers
             return Ok(ApiResponse<RaceResponse>.SuccessResponse(result, "Get race successfully."));
         }
 
+        [HttpGet("upcoming")]
+        public async Task<IActionResult> GetUpcomingRaces(
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 10,
+            [FromQuery] string? status = null)
+        {
+            List<string>? statuses = status?
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .ToList();
+
+            PagedResponse<UpcomingRaceResponse> result = await _raceService.GetUpcomingRacesAsync(page, pageSize, statuses);
+            return Ok(ApiResponse<PagedResponse<UpcomingRaceResponse>>.SuccessResponse(result, "Get upcoming races successfully."));
+        }
+
         [HttpGet("tournament/{tournamentId}")]
         public async Task<IActionResult> GetRacesByTournament(Guid tournamentId)
         {
             List<RaceResponse> result = await _raceService.GetRacesByTournamentAsync(tournamentId);
             return Ok(ApiResponse<List<RaceResponse>>.SuccessResponse(result, "Get races by tournament successfully."));
         }
+
+      
+
+        [HttpGet("{raceId}/horses")]
+        public async Task<IActionResult> GetRaceHorses(Guid raceId)
+        {
+            List<RaceResultHorseDto> result = await _raceService.GetRaceHorsesAsync(raceId);
+            return Ok(ApiResponse<List<RaceResultHorseDto>>.SuccessResponse(result, "Get race horses successfully."));
+        }
+
+        [HttpGet("{raceId}/results")]
+        public async Task<IActionResult> GetRaceResults(Guid raceId)
+        {
+            List<RaceResultResponse> result = await _raceService.GetRaceResultsAsync(raceId);
+            return Ok(ApiResponse<List<RaceResultResponse>>.SuccessResponse(result, "Get race results successfully."));
+        }
+
+        
 
         [Authorize(Roles = "Admin")]
         [HttpPost]
@@ -66,7 +100,8 @@ namespace HorseRacingAPI.Controllers
             return Ok(ApiResponse<object>.SuccessResponse("Race deleted successfully."));
         }
 
-[Authorize(Roles = "HorseOwner")]
+
+        [Authorize(Roles = "HorseOwner")]
         [HttpPost("{raceId}/register")]
         public async Task<IActionResult> RegisterHorse(Guid raceId, [FromBody] RegisterHorseToRaceRequest request)
         {
@@ -74,6 +109,7 @@ namespace HorseRacingAPI.Controllers
             RegistrationResponse result = await _raceService.RegisterHorseAsync(raceId, ownerId, request);
             return Ok(ApiResponse<RegistrationResponse>.SuccessResponse(result, "Horse registered successfully."));
         }
+
 
         private Guid GetAccountIdFromToken()
         {

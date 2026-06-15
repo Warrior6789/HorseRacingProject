@@ -10,6 +10,9 @@ namespace HorseRacingAPI.Services
         Task<RaceResponse> CreateRaceAsync(CreateRaceRequest request);
         Task<RaceResponse> UpdateRaceAsync(Guid raceId, UpdateRaceRequest request);
         Task DeleteRaceAsync(Guid raceId);
-Task<RegistrationResponse> RegisterHorseAsync(Guid raceId, Guid ownerId, RegisterHorseToRaceRequest request);
+        Task<RegistrationResponse> RegisterHorseAsync(Guid raceId, Guid ownerId, RegisterHorseToRaceRequest request);
+        Task<PagedResponse<UpcomingRaceResponse>> GetUpcomingRacesAsync(int page, int pageSize, List<string>? statuses);
+Task<List<RaceResultResponse>> GetRaceResultsAsync(Guid raceId);
+        Task<List<RaceResultHorseDto>> GetRaceHorsesAsync(Guid raceId);
     }
 }
