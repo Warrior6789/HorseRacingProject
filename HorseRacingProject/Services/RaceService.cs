@@ -473,6 +473,52 @@ public async Task<List<RaceResultResponse>> GetRaceResultsAsync(Guid raceId)
                 .ToListAsync();
         }
 
+        public async Task<RaceResponse> AdvanceRaceStatusAsync(Guid raceId)
+        {
+            Race? race = await _uow.GetRepository<Race>().Entities
+                .Include(r => r.Racecourse)
+                .Include(r => r.Tournament)
+                .FirstOrDefaultAsync(r => r.RaceId == raceId && !r.IsDeleted);
+
+            if (race == null)
+                throw new KeyNotFoundException($"Race with id {raceId} not found.");
+
+            string? nextStatus = race.Status switch
+            {
+                "Scheduled" => "BettingOpen",
+                "BettingOpen" => "BettingClosed",
+                "BettingClosed" => "Live",
+                _ => null
+            };
+
+            if (nextStatus == null)
+                throw new InvalidOperationException($"Race is in '{race.Status}' status and cannot be advanced.");
+
+            if (nextStatus == "Live")
+            {
+                int confirmedCount = await _uow.GetRepository<Registration>().Entities
+                    .CountAsync(r => r.RaceId == raceId && r.Status == "Confirmed");
+
+                if (confirmedCount == 0)
+                    throw new InvalidOperationException("Race must have at least one confirmed registration before going Live.");
+
+                bool otherRaceLive = await _uow.GetRepository<Race>().Entities
+                    .AnyAsync(r => r.RacecourseId == race.RacecourseId
+                                && r.RaceId != raceId
+                                && r.Status == "Live"
+                                && !r.IsDeleted);
+
+                if (otherRaceLive)
+                    throw new InvalidOperationException("Another race at the same racecourse is currently Live.");
+            }
+
+            race.Status = nextStatus;
+            await _uow.GetRepository<Race>().UpdateAsync(race);
+            await _uow.SaveAsync();
+
+            return MapToResponse(race);
+        }
+
         private static RaceResponse MapToResponse(Race race) => new RaceResponse
         {
             RaceId = race.RaceId,

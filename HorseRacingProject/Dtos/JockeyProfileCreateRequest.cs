@@ -6,5 +6,6 @@ namespace HorseRacingAPI.Dtos
         public DateOnly? DateOfBirth { get; set; }
         public string? Nationality { get; set; }
         public string? LicenseNumber { get; set; }
+        public IFormFile? Image { get; set; }
     }
 }

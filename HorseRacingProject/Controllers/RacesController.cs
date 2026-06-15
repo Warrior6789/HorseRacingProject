@@ -93,6 +93,14 @@ namespace HorseRacingAPI.Controllers
         }
 
         [Authorize(Roles = "Admin")]
+        [HttpPost("{raceId}/advance")]
+        public async Task<IActionResult> AdvanceRaceStatus(Guid raceId)
+        {
+            RaceResponse result = await _raceService.AdvanceRaceStatusAsync(raceId);
+            return Ok(ApiResponse<RaceResponse>.SuccessResponse(result, $"Race advanced to '{result.Status}' successfully."));
+        }
+
+        [Authorize(Roles = "Admin")]
         [HttpDelete("{raceId}")]
         public async Task<IActionResult> DeleteRace(Guid raceId)
         {

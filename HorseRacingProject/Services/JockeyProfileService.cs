@@ -34,6 +34,10 @@ namespace HorseRacingAPI.Services
             if (existingCount > 0)
                 throw new InvalidOperationException("A jockey profile already exists for this account.");
 
+            string? imageUrl = null;
+            if (req.Image != null)
+                imageUrl = await _cloudinaryService.UploadImageAsync(req.Image, "jockey-profiles");
+
             JockeyProfile jockeyProfile = new JockeyProfile
             {
                 JockeyProfileId = Guid.NewGuid(),
@@ -42,6 +46,7 @@ namespace HorseRacingAPI.Services
                 DateOfBirth = req.DateOfBirth,
                 Nationality = req.Nationality,
                 LicenseNumber = req.LicenseNumber,
+                ImageUrl = imageUrl,
                 TotalRaces = 0,
                 TotalWins = 0,
                 CreateAt = DateTimeOffset.UtcNow,

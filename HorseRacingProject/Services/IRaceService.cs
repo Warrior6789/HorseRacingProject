@@ -14,5 +14,6 @@ namespace HorseRacingAPI.Services
         Task<PagedResponse<UpcomingRaceResponse>> GetUpcomingRacesAsync(int page, int pageSize, List<string>? statuses);
 Task<List<RaceResultResponse>> GetRaceResultsAsync(Guid raceId);
         Task<List<RaceResultHorseDto>> GetRaceHorsesAsync(Guid raceId);
+        Task<RaceResponse> AdvanceRaceStatusAsync(Guid raceId);
     }
 }

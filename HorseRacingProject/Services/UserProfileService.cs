@@ -31,12 +31,17 @@ namespace HorseRacingAPI.Services
             {
                 throw new InvalidOperationException("A profile already exists for this account.");
             }
+            string? imageUrl = null;
+            if (req.Image != null)
+                imageUrl = await _cloudinaryService.UploadImageAsync(req.Image, "user-profiles");
+
             UserProfile userProfile = new UserProfile
             {
                 ProfileId = Guid.NewGuid(),
                 AccountId = accountId,
                 FullName = req.FullName,
                 Phone = req.Phone,
+                ImageUrl = imageUrl,
                 Balance = 0,
                 CreateAt = DateTimeOffset.UtcNow,
                 UpdatedAt = DateTimeOffset.UtcNow,

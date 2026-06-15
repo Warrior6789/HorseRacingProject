@@ -22,7 +22,7 @@ namespace HorseRacingAPI.Controllers
 
         [Authorize]
         [HttpPost]
-        public async Task<IActionResult> CreateUserProfile([FromBody] UserProfileCreateRequest req)
+        public async Task<IActionResult> CreateUserProfile([FromForm] UserProfileCreateRequest req)
         {
             string tokenAccountId = HttpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? string.Empty;
             if (!Guid.TryParse(tokenAccountId, out Guid accountId))
