@@ -21,6 +21,10 @@ namespace HorseRacingAPI.Middlewares
 
             switch (exception)
             {
+                case ForbiddenAccessException:
+                    statusCode = HttpStatusCode.Forbidden;
+                    message = exception.Message;
+                    break;
                 case InvalidOperationException:
                     statusCode = HttpStatusCode.BadRequest;
                     message = exception.Message;
