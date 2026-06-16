@@ -32,6 +32,9 @@ namespace HorseRacingAPI.Services
 
         public async Task<PagedResponse<RacecourseResponse>> GetAllRacecoursesPagingAsync(int page, int pageSize)
         {
+            if (page < 1) page = 1;
+            if (pageSize < 1) pageSize = 10;
+            if (pageSize > 100) pageSize = 100;
             IGenericRepository<Racecourse> repo = _uow.GetRepository<Racecourse>();
 
             IEnumerable<RacecourseResponse> items = await repo.FindAsync(
@@ -67,13 +70,7 @@ namespace HorseRacingAPI.Services
             if (racecourse == null || racecourse.IsDeleted)
                 throw new KeyNotFoundException($"Racecourse with id {id} not found.");
 
-            return new RacecourseResponse
-            {
-                RacecourseId = racecourse.Id,
-                RacecourseName = racecourse.RacecourseName,
-                Location = racecourse.Location,
-                TrackType = racecourse.TrackType
-            };
+            return MapToResponse(racecourse);
         }
 
         public async Task<RacecourseResponse> CreateRacecourseAsync(CreateRacecourseRequest request)
@@ -90,13 +87,7 @@ namespace HorseRacingAPI.Services
             await repo.AddAsync(racecourse);
             await _uow.SaveAsync();
 
-            return new RacecourseResponse
-            {
-                RacecourseId = racecourse.Id,
-                RacecourseName = racecourse.RacecourseName,
-                Location = racecourse.Location,
-                TrackType = racecourse.TrackType
-            };
+            return MapToResponse(racecourse);
         }
 
         public async Task<RacecourseResponse> UpdateRacecourseAsync(Guid id, UpdateRacecourseRequest request)
@@ -119,13 +110,7 @@ namespace HorseRacingAPI.Services
             await repo.UpdateAsync(racecourse);
             await _uow.SaveAsync();
 
-            return new RacecourseResponse
-            {
-                RacecourseId = racecourse.Id,
-                RacecourseName = racecourse.RacecourseName,
-                Location = racecourse.Location,
-                TrackType = racecourse.TrackType
-            };
+            return MapToResponse(racecourse);
         }
 
         public async Task<bool> DeleteRacecourseAsync(Guid id)
@@ -144,5 +129,13 @@ namespace HorseRacingAPI.Services
 
             return true;
         }
+
+        private static RacecourseResponse MapToResponse(Racecourse r) => new RacecourseResponse
+        {
+            RacecourseId = r.Id,
+            RacecourseName = r.RacecourseName,
+            Location = r.Location,
+            TrackType = r.TrackType
+        };
     }
 }

@@ -7,7 +7,7 @@ public partial class ConversionRate
 {
     public Guid ConversionRateId { get; set; }
 
-    public float ConversionRate1 { get; set; }
+    public float RateValue { get; set; }
 
     public string? Status { get; set; }
 

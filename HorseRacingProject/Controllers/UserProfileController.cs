@@ -1,4 +1,4 @@
-﻿using Guid = System.Guid;
+using Guid = System.Guid;
 using HorseRacingAPI.Dtos;
 using HorseRacingAPI.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -24,15 +24,8 @@ namespace HorseRacingAPI.Controllers
         [HttpPost]
         public async Task<IActionResult> CreateUserProfile([FromForm] UserProfileCreateRequest req)
         {
-            string tokenAccountId = HttpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? string.Empty;
-            if (!Guid.TryParse(tokenAccountId, out Guid accountId))
-            {
-                ApiResponse<object> errorResponse = ApiResponse<object>.FailResponse("Invalid token.");
-                return StatusCode(StatusCodes.Status401Unauthorized, errorResponse);
-            }
-
+            Guid accountId = GetAccountIdFromToken();
             UserProfileResponse response = await _userProfileService.CreateUserProfileAsync(accountId, req);
-
             ApiResponse<UserProfileResponse> apiResponse = ApiResponse<UserProfileResponse>.SuccessResponse(response, "Create user profile successfully.");
             return StatusCode(StatusCodes.Status201Created, apiResponse);
         }
@@ -42,7 +35,6 @@ namespace HorseRacingAPI.Controllers
         public async Task<IActionResult> GetAllUserProfiles()
         {
             List<UserProfileResponse> profiles = await _userProfileService.GetAllUserProfilesAsync();
-
             ApiResponse<List<UserProfileResponse>> apiResponse = ApiResponse<List<UserProfileResponse>>.SuccessResponse(profiles, "Get all user profiles successfully.");
             return Ok(apiResponse);
         }
@@ -59,13 +51,7 @@ namespace HorseRacingAPI.Controllers
         [HttpGet("my")]
         public async Task<IActionResult> GetMyProfile()
         {
-            string tokenAccountId = HttpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? string.Empty;
-            if (!Guid.TryParse(tokenAccountId, out Guid accountId))
-            {
-                ApiResponse<object> errorResponse = ApiResponse<object>.FailResponse("Invalid token.");
-                return StatusCode(StatusCodes.Status401Unauthorized, errorResponse);
-            }
-
+            Guid accountId = GetAccountIdFromToken();
             UserProfileResponse response = await _userProfileService.GetUserProfileByIdAsync(accountId);
             return Ok(ApiResponse<UserProfileResponse>.SuccessResponse(response, "Get my profile successfully."));
         }
@@ -75,7 +61,6 @@ namespace HorseRacingAPI.Controllers
         public async Task<IActionResult> GetUserProfileById(Guid accountId)
         {
             UserProfileResponse response = await _userProfileService.GetUserProfileByIdAsync(accountId);
-
             ApiResponse<UserProfileResponse> apiResponse = ApiResponse<UserProfileResponse>.SuccessResponse(response, "Get user profile details successfully.");
             return Ok(apiResponse);
         }
@@ -85,19 +70,17 @@ namespace HorseRacingAPI.Controllers
         public async Task<IActionResult> UpdateUserProfile(Guid accountId, [FromBody] UserProfileUpdateRequest req)
         {
             string userRole = HttpContext.User.FindFirst(ClaimTypes.Role)?.Value ?? string.Empty;
-            if(userRole == AccountRole.Spectator.ToString() ||
-            userRole == AccountRole.Jockey.ToString() ||
-            userRole == AccountRole.HorseOwner.ToString())
+            if (userRole == AccountRole.Spectator.ToString() ||
+                userRole == AccountRole.Jockey.ToString() ||
+                userRole == AccountRole.HorseOwner.ToString())
             {
-                string tokenAccountId = HttpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? string.Empty;
-                if(tokenAccountId != accountId.ToString())
+                if (GetAccountIdFromToken() != accountId)
                 {
                     ApiResponse<object> forbiddenResponse = ApiResponse<object>.FailResponse("You do not have permission to modify this profile.");
                     return StatusCode(StatusCodes.Status403Forbidden, forbiddenResponse);
                 }
             }
             await _userProfileService.UpdateUserProfileAsync(accountId, req);
-
             ApiResponse<object> apiResponse = ApiResponse<object>.SuccessResponse(null!, "Update user profile successfully.");
             return Ok(apiResponse);
         }
@@ -106,17 +89,18 @@ namespace HorseRacingAPI.Controllers
         [HttpPut("image")]
         public async Task<IActionResult> UploadImage(IFormFile file)
         {
-            string tokenAccountId = HttpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? string.Empty;
-            if (!Guid.TryParse(tokenAccountId, out Guid accountId))
-            {
-                ApiResponse<object> errorResponse = ApiResponse<object>.FailResponse("Invalid token.");
-                return StatusCode(StatusCodes.Status401Unauthorized, errorResponse);
-            }
-
+            Guid accountId = GetAccountIdFromToken();
             string imageUrl = await _userProfileService.UploadImageAsync(accountId, file);
-
             ApiResponse<object> apiResponse = ApiResponse<object>.SuccessResponse(new { imageUrl }, "Upload image successfully.");
             return Ok(apiResponse);
+        }
+
+        private Guid GetAccountIdFromToken()
+        {
+            string? value = HttpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (!Guid.TryParse(value, out Guid accountId))
+                throw new UnauthorizedAccessException("Invalid token.");
+            return accountId;
         }
     }
 }

@@ -13,6 +13,15 @@ namespace HorseRacingAPI.Services
         private readonly IUnitofWork _uow;
         private readonly RaceEngineService _engine;
 
+        private static readonly Dictionary<string, double> _gradePurseRatio = new()
+        {
+            ["G1"]     = 0.50,
+            ["G2"]     = 0.30,
+            ["G3"]     = 0.15,
+            ["Listed"] = 0.05,
+            ["Open"]   = 0.03
+        };
+
         public RaceService(IUnitofWork uow, RaceEngineService engine)
         {
             _uow = uow;
@@ -47,6 +56,7 @@ namespace HorseRacingAPI.Services
                     TrackLength = r.TrackLength,
                     MaxParticipants = r.MaxParticipants,
                     Status = r.Status,
+                    Grade = r.Grade,
                     RacecourseName = r.Racecourse.RacecourseName,
                     Location = r.Racecourse.Location,
                     Tournament = new TournamentResponse
@@ -56,7 +66,8 @@ namespace HorseRacingAPI.Services
                         Description = r.Tournament.Description,
                         StartDate = r.Tournament.StartDate,
                         EndDate = r.Tournament.EndDate,
-                        Status = r.Tournament.Status
+                        Status = r.Tournament.Status,
+                        FundsPrize = r.Tournament.FundsPrize
                     }
                 },
                 pageIndex: page - 1,
@@ -103,6 +114,7 @@ namespace HorseRacingAPI.Services
                     TrackLength = r.TrackLength,
                     MaxParticipants = r.MaxParticipants,
                     Status = r.Status,
+                    Grade = r.Grade,
                     RacecourseName = r.Racecourse.RacecourseName,
                     Location = r.Racecourse.Location,
                     Tournament = new TournamentResponse
@@ -112,7 +124,8 @@ namespace HorseRacingAPI.Services
                         Description = r.Tournament.Description,
                         StartDate = r.Tournament.StartDate,
                         EndDate = r.Tournament.EndDate,
-                        Status = r.Tournament.Status
+                        Status = r.Tournament.Status,
+                        FundsPrize = r.Tournament.FundsPrize
                     }
                 })
                 .ToListAsync();
@@ -140,6 +153,20 @@ namespace HorseRacingAPI.Services
             if (duplicate)
                 throw new InvalidOperationException($"Race number {request.RaceNumber} already exists in this tournament.");
 
+            List<string?> existingGrades = await _uow.GetRepository<Race>().Entities
+                .Where(r => r.TournamentId == request.TournamentId && !r.IsDeleted && r.Status != "Cancelled")
+                .Select(r => r.Grade)
+                .ToListAsync();
+
+            decimal totalExpected = existingGrades
+                .Sum(g => tournament.FundsPrize * (decimal)_gradePurseRatio.GetValueOrDefault(g ?? "Open", 0.03));
+
+            decimal newRacePurse = tournament.FundsPrize * (decimal)_gradePurseRatio.GetValueOrDefault(request.Grade.ToString(), 0.03);
+
+            if (totalExpected + newRacePurse > tournament.FundsPrize)
+                throw new InvalidOperationException(
+                    $"Cannot create race. Total expected prize ({totalExpected + newRacePurse:N0}) would exceed tournament funds ({tournament.FundsPrize:N0}).");
+
             Race? latestRace = await _uow.GetRepository<Race>().Entities
                 .Where(r => r.RacecourseId == request.RacecourseId
                     && r.Status != "Cancelled"
@@ -162,6 +189,7 @@ namespace HorseRacingAPI.Services
                 StartTime = request.StartTime,
                 TrackLength = request.TrackLength,
                 MaxParticipants = request.MaxParticipants,
+                Grade = request.Grade.ToString(),
                 Status = RaceStatus.Scheduled.ToString(),
                 CreateAt = DateTimeOffset.UtcNow,
                 IsDeleted = false
@@ -239,6 +267,9 @@ namespace HorseRacingAPI.Services
 
             if (request.MaxParticipants.HasValue)
                 race.MaxParticipants = request.MaxParticipants;
+
+            if (request.Grade != null)
+                race.Grade = request.Grade.ToString();
 
             await _uow.GetRepository<Race>().UpdateAsync(race);
             await _uow.SaveAsync();
@@ -603,6 +634,7 @@ public async Task<List<RaceResultResponse>> GetRaceResultsAsync(Guid raceId)
             TrackLength = race.TrackLength,
             MaxParticipants = race.MaxParticipants,
             Status = race.Status,
+            Grade = race.Grade,
             RacecourseName = race.Racecourse?.RacecourseName,
             Location = race.Racecourse?.Location,
             Tournament = race.Tournament == null ? null : new TournamentResponse
@@ -612,7 +644,8 @@ public async Task<List<RaceResultResponse>> GetRaceResultsAsync(Guid raceId)
                 Description = race.Tournament.Description,
                 StartDate = race.Tournament.StartDate,
                 EndDate = race.Tournament.EndDate,
-                Status = race.Tournament.Status
+                Status = race.Tournament.Status,
+                FundsPrize = race.Tournament.FundsPrize
             }
         };
     }

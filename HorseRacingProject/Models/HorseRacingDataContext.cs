@@ -19,6 +19,8 @@ public partial class HorseRacingDataContext : DbContext
 
     public virtual DbSet<Bet> Bets { get; set; }
 
+    public virtual DbSet<BetPayoutConfig> BetPayoutConfigs { get; set; }
+
     public virtual DbSet<ConversionRate> ConversionRates { get; set; }
 
     public virtual DbSet<Horse> Horses { get; set; }
@@ -42,10 +44,6 @@ public partial class HorseRacingDataContext : DbContext
     public virtual DbSet<Tournament> Tournaments { get; set; }
 
     public virtual DbSet<UserProfile> UserProfiles { get; set; }
-
-    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-    {
-    }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -108,7 +106,7 @@ public partial class HorseRacingDataContext : DbContext
             entity.Property(e => e.ConversionRateId)
                 .HasDefaultValueSql("gen_random_uuid()")
                 .HasColumnName("ConversionRateID");
-            entity.Property(e => e.ConversionRate1).HasColumnName("ConversionRate");
+            entity.Property(e => e.RateValue).HasColumnName("RateValue");
             entity.Property(e => e.Status).HasMaxLength(20);
         });
 
@@ -209,6 +207,7 @@ public partial class HorseRacingDataContext : DbContext
             entity.Property(e => e.RacecourseId).HasColumnName("RacecourseID");
             entity.Property(e => e.Status).HasMaxLength(20);
             entity.Property(e => e.TournamentId).HasColumnName("TournamentID");
+            entity.Property(e => e.Grade).HasMaxLength(20).HasColumnName("Grade");
 
             entity.HasOne(d => d.Racecourse).WithMany(p => p.Races)
                 .HasForeignKey(d => d.RacecourseId)
@@ -271,6 +270,11 @@ public partial class HorseRacingDataContext : DbContext
                 .HasForeignKey(d => d.RefereeId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_RefereeReports_Account");
+
+            entity.HasOne(d => d.Registration).WithMany()
+                .HasForeignKey(d => d.RegistrationId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_RefereeReports_Registrations");
         });
 
         modelBuilder.Entity<Registration>(entity =>
@@ -315,6 +319,7 @@ public partial class HorseRacingDataContext : DbContext
             entity.Property(e => e.CreateAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
             entity.Property(e => e.Status).HasMaxLength(20);
             entity.Property(e => e.TournamentName).HasMaxLength(150);
+            entity.Property(e => e.FundsPrize).HasPrecision(18, 2).HasColumnName("FundsPrize");
         });
 
         modelBuilder.Entity<UserProfile>(entity =>

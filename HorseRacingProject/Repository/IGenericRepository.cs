@@ -25,7 +25,8 @@ namespace HorseRacingAPI.Repositories
             Func<IQueryable<T>, IOrderedQueryable<T>>? orderBy,
             Expression<Func<T, TResult>> selector,
             int pageIndex = 0,
-            int pageSize = 10);
+            int pageSize = 10,
+            Func<IQueryable<T>, IQueryable<T>>? include = null);
 
        
 

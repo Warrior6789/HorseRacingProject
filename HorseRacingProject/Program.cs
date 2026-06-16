@@ -90,6 +90,8 @@ builder.Services.AddScoped<IRacecourseService, RacecourseService>();
 builder.Services.AddScoped<IRaceService, RaceService>();
 builder.Services.AddScoped<IPaymentService, PaymentService>();
 builder.Services.AddScoped<IBetService, BetService>();
+builder.Services.AddScoped<IBetPayoutConfigService, BetPayoutConfigService>();
+builder.Services.AddScoped<IConversionRateService, ConversionRateService>();
 builder.Services.AddSingleton<RaceEngineService>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<RaceEngineService>());
 
