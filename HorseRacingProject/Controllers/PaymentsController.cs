@@ -35,7 +35,7 @@ public class PaymentsController : ControllerBase
     }
 
     [Authorize]
-    [HttpGet("history")]
+    [HttpGet("history/paged")]
     public async Task<IActionResult> GetHistory(
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 10)

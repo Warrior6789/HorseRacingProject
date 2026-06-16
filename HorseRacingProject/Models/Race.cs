@@ -25,6 +25,8 @@ public partial class Race
 
     public bool IsDeleted { get; set; }
 
+    public DateTimeOffset? EndTime { get; set; }
+
     public DateTimeOffset? DeletedAt { get; set; }
 
     public virtual Racecourse Racecourse { get; set; } = null!;

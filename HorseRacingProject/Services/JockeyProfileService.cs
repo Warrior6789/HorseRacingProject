@@ -34,6 +34,10 @@ namespace HorseRacingAPI.Services
             if (existingCount > 0)
                 throw new InvalidOperationException("A jockey profile already exists for this account.");
 
+            string? imageUrl = null;
+            if (req.Image != null)
+                imageUrl = await _cloudinaryService.UploadImageAsync(req.Image, "jockey-profiles");
+
             JockeyProfile jockeyProfile = new JockeyProfile
             {
                 JockeyProfileId = Guid.NewGuid(),
@@ -42,6 +46,7 @@ namespace HorseRacingAPI.Services
                 DateOfBirth = req.DateOfBirth,
                 Nationality = req.Nationality,
                 LicenseNumber = req.LicenseNumber,
+                ImageUrl = imageUrl,
                 TotalRaces = 0,
                 TotalWins = 0,
                 CreateAt = DateTimeOffset.UtcNow,
@@ -73,6 +78,32 @@ namespace HorseRacingAPI.Services
                     CreateAt = p.CreateAt,
                     UpdatedAt = p.UpdatedAt
                 }).ToListAsync();
+        }
+
+        public async Task<PagedResponse<JockeyProfileResponse>> GetAllJockeyProfilesPagedAsync(int page, int pageSize)
+        {
+            IGenericRepository<JockeyProfile> repo = _uow.GetRepository<JockeyProfile>();
+            IQueryable<JockeyProfile> query = repo.Entities.Where(p => !p.IsDeleted);
+            int totalCount = await query.CountAsync();
+            List<JockeyProfileResponse> items = await query
+                .OrderBy(p => p.CreateAt)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(p => new JockeyProfileResponse
+                {
+                    JockeyProfileId = p.JockeyProfileId,
+                    AccountId = p.AccountId,
+                    FullName = p.FullName,
+                    DateOfBirth = p.DateOfBirth,
+                    Nationality = p.Nationality,
+                    LicenseNumber = p.LicenseNumber,
+                    TotalRaces = p.TotalRaces,
+                    TotalWins = p.TotalWins,
+                    ImageUrl = p.ImageUrl,
+                    CreateAt = p.CreateAt,
+                    UpdatedAt = p.UpdatedAt
+                }).ToListAsync();
+            return new PagedResponse<JockeyProfileResponse> { Items = items, Page = page, PageSize = pageSize, TotalCount = totalCount };
         }
 
         public async Task<JockeyProfileResponse> GetJockeyProfileByAccountIdAsync(Guid accountId)

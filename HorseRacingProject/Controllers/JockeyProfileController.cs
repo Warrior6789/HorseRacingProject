@@ -20,7 +20,7 @@ namespace HorseRacingAPI.Controllers
 
         [Authorize]
         [HttpPost]
-        public async Task<IActionResult> CreateJockeyProfile([FromBody] JockeyProfileCreateRequest req)
+        public async Task<IActionResult> CreateJockeyProfile([FromForm] JockeyProfileCreateRequest req)
         {
             string tokenAccountId = HttpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? string.Empty;
             if (!Guid.TryParse(tokenAccountId, out Guid accountId))
@@ -43,6 +43,29 @@ namespace HorseRacingAPI.Controllers
 
             ApiResponse<List<JockeyProfileResponse>> apiResponse = ApiResponse<List<JockeyProfileResponse>>.SuccessResponse(profiles, "Get all jockey profiles successfully.");
             return Ok(apiResponse);
+        }
+
+        [Authorize(Roles = "Admin")]
+        [HttpGet("paged")]
+        public async Task<IActionResult> GetAllJockeyProfilesPaged([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
+        {
+            PagedResponse<JockeyProfileResponse> result = await _jockeyProfileService.GetAllJockeyProfilesPagedAsync(page, pageSize);
+            return Ok(ApiResponse<PagedResponse<JockeyProfileResponse>>.SuccessResponse(result, "Get all jockey profiles successfully."));
+        }
+
+        [Authorize]
+        [HttpGet("my")]
+        public async Task<IActionResult> GetMyProfile()
+        {
+            string tokenAccountId = HttpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? string.Empty;
+            if (!Guid.TryParse(tokenAccountId, out Guid accountId))
+            {
+                ApiResponse<object> errorResponse = ApiResponse<object>.FailResponse("Invalid token.");
+                return StatusCode(StatusCodes.Status401Unauthorized, errorResponse);
+            }
+
+            JockeyProfileResponse response = await _jockeyProfileService.GetJockeyProfileByAccountIdAsync(accountId);
+            return Ok(ApiResponse<JockeyProfileResponse>.SuccessResponse(response, "Get my profile successfully."));
         }
 
         [Authorize]

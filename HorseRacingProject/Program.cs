@@ -1,5 +1,6 @@
 using Guid = System.Guid;
 using HorseRacingAPI.Dtos;
+using HorseRacingAPI.Hubs;
 using HorseRacingAPI.Middlewares;
 using HorseRacingAPI.Models;
 using HorseRacingAPI.Repository;
@@ -16,6 +17,20 @@ using System.Text.Json.Serialization;
 AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("FrontendPolicy", policy =>
+    {
+        policy.WithOrigins("http://localhost:3000", "http://localhost:5173"
+            )
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials();
+    });
+});
+
+builder.Services.AddSignalR();
 
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
@@ -74,9 +89,9 @@ builder.Services.AddScoped<ITournamentService, TournamentService>();
 builder.Services.AddScoped<IRacecourseService, RacecourseService>();
 builder.Services.AddScoped<IRaceService, RaceService>();
 builder.Services.AddScoped<IPaymentService, PaymentService>();
-builder.Services.AddScoped<IHorseService, HorseService>();
-builder.Services.AddHttpContextAccessor();
-builder.Services.AddScoped<IHorseImageStorageService, LocalHorseImageStorageService>();
+builder.Services.AddScoped<IBetService, BetService>();
+builder.Services.AddSingleton<RaceEngineService>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<RaceEngineService>());
 
 var jwtKey = builder.Configuration["Jwt:Key"]
     ?? throw new Exception("Missing System Config: Jwt:Key in appsettings.json");
@@ -102,6 +117,14 @@ builder.Services.AddAuthentication(options =>
 
     options.Events = new JwtBearerEvents
     {
+        OnMessageReceived = context =>
+        {
+            string? accessToken = context.Request.Query["access_token"];
+            PathString path = context.HttpContext.Request.Path;
+            if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/racehub"))
+                context.Token = accessToken;
+            return Task.CompletedTask;
+        },
         OnChallenge = async context =>
         {
             context.HandleResponse();
@@ -137,12 +160,15 @@ if (app.Environment.IsDevelopment())
     });
 }
 
-app.UseHttpsRedirection();
-app.UseStaticFiles();
+app.UseCors("FrontendPolicy");
+
+if (!app.Environment.IsDevelopment())
+    app.UseHttpsRedirection();
 
 app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapHub<RaceHub>("/racehub");
 
 app.Run();
