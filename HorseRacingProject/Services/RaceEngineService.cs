@@ -301,23 +301,26 @@ namespace HorseRacingAPI.Services
             await uow.SaveAsync();
         }
 
-        private static readonly Dictionary<string, double> _gradePurseRatio = new()
-        {
-            ["G1"]     = 0.50,
-            ["G2"]     = 0.30,
-            ["G3"]     = 0.15,
-            ["Listed"] = 0.05,
-            ["Open"]   = 0.03
-        };
-
-        private static readonly double[] _positionRatios = [0.60, 0.20, 0.10, 0.05, 0.03, 0.02];
-
         private async Task DistributePrizesAsync(IUnitofWork uow, Race race, List<Registration> sortedRegs)
         {
             Tournament? tournament = await uow.GetRepository<Tournament>().Entities
                 .FirstOrDefaultAsync(t => t.Id == race.TournamentId);
 
             if (tournament == null || tournament.FundsPrize <= 0) return;
+
+            GradePurseConfig? gradeConfig = await uow.GetRepository<GradePurseConfig>().Entities
+                .FirstOrDefaultAsync(c => c.Status == "Active");
+            PositionPrizeConfig? posConfig = await uow.GetRepository<PositionPrizeConfig>().Entities
+                .FirstOrDefaultAsync(c => c.Status == "Active");
+            JockeyRewardConfig? jockeyConfig = await uow.GetRepository<JockeyRewardConfig>().Entities
+                .FirstOrDefaultAsync(c => c.Status == "Active");
+
+            if (gradeConfig == null || posConfig == null || jockeyConfig == null) return;
+
+            race.GradePurseConfigId = gradeConfig.GradePurseConfigId;
+            race.PositionPrizeConfigId = posConfig.PositionPrizeConfigId;
+            race.JockeyRewardConfigId = jockeyConfig.JockeyRewardConfigId;
+            await uow.GetRepository<Race>().UpdateAsync(race);
 
             decimal alreadyDistributed = await uow.GetRepository<Prize>().Entities
                 .Include(p => p.Registration).ThenInclude(r => r.Race)
@@ -327,17 +330,30 @@ namespace HorseRacingAPI.Services
             decimal remaining = tournament.FundsPrize - alreadyDistributed;
             if (remaining <= 0) return;
 
-            double gradeRatio = _gradePurseRatio.GetValueOrDefault(race.Grade ?? "Open", 0.03);
-            decimal racePurse = Math.Min(tournament.FundsPrize * (decimal)gradeRatio, remaining);
+            double gradeRatio = race.Grade switch
+            {
+                "G1"     => gradeConfig.G1Ratio,
+                "G2"     => gradeConfig.G2Ratio,
+                "G3"     => gradeConfig.G3Ratio,
+                "Listed" => gradeConfig.ListedRatio,
+                _        => gradeConfig.OpenRatio
+            };
 
+            double[] positionRatios =
+            [
+                posConfig.Pos1Ratio, posConfig.Pos2Ratio, posConfig.Pos3Ratio,
+                posConfig.Pos4Ratio, posConfig.Pos5Ratio, posConfig.Pos6Ratio
+            ];
+
+            decimal racePurse = Math.Min(tournament.FundsPrize * (decimal)gradeRatio, remaining);
             if (racePurse <= 0) return;
 
-            for (int i = 0; i < sortedRegs.Count && i < _positionRatios.Length; i++)
+            for (int i = 0; i < sortedRegs.Count && i < positionRatios.Length; i++)
             {
                 Registration reg = sortedRegs[i];
                 int position = i + 1;
-                decimal positionPrize = racePurse * (decimal)_positionRatios[i];
-                decimal jockeyAmount = positionPrize * (position == 1 ? 0.10m : 0.05m);
+                decimal positionPrize = racePurse * (decimal)positionRatios[i];
+                decimal jockeyAmount = positionPrize * (decimal)(position == 1 ? jockeyConfig.WinCut : jockeyConfig.PlaceCut);
                 decimal ownerAmount = positionPrize - jockeyAmount;
 
                 await uow.GetRepository<Prize>().AddAsync(new Prize

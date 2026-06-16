@@ -23,6 +23,12 @@ public partial class HorseRacingDataContext : DbContext
 
     public virtual DbSet<ConversionRate> ConversionRates { get; set; }
 
+    public virtual DbSet<GradePurseConfig> GradePurseConfigs { get; set; }
+
+    public virtual DbSet<JockeyRewardConfig> JockeyRewardConfigs { get; set; }
+
+    public virtual DbSet<PositionPrizeConfig> PositionPrizeConfigs { get; set; }
+
     public virtual DbSet<Horse> Horses { get; set; }
 
     public virtual DbSet<JockeyProfile> JockeyProfiles { get; set; }
@@ -218,6 +224,21 @@ public partial class HorseRacingDataContext : DbContext
                 .HasForeignKey(d => d.TournamentId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_Races_Tournaments");
+
+            entity.HasOne(d => d.GradePurseConfig).WithMany(p => p.Races)
+                .HasForeignKey(d => d.GradePurseConfigId)
+                .OnDelete(DeleteBehavior.SetNull)
+                .HasConstraintName("FK_Races_GradePurseConfigs");
+
+            entity.HasOne(d => d.PositionPrizeConfig).WithMany(p => p.Races)
+                .HasForeignKey(d => d.PositionPrizeConfigId)
+                .OnDelete(DeleteBehavior.SetNull)
+                .HasConstraintName("FK_Races_PositionPrizeConfigs");
+
+            entity.HasOne(d => d.JockeyRewardConfig).WithMany(p => p.Races)
+                .HasForeignKey(d => d.JockeyRewardConfigId)
+                .OnDelete(DeleteBehavior.SetNull)
+                .HasConstraintName("FK_Races_JockeyRewardConfigs");
         });
 
         modelBuilder.Entity<RaceResult>(entity =>

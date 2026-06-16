@@ -13,15 +13,6 @@ namespace HorseRacingAPI.Services
         private readonly IUnitofWork _uow;
         private readonly RaceEngineService _engine;
 
-        private static readonly Dictionary<string, double> _gradePurseRatio = new()
-        {
-            ["G1"]     = 0.50,
-            ["G2"]     = 0.30,
-            ["G3"]     = 0.15,
-            ["Listed"] = 0.05,
-            ["Open"]   = 0.03
-        };
-
         public RaceService(IUnitofWork uow, RaceEngineService engine)
         {
             _uow = uow;
@@ -153,15 +144,20 @@ namespace HorseRacingAPI.Services
             if (duplicate)
                 throw new InvalidOperationException($"Race number {request.RaceNumber} already exists in this tournament.");
 
+            GradePurseConfig? gradeConfig = await _uow.GetRepository<GradePurseConfig>().Entities
+                .FirstOrDefaultAsync(c => c.Status == "Active");
+            if (gradeConfig == null)
+                throw new InvalidOperationException("No active grade purse config found. Please contact admin.");
+
             List<string?> existingGrades = await _uow.GetRepository<Race>().Entities
                 .Where(r => r.TournamentId == request.TournamentId && !r.IsDeleted && r.Status != "Cancelled")
                 .Select(r => r.Grade)
                 .ToListAsync();
 
             decimal totalExpected = existingGrades
-                .Sum(g => tournament.FundsPrize * (decimal)_gradePurseRatio.GetValueOrDefault(g ?? "Open", 0.03));
+                .Sum(g => tournament.FundsPrize * (decimal)GetGradeRatio(gradeConfig, g ?? "Open"));
 
-            decimal newRacePurse = tournament.FundsPrize * (decimal)_gradePurseRatio.GetValueOrDefault(request.Grade.ToString(), 0.03);
+            decimal newRacePurse = tournament.FundsPrize * (decimal)GetGradeRatio(gradeConfig, request.Grade.ToString());
 
             if (totalExpected + newRacePurse > tournament.FundsPrize)
                 throw new InvalidOperationException(
@@ -625,6 +621,15 @@ public async Task<List<RaceResultResponse>> GetRaceResultsAsync(Guid raceId)
 
             return MapToResponse(race);
         }
+
+        private static float GetGradeRatio(GradePurseConfig config, string grade) => grade switch
+        {
+            "G1"     => config.G1Ratio,
+            "G2"     => config.G2Ratio,
+            "G3"     => config.G3Ratio,
+            "Listed" => config.ListedRatio,
+            _        => config.OpenRatio
+        };
 
         private static RaceResponse MapToResponse(Race race) => new RaceResponse
         {

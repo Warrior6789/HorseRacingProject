@@ -31,7 +31,19 @@ public partial class Race
 
     public DateTimeOffset? DeletedAt { get; set; }
 
+    public Guid? GradePurseConfigId { get; set; }
+
+    public Guid? PositionPrizeConfigId { get; set; }
+
+    public Guid? JockeyRewardConfigId { get; set; }
+
     public virtual Racecourse Racecourse { get; set; } = null!;
+
+    public virtual GradePurseConfig? GradePurseConfig { get; set; }
+
+    public virtual PositionPrizeConfig? PositionPrizeConfig { get; set; }
+
+    public virtual JockeyRewardConfig? JockeyRewardConfig { get; set; }
 
     public virtual ICollection<RefereeReport> RefereeReports { get; set; } = new List<RefereeReport>();
 
