@@ -14,6 +14,7 @@ namespace HorseRacingAPI.Services
         private readonly Dictionary<Guid, double> _angles = new();
         private readonly Dictionary<Guid, double> _baseSpeeds = new();
         private readonly Dictionary<Guid, double> _momentum = new();
+        private readonly Dictionary<Guid, DateTimeOffset> _finishTimes = new();
         private readonly Random _random = new();
 
         public RaceEngineService(IHubContext<RaceHub> hubContext, IServiceScopeFactory factory)
@@ -160,7 +161,12 @@ namespace HorseRacingAPI.Services
 
                         int lap = (int)((currentAngle - Math.PI) / (2 * Math.PI));
 
-                        if (isFinished) finishedCount++;
+                        if (isFinished)
+                        {
+                            finishedCount++;
+                            if (!_finishTimes.ContainsKey(registration.HorseId))
+                                _finishTimes[registration.HorseId] = DateTimeOffset.UtcNow;
+                        }
 
                         horseStates.Add(new
                         {
@@ -193,11 +199,18 @@ namespace HorseRacingAPI.Services
 
                         for (int i = 0; i < sortedRegs.Count; i++)
                         {
+                            Registration reg = sortedRegs[i];
+                            int? finishMs = null;
+                            if (race.StartTime.HasValue && _finishTimes.TryGetValue(reg.HorseId, out DateTimeOffset ft))
+                                finishMs = (int)(ft - race.StartTime.Value).TotalMilliseconds;
+
                             var result = new RaceResult
                             {
                                 ResultId = Guid.NewGuid(),
-                                RegistrationId = sortedRegs[i].RegistrationId,
+                                RegistrationId = reg.RegistrationId,
                                 FinishPosition = i + 1,
+                                FinishTime = finishMs,
+                                IsDisqualified = false,
                                 CreateAt = DateTimeOffset.UtcNow
                             };
                             await uow.GetRepository<RaceResult>().AddAsync(result);
@@ -205,6 +218,7 @@ namespace HorseRacingAPI.Services
 
                         await uow.SaveAsync();
                         await SettleBetsAsync(uow, race.RaceId, sortedRegs);
+                        await DistributePrizesAsync(uow, race, sortedRegs);
 
                         await _hubContext.Clients.Group($"race-{race.RaceId}")
                             .SendAsync("RaceUpdate", new
@@ -235,6 +249,7 @@ namespace HorseRacingAPI.Services
                 _angles.Remove(id);
                 _baseSpeeds.Remove(id);
                 _momentum.Remove(id);
+                _finishTimes.Remove(id);
             }
         }
 
@@ -280,6 +295,85 @@ namespace HorseRacingAPI.Services
                         profile.UpdatedAt = DateTimeOffset.UtcNow;
                         await uow.GetRepository<UserProfile>().UpdateAsync(profile);
                     }
+                }
+            }
+
+            await uow.SaveAsync();
+        }
+
+        private static readonly Dictionary<string, double> _gradePurseRatio = new()
+        {
+            ["G1"]     = 0.50,
+            ["G2"]     = 0.30,
+            ["G3"]     = 0.15,
+            ["Listed"] = 0.05,
+            ["Open"]   = 0.03
+        };
+
+        private static readonly double[] _positionRatios = [0.60, 0.20, 0.10, 0.05, 0.03, 0.02];
+
+        private async Task DistributePrizesAsync(IUnitofWork uow, Race race, List<Registration> sortedRegs)
+        {
+            Tournament? tournament = await uow.GetRepository<Tournament>().Entities
+                .FirstOrDefaultAsync(t => t.Id == race.TournamentId);
+
+            if (tournament == null || tournament.FundsPrize <= 0) return;
+
+            decimal alreadyDistributed = await uow.GetRepository<Prize>().Entities
+                .Include(p => p.Registration).ThenInclude(r => r.Race)
+                .Where(p => p.Registration.Race.TournamentId == race.TournamentId)
+                .SumAsync(p => p.Amount ?? 0);
+
+            decimal remaining = tournament.FundsPrize - alreadyDistributed;
+            if (remaining <= 0) return;
+
+            double gradeRatio = _gradePurseRatio.GetValueOrDefault(race.Grade ?? "Open", 0.03);
+            decimal racePurse = Math.Min(tournament.FundsPrize * (decimal)gradeRatio, remaining);
+
+            if (racePurse <= 0) return;
+
+            for (int i = 0; i < sortedRegs.Count && i < _positionRatios.Length; i++)
+            {
+                Registration reg = sortedRegs[i];
+                int position = i + 1;
+                decimal positionPrize = racePurse * (decimal)_positionRatios[i];
+                decimal jockeyAmount = positionPrize * (position == 1 ? 0.10m : 0.05m);
+                decimal ownerAmount = positionPrize - jockeyAmount;
+
+                await uow.GetRepository<Prize>().AddAsync(new Prize
+                {
+                    PrizeId = Guid.NewGuid(),
+                    RegistrationId = reg.RegistrationId,
+                    PrizeType = "Owner",
+                    Amount = ownerAmount,
+                    DistributedAt = DateTimeOffset.UtcNow
+                });
+
+                await uow.GetRepository<Prize>().AddAsync(new Prize
+                {
+                    PrizeId = Guid.NewGuid(),
+                    RegistrationId = reg.RegistrationId,
+                    PrizeType = "Jockey",
+                    Amount = jockeyAmount,
+                    DistributedAt = DateTimeOffset.UtcNow
+                });
+
+                UserProfile? ownerProfile = await uow.GetRepository<UserProfile>().Entities
+                    .FirstOrDefaultAsync(p => p.AccountId == reg.Horse.OwnerId && !p.IsDeleted);
+                if (ownerProfile != null)
+                {
+                    ownerProfile.Balance = (ownerProfile.Balance ?? 0) + (long)ownerAmount;
+                    ownerProfile.UpdatedAt = DateTimeOffset.UtcNow;
+                    await uow.GetRepository<UserProfile>().UpdateAsync(ownerProfile);
+                }
+
+                UserProfile? jockeyProfile = await uow.GetRepository<UserProfile>().Entities
+                    .FirstOrDefaultAsync(p => p.AccountId == reg.JockeyId && !p.IsDeleted);
+                if (jockeyProfile != null)
+                {
+                    jockeyProfile.Balance = (jockeyProfile.Balance ?? 0) + (long)jockeyAmount;
+                    jockeyProfile.UpdatedAt = DateTimeOffset.UtcNow;
+                    await uow.GetRepository<UserProfile>().UpdateAsync(jockeyProfile);
                 }
             }
 

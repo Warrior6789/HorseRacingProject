@@ -153,7 +153,7 @@ namespace HorseRacingAPI.Services
             if (conversionRate == null)
                 throw new KeyNotFoundException("Conversion rate not found.");
 
-            long balanceToAdd = (long)(payment.Amount * (decimal)conversionRate.ConversionRate1);
+            long balanceToAdd = (long)(payment.Amount * (decimal)conversionRate.RateValue);
             long currentBalance = profile.Balance ?? 0;
             profile.Balance = currentBalance + balanceToAdd;
 

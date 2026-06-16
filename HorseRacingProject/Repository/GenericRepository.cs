@@ -54,19 +54,19 @@ namespace HorseRacingAPI.Repositories
             Func<IQueryable<T>, IOrderedQueryable<T>>? orderBy,
             Expression<Func<T, TResult>> selector,
             int pageIndex = 0,
-            int pageSize = 10)
+            int pageSize = 10,
+            Func<IQueryable<T>, IQueryable<T>>? include = null)
         {
             IQueryable<T> query = _dbSet;
 
+            if (include != null)
+                query = include(query);
+
             if (predicate != null)
-            {
                 query = query.Where(predicate);
-            }
 
             if (orderBy != null)
-            {
                 query = orderBy(query);
-            }
 
             return await query.Skip(pageIndex * pageSize)
                               .Take(pageSize)

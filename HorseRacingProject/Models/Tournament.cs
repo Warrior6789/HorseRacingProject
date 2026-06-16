@@ -17,6 +17,8 @@ public partial class Tournament
 
     public string? Status { get; set; }
 
+    public decimal FundsPrize { get; set; }
+
     public DateTimeOffset? CreateAt { get; set; }
 
     public bool IsDeleted { get; set; }

@@ -8,6 +8,7 @@
         public float? TrackLength { get; set; }
         public int? MaxParticipants { get; set; }
         public string? Status { get; set; }
+        public string? Grade { get; set; }
         public string? RacecourseName { get; set; }
         public string? Location { get; set; }
         public TournamentResponse? Tournament { get; set; }

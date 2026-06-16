@@ -49,16 +49,7 @@ namespace HorseRacingAPI.Services
             };
             await userProfileRepo.AddAsync(userProfile);
             await _uow.SaveAsync();
-            return new UserProfileResponse
-            {
-                ProfileId = userProfile.ProfileId,
-                AccountId = userProfile.AccountId,
-                FullName = userProfile.FullName,
-                Phone = userProfile.Phone,
-                Balance = userProfile.Balance,
-                CreateAt = userProfile.CreateAt,
-                UpdatedAt = userProfile.UpdatedAt
-            };
+            return MapToResponse(userProfile);
         }
 
         public async Task<List<UserProfileResponse>> GetAllUserProfilesAsync()
@@ -79,14 +70,15 @@ namespace HorseRacingAPI.Services
 
         public async Task<PagedResponse<UserProfileResponse>> GetAllUserProfilesPagedAsync(int page, int pageSize)
         {
+            if (page < 1) page = 1;
+            if (pageSize < 1) pageSize = 10;
+            if (pageSize > 100) pageSize = 100;
             IGenericRepository<UserProfile> userProfileRepo = _uow.GetRepository<UserProfile>();
-            IQueryable<UserProfile> query = userProfileRepo.Entities;
-            int totalCount = await query.CountAsync();
-            List<UserProfileResponse> items = await query
-                .OrderBy(u => u.CreateAt)
-                .Skip((page - 1) * pageSize)
-                .Take(pageSize)
-                .Select(u => new UserProfileResponse
+            int totalCount = await userProfileRepo.Entities.CountAsync();
+            IEnumerable<UserProfileResponse> items = await userProfileRepo.FindAsync<UserProfileResponse>(
+                predicate: null,
+                orderBy: q => q.OrderBy(u => u.CreateAt),
+                selector: u => new UserProfileResponse
                 {
                     ProfileId = u.ProfileId,
                     AccountId = u.AccountId,
@@ -96,8 +88,10 @@ namespace HorseRacingAPI.Services
                     ImageUrl = u.ImageUrl,
                     CreateAt = u.CreateAt,
                     UpdatedAt = u.UpdatedAt,
-                }).ToListAsync();
-            return new PagedResponse<UserProfileResponse> { Items = items, Page = page, PageSize = pageSize, TotalCount = totalCount };
+                },
+                pageIndex: page - 1,
+                pageSize: pageSize);
+            return new PagedResponse<UserProfileResponse> { Items = items.ToList(), Page = page, PageSize = pageSize, TotalCount = totalCount };
         }
 
         public async Task<UserProfileResponse> GetUserProfileByIdAsync(Guid accountId)
@@ -154,6 +148,18 @@ namespace HorseRacingAPI.Services
             userProfile.UpdatedAt = DateTimeOffset.UtcNow;
             await _uow.SaveAsync();
         }
+
+        private static UserProfileResponse MapToResponse(UserProfile u) => new UserProfileResponse
+        {
+            ProfileId = u.ProfileId,
+            AccountId = u.AccountId,
+            FullName = u.FullName,
+            Phone = u.Phone,
+            Balance = u.Balance,
+            ImageUrl = u.ImageUrl,
+            CreateAt = u.CreateAt,
+            UpdatedAt = u.UpdatedAt
+        };
 
         public async Task<string> UploadImageAsync(Guid accountId, IFormFile file)
         {

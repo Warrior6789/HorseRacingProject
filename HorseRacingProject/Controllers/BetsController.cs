@@ -22,7 +22,7 @@ namespace HorseRacingAPI.Controllers
         [HttpPost]
         public async Task<IActionResult> PlaceBet([FromBody] PlaceBetRequest req)
         {
-            Guid spectatorId = GetAccountId();
+            Guid spectatorId = GetAccountIdFromToken();
             BetResponse result = await _betService.PlaceBetAsync(spectatorId, req);
             return StatusCode(StatusCodes.Status201Created,
                 ApiResponse<BetResponse>.SuccessResponse(result, "Bet placed successfully."));
@@ -33,7 +33,7 @@ namespace HorseRacingAPI.Controllers
         [HttpGet("my")]
         public async Task<IActionResult> GetMyBets()
         {
-            Guid spectatorId = GetAccountId();
+            Guid spectatorId = GetAccountIdFromToken();
             List<BetResponse> result = await _betService.GetMyBetsAsync(spectatorId);
             return Ok(ApiResponse<List<BetResponse>>.SuccessResponse(result, "Get bets successfully."));
         }
@@ -42,12 +42,12 @@ namespace HorseRacingAPI.Controllers
         [HttpGet("my/paged")]
         public async Task<IActionResult> GetMyBetsPaged([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
         {
-            Guid spectatorId = GetAccountId();
+            Guid spectatorId = GetAccountIdFromToken();
             PagedResponse<BetResponse> result = await _betService.GetMyBetsPagedAsync(spectatorId, page, pageSize);
             return Ok(ApiResponse<PagedResponse<BetResponse>>.SuccessResponse(result, "Get bets successfully."));
         }
 
-        private Guid GetAccountId()
+        private Guid GetAccountIdFromToken()
         {
             string? value = HttpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (!Guid.TryParse(value, out Guid id))

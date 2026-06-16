@@ -21,6 +21,8 @@ public partial class Race
 
     public string? Status { get; set; }
 
+    public string Grade { get; set; } = "Open";
+
     public DateTimeOffset? CreateAt { get; set; }
 
     public bool IsDeleted { get; set; }

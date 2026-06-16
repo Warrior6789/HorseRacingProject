@@ -82,14 +82,15 @@ namespace HorseRacingAPI.Services
 
         public async Task<PagedResponse<JockeyProfileResponse>> GetAllJockeyProfilesPagedAsync(int page, int pageSize)
         {
+            if (page < 1) page = 1;
+            if (pageSize < 1) pageSize = 10;
+            if (pageSize > 100) pageSize = 100;
             IGenericRepository<JockeyProfile> repo = _uow.GetRepository<JockeyProfile>();
-            IQueryable<JockeyProfile> query = repo.Entities.Where(p => !p.IsDeleted);
-            int totalCount = await query.CountAsync();
-            List<JockeyProfileResponse> items = await query
-                .OrderBy(p => p.CreateAt)
-                .Skip((page - 1) * pageSize)
-                .Take(pageSize)
-                .Select(p => new JockeyProfileResponse
+            int totalCount = await repo.Entities.CountAsync(p => !p.IsDeleted);
+            IEnumerable<JockeyProfileResponse> items = await repo.FindAsync<JockeyProfileResponse>(
+                predicate: p => !p.IsDeleted,
+                orderBy: q => q.OrderBy(p => p.CreateAt),
+                selector: p => new JockeyProfileResponse
                 {
                     JockeyProfileId = p.JockeyProfileId,
                     AccountId = p.AccountId,
@@ -102,8 +103,10 @@ namespace HorseRacingAPI.Services
                     ImageUrl = p.ImageUrl,
                     CreateAt = p.CreateAt,
                     UpdatedAt = p.UpdatedAt
-                }).ToListAsync();
-            return new PagedResponse<JockeyProfileResponse> { Items = items, Page = page, PageSize = pageSize, TotalCount = totalCount };
+                },
+                pageIndex: page - 1,
+                pageSize: pageSize);
+            return new PagedResponse<JockeyProfileResponse> { Items = items.ToList(), Page = page, PageSize = pageSize, TotalCount = totalCount };
         }
 
         public async Task<JockeyProfileResponse> GetJockeyProfileByAccountIdAsync(Guid accountId)

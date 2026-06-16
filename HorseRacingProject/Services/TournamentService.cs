@@ -41,18 +41,11 @@ namespace HorseRacingAPI.Services
                 StartDate = request.StartDate,
                 EndDate = request.EndDate,
                 Status = TournamentStatus.Upcoming.ToString(),
+                FundsPrize = request.FundsPrize
             };
             await tournamentRepo.AddAsync(tournament);
             await _uow.SaveAsync();
-            return new TournamentResponse
-            {
-                TournamentId = tournament.Id,
-                TournamentName = tournament.TournamentName,
-                Description = tournament.Description,
-                StartDate = tournament.StartDate,
-                EndDate = tournament.EndDate,
-                Status = tournament.Status
-            };
+            return MapToResponse(tournament);
         }
 
         public async Task<bool> DeleteTournamentAsync(Guid tournamentId)
@@ -92,6 +85,9 @@ namespace HorseRacingAPI.Services
 
         public async Task<PagedResponse<TournamentResponse>> GetAllTournamentsPagingAsync(int page, int pageSize)
         {
+            if (page < 1) page = 1;
+            if (pageSize < 1) pageSize = 10;
+            if (pageSize > 100) pageSize = 100;
             IGenericRepository<Tournament> tournamentRepo = _uow.GetRepository<Tournament>();
 
             IEnumerable<TournamentResponse> items = await tournamentRepo
@@ -105,7 +101,8 @@ namespace HorseRacingAPI.Services
                     Description = t.Description,
                     StartDate = t.StartDate,
                     EndDate = t.EndDate,
-                    Status = t.Status
+                    Status = t.Status,
+                    FundsPrize = t.FundsPrize
                 },
                 pageIndex: page - 1,
                 pageSize: pageSize
@@ -131,16 +128,7 @@ namespace HorseRacingAPI.Services
             {
                 throw new KeyNotFoundException($"Tournament with id {id} not found.");
             }
-            TournamentResponse tournamentResponse = new TournamentResponse
-            {
-                TournamentId = tournament.Id,
-                TournamentName = tournament.TournamentName,
-                Description = tournament.Description,
-                StartDate = tournament.StartDate,
-                EndDate = tournament.EndDate,
-                Status = tournament.Status
-            };
-            return tournamentResponse;
+            return MapToResponse(tournament);
         }
 
         public async Task<TournamentResponse> UpdateTournamentAsync(Guid tournamentId, UpdateTournamentRequest request)
@@ -164,18 +152,24 @@ namespace HorseRacingAPI.Services
             if (request.EndDate.HasValue)
                 tournament.EndDate = request.EndDate;
 
+            if (request.FundsPrize.HasValue)
+                tournament.FundsPrize = request.FundsPrize.Value;
+
             await tournamentRepo.UpdateAsync(tournament);
             await _uow.SaveAsync();
 
-            return new TournamentResponse
-            {
-                TournamentId = tournament.Id,
-                TournamentName = tournament.TournamentName,
-                Description = tournament.Description,
-                StartDate = tournament.StartDate,
-                EndDate = tournament.EndDate,
-                Status = tournament.Status
-            };
+            return MapToResponse(tournament);
         }
+
+        private static TournamentResponse MapToResponse(Tournament t) => new TournamentResponse
+        {
+            TournamentId = t.Id,
+            TournamentName = t.TournamentName,
+            Description = t.Description,
+            StartDate = t.StartDate,
+            EndDate = t.EndDate,
+            Status = t.Status,
+            FundsPrize = t.FundsPrize
+        };
     }
 }
