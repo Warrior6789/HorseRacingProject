@@ -77,6 +77,29 @@ namespace HorseRacingAPI.Services
             }).ToListAsync();
         }
 
+        public async Task<PagedResponse<UserProfileResponse>> GetAllUserProfilesPagedAsync(int page, int pageSize)
+        {
+            IGenericRepository<UserProfile> userProfileRepo = _uow.GetRepository<UserProfile>();
+            IQueryable<UserProfile> query = userProfileRepo.Entities;
+            int totalCount = await query.CountAsync();
+            List<UserProfileResponse> items = await query
+                .OrderBy(u => u.CreateAt)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(u => new UserProfileResponse
+                {
+                    ProfileId = u.ProfileId,
+                    AccountId = u.AccountId,
+                    FullName = u.FullName,
+                    Phone = u.Phone,
+                    Balance = u.Balance,
+                    ImageUrl = u.ImageUrl,
+                    CreateAt = u.CreateAt,
+                    UpdatedAt = u.UpdatedAt,
+                }).ToListAsync();
+            return new PagedResponse<UserProfileResponse> { Items = items, Page = page, PageSize = pageSize, TotalCount = totalCount };
+        }
+
         public async Task<UserProfileResponse> GetUserProfileByIdAsync(Guid accountId)
         {
             IGenericRepository<UserProfile> userProfileRepo = _uow.GetRepository<UserProfile>();

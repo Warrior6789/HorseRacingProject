@@ -18,7 +18,7 @@ namespace HorseRacingAPI.Controllers
 
       
 
-        [HttpGet]
+        [HttpGet("paged")]
         public async Task<IActionResult> GetRaces(
             [FromQuery] int page = 1,
             [FromQuery] int pageSize = 10,
@@ -37,7 +37,7 @@ namespace HorseRacingAPI.Controllers
             return Ok(ApiResponse<RaceResponse>.SuccessResponse(result, "Get race successfully."));
         }
 
-        [HttpGet("upcoming")]
+        [HttpGet("upcoming/paged")]
         public async Task<IActionResult> GetUpcomingRaces(
             [FromQuery] int page = 1,
             [FromQuery] int pageSize = 10,
@@ -90,6 +90,14 @@ namespace HorseRacingAPI.Controllers
         {
             RaceResponse result = await _raceService.UpdateRaceAsync(raceId, request);
             return Ok(ApiResponse<RaceResponse>.SuccessResponse(result, "Race updated successfully."));
+        }
+
+        [Authorize(Roles = "Admin")]
+        [HttpPost("{raceId}/reset")]
+        public async Task<IActionResult> ResetRace(Guid raceId)
+        {
+            await _raceService.ResetRaceAsync(raceId);
+            return Ok(ApiResponse<object>.SuccessResponse(null!, "Race reset to Scheduled successfully."));
         }
 
         [Authorize(Roles = "Admin")]

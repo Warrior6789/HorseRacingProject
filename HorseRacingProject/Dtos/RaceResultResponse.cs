@@ -3,6 +3,7 @@ namespace HorseRacingAPI.Dtos
     public class RaceResultHorseDto
     {
         public Guid Id { get; set; }
+        public Guid RegistrationId { get; set; }
         public string HorseName { get; set; } = string.Empty;
         public string? Breed { get; set; }
         public string? Color { get; set; }

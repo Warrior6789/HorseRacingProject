@@ -11,10 +11,12 @@ namespace HorseRacingAPI.Services
     public class RaceService : IRaceService
     {
         private readonly IUnitofWork _uow;
+        private readonly RaceEngineService _engine;
 
-public RaceService(IUnitofWork uow)
+        public RaceService(IUnitofWork uow, RaceEngineService engine)
         {
             _uow = uow;
+            _engine = engine;
         }
 
         public async Task<PagedResponse<RaceResponse>> GetRacesAsync(int page, int pageSize, Guid? tournamentId, Guid? racecourseId, string? status)
@@ -293,6 +295,11 @@ public async Task<RegistrationResponse> RegisterHorseAsync(Guid raceId, Guid own
             if (jockey.Role != AccountRole.Jockey)
                 throw new InvalidOperationException("The specified account is not a Jockey.");
 
+            bool hasProfile = await _uow.GetRepository<JockeyProfile>().Entities
+                .AnyAsync(p => p.AccountId == request.JockeyId && !p.IsDeleted);
+            if (!hasProfile)
+                throw new InvalidOperationException("Jockey does not have a profile yet.");
+
             if (race.MaxParticipants.HasValue)
             {
                 int activeCount = await _uow.GetRepository<Registration>().Entities
@@ -464,6 +471,7 @@ public async Task<List<RaceResultResponse>> GetRaceResultsAsync(Guid raceId)
                 .Select(r => new RaceResultHorseDto
                 {
                     Id = r.Horse.Id,
+                    RegistrationId = r.RegistrationId,
                     HorseName = r.Horse.HorseName,
                     Breed = r.Horse.Breed,
                     Color = r.Horse.Color,
@@ -471,6 +479,70 @@ public async Task<List<RaceResultResponse>> GetRaceResultsAsync(Guid raceId)
                     Status = r.Horse.Status
                 })
                 .ToListAsync();
+        }
+
+        public async Task ResetRaceAsync(Guid raceId)
+        {
+            Race? race = await _uow.GetRepository<Race>().Entities
+                .Include(r => r.Racecourse)
+                .Include(r => r.Tournament)
+                .FirstOrDefaultAsync(r => r.RaceId == raceId && !r.IsDeleted);
+
+            if (race == null)
+                throw new KeyNotFoundException($"Race with id {raceId} not found.");
+
+            if (race.Status == "Scheduled")
+                throw new InvalidOperationException("Race is already in Scheduled status.");
+
+            List<Registration> registrations = await _uow.GetRepository<Registration>().Entities
+                .Where(r => r.RaceId == raceId)
+                .ToListAsync();
+
+            List<Guid> horseIds = registrations.Select(r => r.HorseId).ToList();
+
+            List<Bet> bets = await _uow.GetRepository<Bet>().Entities
+                .Include(b => b.Registration)
+                .Where(b => b.Registration.RaceId == raceId)
+                .ToListAsync();
+
+            foreach (Bet bet in bets)
+            {
+                UserProfile? profile = await _uow.GetRepository<UserProfile>().Entities
+                    .FirstOrDefaultAsync(p => p.AccountId == bet.SpectatorId && !p.IsDeleted);
+
+                if (profile != null)
+                {
+                    if (bet.Status == "Won")
+                    {
+                        long payout = (long)(bet.BetAmount * (decimal)(bet.PayoutRatio ?? 1));
+                        profile.Balance = (profile.Balance ?? 0) - payout + (long)bet.BetAmount;
+                    }
+                    else if (bet.Status == "Lost" || bet.Status == "Pending")
+                    {
+                        profile.Balance = (profile.Balance ?? 0) + (long)bet.BetAmount;
+                    }
+                    profile.UpdatedAt = DateTimeOffset.UtcNow;
+                    await _uow.GetRepository<UserProfile>().UpdateAsync(profile);
+                }
+            }
+
+            await _uow.GetRepository<Bet>().DeleteRangeAsync(bets);
+
+            List<RaceResult> results = await _uow.GetRepository<RaceResult>().Entities
+                .Include(r => r.Registration)
+                .Where(r => r.Registration.RaceId == raceId)
+                .ToListAsync();
+
+            await _uow.GetRepository<RaceResult>().DeleteRangeAsync(results);
+
+            race.Status = RaceStatus.Scheduled.ToString();
+            race.EndTime = null;
+            race.StartTime = DateTimeOffset.UtcNow.AddHours(24);
+            await _uow.GetRepository<Race>().UpdateAsync(race);
+
+            await _uow.SaveAsync();
+
+            _engine.ClearHorseState(horseIds);
         }
 
         public async Task<RaceResponse> AdvanceRaceStatusAsync(Guid raceId)

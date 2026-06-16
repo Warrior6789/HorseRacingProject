@@ -47,6 +47,29 @@ namespace HorseRacingAPI.Controllers
             return Ok(apiResponse);
         }
 
+        [Authorize(Roles = "Admin")]
+        [HttpGet("paged")]
+        public async Task<IActionResult> GetAllUserProfilesPaged([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
+        {
+            PagedResponse<UserProfileResponse> result = await _userProfileService.GetAllUserProfilesPagedAsync(page, pageSize);
+            return Ok(ApiResponse<PagedResponse<UserProfileResponse>>.SuccessResponse(result, "Get all user profiles successfully."));
+        }
+
+        [Authorize]
+        [HttpGet("my")]
+        public async Task<IActionResult> GetMyProfile()
+        {
+            string tokenAccountId = HttpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? string.Empty;
+            if (!Guid.TryParse(tokenAccountId, out Guid accountId))
+            {
+                ApiResponse<object> errorResponse = ApiResponse<object>.FailResponse("Invalid token.");
+                return StatusCode(StatusCodes.Status401Unauthorized, errorResponse);
+            }
+
+            UserProfileResponse response = await _userProfileService.GetUserProfileByIdAsync(accountId);
+            return Ok(ApiResponse<UserProfileResponse>.SuccessResponse(response, "Get my profile successfully."));
+        }
+
         [Authorize]
         [HttpGet("{accountId}")]
         public async Task<IActionResult> GetUserProfileById(Guid accountId)
