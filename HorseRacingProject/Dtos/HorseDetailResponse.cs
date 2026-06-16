@@ -9,6 +9,7 @@ namespace HorseRacingAPI.Dtos
         public string? Breed { get; set; }
         public float? Weight { get; set; }
         public string? Status { get; set; }
+        public string? DerivedStatus { get; set; }
         public int? RecordWins { get; set; }
         public string? Color { get; set; }
         public string? ImageUrl { get; set; }

@@ -245,6 +245,9 @@ public async Task<RegistrationResponse> RegisterHorseAsync(Guid raceId, Guid own
             if (horse.OwnerId != ownerId)
                 throw new ForbiddenAccessException("You do not own this horse.");
 
+            if (!HorseStatusPolicy.CanRegisterForRace(horse.Status))
+                throw new InvalidOperationException("Only Healthy or Resting horses can be registered for a race.");
+
             Account? jockey = await _uow.GetRepository<Account>().Entities
                 .FirstOrDefaultAsync(a => a.Id == request.JockeyId && !a.IsDeleted);
             if (jockey == null)
@@ -312,7 +315,8 @@ public async Task<RegistrationResponse> RegisterHorseAsync(Guid raceId, Guid own
                     Age = horse.Age,
                     Weight = horse.Weight,
                     RecordWins = horse.RecordWins,
-                    Status = horse.Status
+                    Status = horse.Status,
+                    DerivedStatus = horse.Status
                 },
                 Race = MapToResponse(race)
             };

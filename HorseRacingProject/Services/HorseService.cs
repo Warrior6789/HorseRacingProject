@@ -53,11 +53,39 @@ namespace HorseRacingAPI.Services
 
             int totalCount = await horses.CountAsync();
 
+            string confirmedStatus = "Confirmed";
+            string liveStatus = RaceStatus.Live.ToString();
+            string[] upcomingRaceStatuses =
+            {
+                RaceStatus.Scheduled.ToString(),
+                RaceStatus.BettingOpen.ToString(),
+                RaceStatus.BettingClosed.ToString()
+            };
+
             List<HorseDetailResponse> items = await horses
                 .OrderBy(h => h.HorseName)
                 .Skip((query.Page - 1) * query.PageSize)
                 .Take(query.PageSize)
-                .Select(h => MapToResponse(h))
+                .Select(h => new HorseDetailResponse
+                {
+                    Id = h.Id,
+                    OwnerId = h.OwnerId,
+                    HorseName = h.HorseName,
+                    Age = h.Age,
+                    Breed = h.Breed,
+                    Weight = h.Weight,
+                    Status = h.Status,
+                    DerivedStatus = h.Registrations.Any(r => r.Status == confirmedStatus && !r.Race.IsDeleted && r.Race.Status == liveStatus)
+                        ? "Racing"
+                        : h.Registrations.Any(r => r.Status == confirmedStatus && !r.Race.IsDeleted && r.Race.Status != null && upcomingRaceStatuses.Contains(r.Race.Status))
+                            ? "Registered"
+                            : h.Status,
+                    RecordWins = h.RecordWins,
+                    Color = h.Color,
+                    ImageUrl = h.ImageUrl,
+                    CreateAt = h.CreateAt,
+                    UpdatedAt = h.UpdatedAt
+                })
                 .ToListAsync();
 
             return new PagedResponse<HorseDetailResponse>
@@ -91,7 +119,7 @@ namespace HorseRacingAPI.Services
                 Age = request.Age,
                 Breed = request.Breed,
                 Weight = request.Weight,
-                Status = string.IsNullOrWhiteSpace(request.Status) ? HorseStatus.Healthy.ToString() : request.Status,
+                Status = HorseStatusPolicy.NormalizeOrDefault(request.Status).ToString(),
                 RecordWins = request.RecordWins ?? 0,
                 Color = request.Color,
                 ImageUrl = request.ImageUrl,
@@ -123,7 +151,7 @@ namespace HorseRacingAPI.Services
                 horse.Weight = request.Weight;
 
             if (!string.IsNullOrWhiteSpace(request.Status))
-                horse.Status = request.Status;
+                horse.Status = HorseStatusPolicy.NormalizeRequired(request.Status).ToString();
 
             if (request.RecordWins.HasValue)
                 horse.RecordWins = request.RecordWins;
@@ -148,8 +176,18 @@ namespace HorseRacingAPI.Services
 
         public async Task<List<HorseResponse>> GetActiveHorsesAsync(Guid accountId, bool isAdmin)
         {
+            string[] activeStatuses = HorseStatusPolicy.ActiveStatuses.Select(s => s.ToLower()).ToArray();
+            string confirmedStatus = "Confirmed";
+            string liveStatus = RaceStatus.Live.ToString();
+            string[] upcomingRaceStatuses =
+            {
+                RaceStatus.Scheduled.ToString(),
+                RaceStatus.BettingOpen.ToString(),
+                RaceStatus.BettingClosed.ToString()
+            };
+
             return await BuildHorseScope(accountId, isAdmin)
-                .Where(h => h.Status != null && h.Status.ToLower() == "active")
+                .Where(h => h.Status != null && activeStatuses.Contains(h.Status.ToLower()))
                 .OrderBy(h => h.HorseName)
                 .Select(h => new HorseResponse
                 {
@@ -159,6 +197,11 @@ namespace HorseRacingAPI.Services
                     Breed = h.Breed,
                     Weight = h.Weight,
                     Status = h.Status,
+                    DerivedStatus = h.Registrations.Any(r => r.Status == confirmedStatus && !r.Race.IsDeleted && r.Race.Status == liveStatus)
+                        ? "Racing"
+                        : h.Registrations.Any(r => r.Status == confirmedStatus && !r.Race.IsDeleted && r.Race.Status != null && upcomingRaceStatuses.Contains(r.Race.Status))
+                            ? "Registered"
+                            : h.Status,
                     RecordWins = h.RecordWins,
                     Color = h.Color,
                     ImageUrl = h.ImageUrl
@@ -247,6 +290,8 @@ namespace HorseRacingAPI.Services
         private async Task<Horse> GetHorseEntityAsync(Guid horseId, Guid accountId, bool isAdmin)
         {
             Horse? horse = await _uow.GetRepository<Horse>().Entities
+                .Include(h => h.Registrations)
+                    .ThenInclude(r => r.Race)
                 .FirstOrDefaultAsync(h => h.Id == horseId && !h.IsDeleted);
 
             if (horse == null)
@@ -314,12 +359,42 @@ namespace HorseRacingAPI.Services
             Breed = horse.Breed,
             Weight = horse.Weight,
             Status = horse.Status,
+            DerivedStatus = GetDerivedStatus(horse),
             RecordWins = horse.RecordWins,
             Color = horse.Color,
             ImageUrl = horse.ImageUrl,
             CreateAt = horse.CreateAt,
             UpdatedAt = horse.UpdatedAt
         };
+
+        private static string? GetDerivedStatus(Horse horse)
+        {
+            bool hasLiveRace = horse.Registrations.Any(r =>
+                r.Status == "Confirmed" &&
+                !r.Race.IsDeleted &&
+                r.Race.Status == RaceStatus.Live.ToString());
+
+            if (hasLiveRace)
+                return "Racing";
+
+            string[] upcomingRaceStatuses =
+            {
+                RaceStatus.Scheduled.ToString(),
+                RaceStatus.BettingOpen.ToString(),
+                RaceStatus.BettingClosed.ToString()
+            };
+
+            bool hasUpcomingRace = horse.Registrations.Any(r =>
+                r.Status == "Confirmed" &&
+                !r.Race.IsDeleted &&
+                r.Race.Status != null &&
+                upcomingRaceStatuses.Contains(r.Race.Status));
+
+            if (hasUpcomingRace)
+                return "Registered";
+
+            return horse.Status;
+        }
 
         private static HorseScheduleResponse MapToScheduleResponse(Registration registration) => new HorseScheduleResponse
         {
