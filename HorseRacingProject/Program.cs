@@ -72,9 +72,11 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
-builder.Services.AddDbContext<DbContext, HorseRacingDataContext>(options =>
+var connectionString = Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection")
+    ?? builder.Configuration.GetConnectionString("DefaultConnection");
+builder.Services.AddDbContext<HorseRacingDataContext>(options =>
     options.UseNpgsql(connectionString));
+builder.Services.AddScoped<DbContext>(provider => provider.GetRequiredService<HorseRacingDataContext>());
 
 builder.Services.AddScoped<IUnitofWork, UnitofWork>();
 builder.Services.AddScoped<ICloudinaryService, CloudinaryService>();
