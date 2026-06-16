@@ -73,7 +73,8 @@ namespace HorseRacingAPI.Services
                         Age = r.Horse.Age,
                         Weight = r.Horse.Weight,
                         RecordWins = r.Horse.RecordWins,
-                        Status = r.Horse.Status
+                        Status = r.Horse.Status,
+                        DerivedStatus = r.Horse.Status
                     },
                     Race = new RaceResponse
                     {
@@ -138,7 +139,8 @@ namespace HorseRacingAPI.Services
                         Age = r.Horse.Age,
                         Weight = r.Horse.Weight,
                         RecordWins = r.Horse.RecordWins,
-                        Status = r.Horse.Status
+                        Status = r.Horse.Status,
+                        DerivedStatus = r.Horse.Status
                     },
                     Race = new RaceResponse
                     {
