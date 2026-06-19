@@ -13,12 +13,10 @@ namespace HorseRacingAPI.Controllers
     public class HorsesController : ControllerBase
     {
         private readonly IHorseService _horseService;
-        private readonly IHorseImageStorageService _horseImageStorageService;
 
-        public HorsesController(IHorseService horseService, IHorseImageStorageService horseImageStorageService)
+        public HorsesController(IHorseService horseService)
         {
             _horseService = horseService;
-            _horseImageStorageService = horseImageStorageService;
         }
 
         [HttpGet]
@@ -67,9 +65,6 @@ namespace HorseRacingAPI.Controllers
             Guid accountId = GetAccountIdFromToken();
             bool isAdmin = IsAdmin();
 
-            if (request.Image != null)
-                request.ImageUrl = await _horseImageStorageService.SaveImageAsync(request.Image);
-
             HorseDetailResponse horse = await _horseService.CreateHorseAsync(accountId, isAdmin, request);
             return StatusCode(StatusCodes.Status201Created, ApiResponse<HorseDetailResponse>.SuccessResponse(horse, "Horse created successfully."));
         }
@@ -82,6 +77,17 @@ namespace HorseRacingAPI.Controllers
 
             HorseDetailResponse horse = await _horseService.UpdateHorseAsync(id, accountId, isAdmin, request);
             return Ok(ApiResponse<HorseDetailResponse>.SuccessResponse(horse, "Horse updated successfully."));
+        }
+
+        [HttpPut("{id:guid}/image")]
+        [Consumes("multipart/form-data")]
+        public async Task<IActionResult> UploadHorseImage(Guid id, IFormFile file)
+        {
+            Guid accountId = GetAccountIdFromToken();
+            bool isAdmin = IsAdmin();
+
+            string imageUrl = await _horseService.UploadImageAsync(id, accountId, isAdmin, file);
+            return Ok(ApiResponse<string>.SuccessResponse(imageUrl, "Horse image uploaded successfully."));
         }
 
         [HttpDelete("{id:guid}")]

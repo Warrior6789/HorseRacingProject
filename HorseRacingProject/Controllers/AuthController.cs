@@ -19,14 +19,13 @@ namespace HorseRacingAPI.Controllers
         }
 
         [HttpPost("register")]
-        public async Task<IActionResult> Register([FromBody] RegisterDto registerDto)
+        public async Task<IActionResult> Register([FromForm] RegisterDto registerDto)
         {
             if (registerDto == null)
-            {
                 return BadRequest(ApiResponse<object>.FailResponse("Invalid client request."));
-            }
+
             await _authService.RegisterAsync(registerDto);
-            return Ok(ApiResponse<object>.SuccessResponse("Registration successful! Please check your status."));
+            return Ok(ApiResponse<object>.SuccessResponse("Registration successful!"));
         }
 
         [HttpPost("login")]
@@ -48,11 +47,19 @@ namespace HorseRacingAPI.Controllers
             return Ok(ApiResponse<object>.SuccessResponse(result, "Login successful."));
         }
 
+        [Authorize(Roles = "Spectator")]
+        [HttpPost("upgrade")]
+        public async Task<IActionResult> RequestRoleUpgrade([FromForm] RequestRoleUpgradeDto request)
+        {
+            Guid accountId = Guid.Parse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)!.Value);
+            await _authService.RequestRoleUpgradeAsync(accountId, request);
+            return Ok(ApiResponse<object>.SuccessResponse("Role upgrade request submitted successfully."));
+        }
+
         [Authorize]
         [HttpPost("logout")]
         public IActionResult Logout()
         {
-            // Stateless JWT logout only confirms the request; the client must remove the token.
             return Ok(ApiResponse<object>.SuccessResponse("Logout successful."));
         }
     }

@@ -1,8 +1,10 @@
-﻿using HorseRacingAPI.Dtos;
+using HorseRacingAPI.Dtos;
+using HorseRacingAPI.Enums;
 using HorseRacingAPI.Models;
 using HorseRacingAPI.Repositories;
 using HorseRacingAPI.Repository;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace HorseRacingAPI.Services
 {
@@ -27,21 +29,36 @@ namespace HorseRacingAPI.Services
             if (registration.JockeyId != jockeyAccountId)
                 throw new InvalidOperationException("You are not authorized to accept this registration.");
 
-            if (registration.Status != "Pending")
+            if (registration.Status != RegistrationStatus.Pending)
                 throw new InvalidOperationException("Only pending registrations can be accepted.");
 
             if (registration.Race.MaxParticipants.HasValue)
             {
                 int confirmedCount = await registrationRepo.Entities
-                    .CountAsync(r => r.RaceId == registration.RaceId && r.Status == "Confirmed");
+                    .CountAsync(r => r.RaceId == registration.RaceId && r.Status == RegistrationStatus.Confirmed);
                 if (confirmedCount >= registration.Race.MaxParticipants.Value)
                     throw new InvalidOperationException($"Race has reached the maximum number of participants ({registration.Race.MaxParticipants}).");
             }
 
-            registration.JockeyConfirmation = true;
-            registration.Status = "Confirmed";
-            registration.UpdatedAt = DateTimeOffset.UtcNow;
-            await _uow.SaveAsync();
+            await _uow.BeginTransactionAsync();
+            try
+            {
+                registration.JockeyConfirmation = true;
+                registration.Status = RegistrationStatus.Confirmed;
+                registration.UpdatedAt = DateTimeOffset.UtcNow;
+                await _uow.SaveAsync();
+                await _uow.CommitTransactionAsync();
+            }
+            catch (DbUpdateException ex) when (ex.InnerException is PostgresException pg && pg.SqlState == "P0001")
+            {
+                await _uow.RollbackTransactionAsync();
+                throw new InvalidOperationException($"Race has reached the maximum number of participants ({registration.Race.MaxParticipants}).", ex);
+            }
+            catch
+            {
+                await _uow.RollbackTransactionAsync();
+                throw;
+            }
         }
 
         public async Task<List<RegistrationResponse>> GetMyRequestAsync(Guid jockeyAccountId)
@@ -55,10 +72,9 @@ namespace HorseRacingAPI.Services
                 .Include(r => r.Race)
                 .ThenInclude(r => r.Tournament)
                 .Where(j => j.JockeyId == jockeyAccountId
-                && j.Status == "Pending"
-                && j.OwnerConfirmation == true
-                && j.JockeyConfirmation == false
-                )
+                    && j.Status == RegistrationStatus.Pending
+                    && j.OwnerConfirmation == true
+                    && j.JockeyConfirmation == false)
                 .Select(r => new RegistrationResponse
                 {
                     RegistrationId = r.RegistrationId,
@@ -73,8 +89,8 @@ namespace HorseRacingAPI.Services
                         Age = r.Horse.Age,
                         Weight = r.Horse.Weight,
                         RecordWins = r.Horse.RecordWins,
-                        Status = r.Horse.Status,
-                        DerivedStatus = r.Horse.Status
+                        Status = r.Horse.Status.ToString(),
+                        DerivedStatus = r.Horse.Status.ToString()
                     },
                     Race = new RaceResponse
                     {
@@ -83,7 +99,7 @@ namespace HorseRacingAPI.Services
                         StartTime = r.Race.StartTime,
                         TrackLength = r.Race.TrackLength,
                         MaxParticipants = r.Race.MaxParticipants,
-                        Status = r.Race.Status,
+                        Status = r.Race.Status.ToString(),
                         RacecourseName = r.Race.Racecourse.RacecourseName,
                         Location = r.Race.Racecourse.Location,
                         Tournament = new TournamentResponse
@@ -93,16 +109,16 @@ namespace HorseRacingAPI.Services
                             Description = r.Race.Tournament.Description,
                             StartDate = r.Race.Tournament.StartDate,
                             EndDate = r.Race.Tournament.EndDate,
-                            Status = r.Race.Tournament.Status
+                            Status = r.Race.Tournament.Status.ToString()
                         }
                     },
                     OwnerConfirmation = r.OwnerConfirmation,
                     JockeyConfirmation = r.JockeyConfirmation,
-                    Status = r.Status,
+                    Status = r.Status.ToString(),
                     CreateAt = r.CreateAt,
                     UpdatedAt = r.UpdatedAt
                 }).ToListAsync();
-               return registrations;
+            return registrations;
         }
 
         public async Task<PagedResponse<RegistrationResponse>> GetMyRequestPagedAsync(Guid jockeyAccountId, int page, int pageSize)
@@ -114,14 +130,14 @@ namespace HorseRacingAPI.Services
 
             int totalCount = await registrationRepo.Entities
                 .Where(j => j.JockeyId == jockeyAccountId
-                    && j.Status == "Pending"
+                    && j.Status == RegistrationStatus.Pending
                     && j.OwnerConfirmation == true
                     && j.JockeyConfirmation == false)
                 .CountAsync();
 
             IEnumerable<RegistrationResponse> items = await registrationRepo.FindAsync<RegistrationResponse>(
                 predicate: j => j.JockeyId == jockeyAccountId
-                    && j.Status == "Pending"
+                    && j.Status == RegistrationStatus.Pending
                     && j.OwnerConfirmation == true
                     && j.JockeyConfirmation == false,
                 orderBy: null,
@@ -139,8 +155,8 @@ namespace HorseRacingAPI.Services
                         Age = r.Horse.Age,
                         Weight = r.Horse.Weight,
                         RecordWins = r.Horse.RecordWins,
-                        Status = r.Horse.Status,
-                        DerivedStatus = r.Horse.Status
+                        Status = r.Horse.Status.ToString(),
+                        DerivedStatus = r.Horse.Status.ToString()
                     },
                     Race = new RaceResponse
                     {
@@ -149,7 +165,7 @@ namespace HorseRacingAPI.Services
                         StartTime = r.Race.StartTime,
                         TrackLength = r.Race.TrackLength,
                         MaxParticipants = r.Race.MaxParticipants,
-                        Status = r.Race.Status,
+                        Status = r.Race.Status.ToString(),
                         RacecourseName = r.Race.Racecourse.RacecourseName,
                         Location = r.Race.Racecourse.Location,
                         Tournament = new TournamentResponse
@@ -159,12 +175,12 @@ namespace HorseRacingAPI.Services
                             Description = r.Race.Tournament.Description,
                             StartDate = r.Race.Tournament.StartDate,
                             EndDate = r.Race.Tournament.EndDate,
-                            Status = r.Race.Tournament.Status
+                            Status = r.Race.Tournament.Status.ToString()
                         }
                     },
                     OwnerConfirmation = r.OwnerConfirmation,
                     JockeyConfirmation = r.JockeyConfirmation,
-                    Status = r.Status,
+                    Status = r.Status.ToString(),
                     CreateAt = r.CreateAt,
                     UpdatedAt = r.UpdatedAt
                 },
@@ -187,22 +203,81 @@ namespace HorseRacingAPI.Services
 
             Registration? registration = await registrationRepo.Entities.FirstOrDefaultAsync(r => r.RegistrationId == registrationId);
             if (registration == null)
-            {
                 throw new ArgumentException("Registration not found.");
-            }
+
             if (registration.JockeyId != jockeyAccountId)
-            {
                 throw new InvalidOperationException("You are not authorized to reject this registration.");
-            }
-            if (registration.Status != "Pending")
-            {
+
+            if (registration.Status != RegistrationStatus.Pending)
                 throw new InvalidOperationException("Only pending registrations can be rejected.");
-            }
+
             registration.JockeyConfirmation = false;
-            registration.Status = "Rejected";
+            registration.Status = RegistrationStatus.Rejected;
             registration.UpdatedAt = DateTimeOffset.UtcNow;
 
             await _uow.SaveAsync();
+        }
+
+        public async Task ScratchHorseAsync(Guid registrationId)
+        {
+            Registration? registration = await _uow.GetRepository<Registration>().Entities
+                .Include(r => r.Race)
+                .FirstOrDefaultAsync(r => r.RegistrationId == registrationId);
+
+            if (registration == null)
+                throw new KeyNotFoundException("Registration not found.");
+
+            if (registration.Status != RegistrationStatus.Confirmed)
+                throw new InvalidOperationException("Only confirmed registrations can be scratched.");
+
+            RaceStatus raceStatus = registration.Race.Status;
+            if (raceStatus == RaceStatus.Live || raceStatus == RaceStatus.Finished || raceStatus == RaceStatus.Cancelled)
+                throw new InvalidOperationException($"Cannot scratch a horse when race is {raceStatus}.");
+
+            await _uow.BeginTransactionAsync();
+            try
+            {
+                registration.Status = RegistrationStatus.Scratched;
+                registration.UpdatedAt = DateTimeOffset.UtcNow;
+                await _uow.GetRepository<Registration>().UpdateAsync(registration);
+
+                List<Bet> bets = await _uow.GetRepository<Bet>().Entities
+                    .Where(b => b.RegistrationId == registrationId && b.Status == BetStatus.Pending)
+                    .ToListAsync();
+
+                foreach (Bet bet in bets)
+                {
+                    bet.Status = BetStatus.Refunded;
+                    await _uow.GetRepository<Bet>().UpdateAsync(bet);
+
+                    UserProfile? profile = await _uow.GetRepository<UserProfile>().Entities
+                        .FirstOrDefaultAsync(p => p.AccountId == bet.SpectatorId && !p.IsDeleted);
+                    if (profile != null)
+                    {
+                        profile.Balance = (profile.Balance ?? 0) + (long)bet.BetAmount;
+                        profile.UpdatedAt = DateTimeOffset.UtcNow;
+                        await _uow.GetRepository<UserProfile>().UpdateAsync(profile);
+                    }
+                }
+
+                var grouped = bets.GroupBy(b => b.BetType);
+                foreach (var group in grouped)
+                {
+                    decimal totalRefunded = group.Sum(b => b.BetAmount);
+                    await _uow.GetRepository<RacePool>().Entities
+                        .Where(p => p.RaceId == registration.RaceId && p.BetType == group.Key)
+                        .ExecuteUpdateAsync(s => s.SetProperty(p => p.TotalAmount,
+                            p => p.TotalAmount - totalRefunded));
+                }
+
+                await _uow.SaveAsync();
+                await _uow.CommitTransactionAsync();
+            }
+            catch
+            {
+                await _uow.RollbackTransactionAsync();
+                throw;
+            }
         }
     }
 }

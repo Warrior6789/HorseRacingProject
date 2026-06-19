@@ -1,4 +1,4 @@
-﻿using HorseRacingAPI.Dtos;
+using HorseRacingAPI.Dtos;
 using HorseRacingAPI.Enums;
 using HorseRacingAPI.Models;
 using HorseRacingAPI.Repositories;
@@ -22,7 +22,7 @@ namespace HorseRacingAPI.Services
             {
                 ConversionRateId = Guid.NewGuid(),
                 RateValue = req.RateValue,
-                Status = ConversionRateStatus.Inactive.ToString()
+                Status = ConfigStatus.Inactive
             };
             await conversionRateRepo.AddAsync(newConversionRate);
             await _uow.SaveAsync();
@@ -33,12 +33,11 @@ namespace HorseRacingAPI.Services
         {
             IGenericRepository<ConversionRate> conversionRateRepo = _uow.GetRepository<ConversionRate>();
 
-            ConversionRate? activeRate = await conversionRateRepo.Entities.FirstOrDefaultAsync(c => c.Status == ConversionRateStatus.
-            Active.ToString());
+            ConversionRate? activeRate = await conversionRateRepo.Entities
+                .FirstOrDefaultAsync(c => c.Status == ConfigStatus.Active);
             if (activeRate == null)
-            {
                 throw new KeyNotFoundException("Active conversion rate not found.");
-            }
+
             return MapToResponse(activeRate);
         }
 
@@ -55,7 +54,7 @@ namespace HorseRacingAPI.Services
                 {
                     Id = c.ConversionRateId,
                     RateValue = c.RateValue,
-                    Status = Enum.Parse<ConversionRateStatus>(c.Status ?? "Inactive")
+                    Status = c.Status
                 },
                 pageIndex: page - 1,
                 pageSize: pageSize);
@@ -68,30 +67,37 @@ namespace HorseRacingAPI.Services
                 PageSize = pageSize,
                 TotalCount = total
             };
-                
         }
 
         public async Task SetActiveAsync(Guid id)
         {
             IGenericRepository<ConversionRate> repo = _uow.GetRepository<ConversionRate>();
 
-            ConversionRate? target = await repo.Entities.FirstOrDefaultAsync(c => c.ConversionRateId == id);
-            if (target == null)
+            bool exists = await repo.Entities.AnyAsync(c => c.ConversionRateId == id);
+            if (!exists)
                 throw new KeyNotFoundException("Conversion rate not found.");
 
-            List<ConversionRate> allRates = await repo.Entities.ToListAsync();
-            foreach (ConversionRate rate in allRates)
-                rate.Status = ConversionRateStatus.Inactive.ToString();
-
-            target.Status = ConversionRateStatus.Active.ToString();
-            await _uow.SaveAsync();
+            await _uow.BeginTransactionAsync();
+            try
+            {
+                await repo.Entities.ExecuteUpdateAsync(s => s.SetProperty(c => c.Status, ConfigStatus.Inactive));
+                ConversionRate? target = repo.Entities.FirstOrDefault(c => c.ConversionRateId == id);
+                target!.Status = ConfigStatus.Active;
+                await _uow.SaveAsync();
+                await _uow.CommitTransactionAsync();
+            }
+            catch
+            {
+                await _uow.RollbackTransactionAsync();
+                throw;
+            }
         }
 
         private static ConversionRateResponse MapToResponse(ConversionRate c) => new ConversionRateResponse
         {
             Id = c.ConversionRateId,
             RateValue = c.RateValue,
-            Status = Enum.Parse<ConversionRateStatus>(c.Status ?? "Inactive")
+            Status = c.Status
         };
     }
 }

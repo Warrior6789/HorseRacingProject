@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using HorseRacingAPI.Enums;
 
 namespace HorseRacingAPI.Models;
 
@@ -17,7 +18,7 @@ public partial class Horse
 
     public float? Weight { get; set; }
 
-    public string? Status { get; set; }
+    public HorseStatus Status { get; set; }
 
     public int? RecordWins { get; set; }
 

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using HorseRacingAPI.Enums;
 
 namespace HorseRacingAPI.Models;
 
@@ -19,7 +20,7 @@ public partial class Registration
 
     public bool? JockeyConfirmation { get; set; }
 
-    public string? Status { get; set; }
+    public RegistrationStatus Status { get; set; }
 
     public DateTimeOffset? CreateAt { get; set; }
 

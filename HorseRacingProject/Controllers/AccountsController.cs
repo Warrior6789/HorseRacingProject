@@ -18,24 +18,17 @@ namespace HorseRacingAPI.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetAccountsByStatus([FromQuery] string status = "Pending")
+        public async Task<IActionResult> GetAccountsByStatus([FromQuery] string status = "Active")
         {
             List<AccountResponse> accounts = await _accountService.GetAccountByStatusAsync(status);
             return Ok(ApiResponse<List<AccountResponse>>.SuccessResponse(accounts, "Get accounts successfully."));
         }
 
         [HttpGet("paged")]
-        public async Task<IActionResult> GetAccountsByStatusPaged([FromQuery] string status = "Pending", [FromQuery] int page = 1, [FromQuery] int pageSize = 10)
+        public async Task<IActionResult> GetAccountsByStatusPaged([FromQuery] string status = "Active", [FromQuery] int page = 1, [FromQuery] int pageSize = 10)
         {
             PagedResponse<AccountResponse> accounts = await _accountService.GetAccountByStatusPagedAsync(status, page, pageSize);
             return Ok(ApiResponse<PagedResponse<AccountResponse>>.SuccessResponse(accounts, "Get accounts successfully."));
-        }
-
-        [HttpPut("{accountId}/approve")]
-        public async Task<IActionResult> ApproveAccount(Guid accountId)
-        {
-            await _accountService.ApproveAccountAsync(accountId);
-            return Ok(ApiResponse<object>.SuccessResponse("Account approved successfully."));
         }
 
         [HttpPut("{accountId}/suspend")]
@@ -57,6 +50,27 @@ namespace HorseRacingAPI.Controllers
         {
             await _accountService.RestoreAccountAsync(accountId);
             return Ok(ApiResponse<object>.SuccessResponse("Account restored successfully."));
+        }
+
+        [HttpGet("upgrades")]
+        public async Task<IActionResult> GetRoleUpgradeRequests()
+        {
+            List<AccountResponse> result = await _accountService.GetRoleUpgradeRequestsAsync();
+            return Ok(ApiResponse<List<AccountResponse>>.SuccessResponse(result, "Get upgrade requests successfully."));
+        }
+
+        [HttpPut("{accountId}/approve-upgrade")]
+        public async Task<IActionResult> ApproveRoleUpgrade(Guid accountId)
+        {
+            await _accountService.ApproveRoleUpgradeAsync(accountId);
+            return Ok(ApiResponse<object>.SuccessResponse("Upgrade approved successfully."));
+        }
+
+        [HttpPut("{accountId}/reject-upgrade")]
+        public async Task<IActionResult> RejectRoleUpgrade(Guid accountId)
+        {
+            await _accountService.RejectRoleUpgradeAsync(accountId);
+            return Ok(ApiResponse<object>.SuccessResponse("Upgrade rejected successfully."));
         }
     }
 }

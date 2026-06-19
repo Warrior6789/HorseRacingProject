@@ -13,5 +13,6 @@ namespace HorseRacingAPI.Services
         Task<List<HorseScheduleResponse>> GetMyScheduleAsync(Guid ownerId);
         Task<List<HorseScheduleResponse>> GetHorseScheduleAsync(Guid horseId, Guid accountId, bool isAdmin);
         Task<HorseRewardsResponse> GetHorseRewardsAsync(Guid horseId, Guid accountId, bool isAdmin, HorseRewardsQueryRequest query);
+        Task<string> UploadImageAsync(Guid horseId, Guid accountId, bool isAdmin, IFormFile file);
     }
 }

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using HorseRacingAPI.Enums;
 
 namespace HorseRacingAPI.Models;
 
@@ -19,9 +20,9 @@ public partial class Race
 
     public int? MaxParticipants { get; set; }
 
-    public string? Status { get; set; }
+    public RaceStatus Status { get; set; }
 
-    public string Grade { get; set; } = "Open";
+    public RaceGrade Grade { get; set; } = RaceGrade.Open;
 
     public DateTimeOffset? CreateAt { get; set; }
 
@@ -31,7 +32,19 @@ public partial class Race
 
     public DateTimeOffset? DeletedAt { get; set; }
 
+    public Guid? GradePurseConfigId { get; set; }
+
+    public Guid? PositionPrizeConfigId { get; set; }
+
+    public Guid? JockeyRewardConfigId { get; set; }
+
     public virtual Racecourse Racecourse { get; set; } = null!;
+
+    public virtual GradePurseConfig? GradePurseConfig { get; set; }
+
+    public virtual PositionPrizeConfig? PositionPrizeConfig { get; set; }
+
+    public virtual JockeyRewardConfig? JockeyRewardConfig { get; set; }
 
     public virtual ICollection<RefereeReport> RefereeReports { get; set; } = new List<RefereeReport>();
 

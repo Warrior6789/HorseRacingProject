@@ -1,14 +1,10 @@
 using HorseRacingAPI.Enums;
 
-namespace HorseRacingAPI.Services
+namespace HorseRacingAPI.Helpers
 {
     internal static class HorseStatusPolicy
     {
-        public static readonly string[] ActiveStatuses =
-        {
-            HorseStatus.Healthy.ToString(),
-            HorseStatus.Resting.ToString()
-        };
+        public static readonly HorseStatus[] ActiveStatuses = [HorseStatus.Healthy, HorseStatus.Resting];
 
         public static string AllowedStatusMessage =>
             $"Horse status must be one of: {string.Join(", ", Enum.GetNames<HorseStatus>())}.";
@@ -37,18 +33,7 @@ namespace HorseRacingAPI.Services
             return parsedStatus;
         }
 
-        public static bool CanRegisterForRace(string? status)
-        {
-            if (string.IsNullOrWhiteSpace(status))
-                return false;
-
-            if (!Enum.TryParse(status.Trim(), ignoreCase: true, out HorseStatus parsedStatus) ||
-                !Enum.IsDefined(parsedStatus))
-            {
-                return false;
-            }
-
-            return parsedStatus == HorseStatus.Healthy || parsedStatus == HorseStatus.Resting;
-        }
+        public static bool CanRegisterForRace(HorseStatus status) =>
+            status == HorseStatus.Healthy || status == HorseStatus.Resting;
     }
 }

@@ -1,4 +1,5 @@
-﻿using HorseRacingAPI.Dtos;
+using HorseRacingAPI.Dtos;
+using HorseRacingAPI.Enums;
 using HorseRacingAPI.Models;
 using HorseRacingAPI.Repositories;
 using HorseRacingAPI.Repository;
@@ -9,7 +10,7 @@ namespace HorseRacingAPI.Services
     public class BetService : IBetService
     {
         private readonly IUnitofWork _uow;
-        private static readonly HashSet<string> ValidBetTypes = ["Win", "Place", "Show"];
+        private static readonly HashSet<BetType> ValidBetTypes = [BetType.Win, BetType.Place, BetType.Show];
         public BetService(IUnitofWork uow)
         {
             _uow = uow;
@@ -27,11 +28,11 @@ namespace HorseRacingAPI.Services
                       SpectatorId = b.SpectatorId,
                       RegistrationId = b.RegistrationId,
                       HorseName = b.Registration.Horse.HorseName,
-                      RaceName = "Race " + b.Registration.Race.RaceNumber,
+                      RaceNumber = b.Registration.Race.RaceNumber,
                       BetAmount = b.BetAmount,
-                      BetType = b.BetType,
+                      BetType = b.BetType.ToString(),
                       PayoutRatio = b.PayoutRatio,
-                      Status = b.Status,
+                      Status = b.Status.ToString(),
                       CreatedAt = b.CreatedAt
                   })
                   .ToListAsync();
@@ -53,11 +54,11 @@ namespace HorseRacingAPI.Services
                     SpectatorId = b.SpectatorId,
                     RegistrationId = b.RegistrationId,
                     HorseName = b.Registration.Horse.HorseName,
-                    RaceName = "Race " + b.Registration.Race.RaceNumber,
+                    RaceNumber = b.Registration.Race.RaceNumber,
                     BetAmount = b.BetAmount,
-                    BetType = b.BetType,
+                    BetType = b.BetType.ToString(),
                     PayoutRatio = b.PayoutRatio,
-                    Status = b.Status,
+                    Status = b.Status.ToString(),
                     CreatedAt = b.CreatedAt
                 },
                 pageIndex: page - 1,
@@ -75,59 +76,79 @@ namespace HorseRacingAPI.Services
                  .FirstOrDefaultAsync(r => r.RegistrationId == req.RegistrationId);
             if (registration == null)
                 throw new KeyNotFoundException("Registration not found.");
-            if (registration.Status != "Confirmed")
+            if (registration.Status != RegistrationStatus.Confirmed)
                 throw new InvalidOperationException("Horse is not confirmed in this race.");
-            if (registration.Race.Status != "BettingOpen")
+            if (registration.Race.Status != RaceStatus.BettingOpen)
                 throw new InvalidOperationException("Betting is not open for this race.");
-            if (!ValidBetTypes.Contains(req.BetType))
+            if (!Enum.TryParse<BetType>(req.BetType, ignoreCase: true, out var betType) || !ValidBetTypes.Contains(betType))
                 throw new InvalidOperationException("Invalid bet type. Must be Win, Place, or Show.");
 
-            BetPayoutConfig? activeConfig = await _uow.GetRepository<BetPayoutConfig>().Entities
-                .FirstOrDefaultAsync(c => c.Status == "Active");
-            if (activeConfig == null)
-                throw new InvalidOperationException("No active bet payout config found. Please contact admin.");
-
-            float ratio = req.BetType switch
-            {
-                "Win"   => activeConfig.WinRatio,
-                "Place" => activeConfig.PlaceRatio,
-                "Show"  => activeConfig.ShowRatio,
-                _       => throw new InvalidOperationException("Invalid bet type.")
-            };
             if (req.BetAmount <= 0)
                 throw new InvalidOperationException("Bet amount must be greater than 0.");
-            UserProfile? profile = await _uow.GetRepository<UserProfile>().Entities
-                 .FirstOrDefaultAsync(p => p.AccountId == spectatorId && !p.IsDeleted);
-
-            if (profile == null)
+            bool profileExists = await _uow.GetRepository<UserProfile>().Entities
+                .AnyAsync(p => p.AccountId == spectatorId && !p.IsDeleted);
+            if (!profileExists)
                 throw new KeyNotFoundException("User profile not found.");
 
-            if (profile.Balance < (long)req.BetAmount)
-                throw new InvalidOperationException("Insufficient balance.");
             bool alreadyBet = await _uow.GetRepository<Bet>().Entities
                  .AnyAsync(b => b.SpectatorId == spectatorId
                              && b.RegistrationId == req.RegistrationId
-                             && b.Status == "Pending");
+                             && b.Status == BetStatus.Pending);
             if (alreadyBet)
                 throw new InvalidOperationException("You have already placed a bet on this horse.");
-            profile.Balance -= (long)req.BetAmount;
-            profile.UpdatedAt = DateTimeOffset.UtcNow;
-            await _uow.GetRepository<UserProfile>().UpdateAsync(profile);
-            Bet bet = new Bet
+
+            await _uow.BeginTransactionAsync();
+            try
             {
-                BetId = Guid.NewGuid(),
-                SpectatorId = spectatorId,
-                RegistrationId = req.RegistrationId,
-                BetAmount = req.BetAmount,
-                BetType = req.BetType,
-                PayoutRatio = ratio,
-                BetPayoutConfigId = activeConfig.BetPayoutConfigId,
-                Status = "Pending",
-                CreatedAt = DateTimeOffset.UtcNow
-            };
-            await _uow.GetRepository<Bet>().AddAsync(bet);
-            await _uow.SaveAsync();
-            return MapToResponse(bet, registration);
+                int deducted = await _uow.GetRepository<UserProfile>().Entities
+                    .Where(p => p.AccountId == spectatorId && !p.IsDeleted && p.Balance >= (long)req.BetAmount)
+                    .ExecuteUpdateAsync(s => s
+                        .SetProperty(p => p.Balance, p => p.Balance - (long)req.BetAmount)
+                        .SetProperty(p => p.UpdatedAt, DateTimeOffset.UtcNow));
+                if (deducted == 0)
+                    throw new InvalidOperationException("Insufficient balance.");
+
+                int poolUpdated = await _uow.GetRepository<RacePool>().Entities
+                    .Where(p => p.RaceId == registration.RaceId && p.BetType == betType)
+                    .ExecuteUpdateAsync(s => s.SetProperty(p => p.TotalAmount, p => p.TotalAmount + req.BetAmount));
+
+                if (poolUpdated == 0)
+                    await _uow.GetRepository<RacePool>().AddAsync(new RacePool
+                    {
+                        RacePoolId = Guid.NewGuid(),
+                        RaceId = registration.RaceId,
+                        BetType = betType,
+                        TotalAmount = req.BetAmount
+                    });
+
+                bool duplicateInTx = await _uow.GetRepository<Bet>().Entities
+                    .AnyAsync(b => b.SpectatorId == spectatorId
+                                && b.RegistrationId == req.RegistrationId
+                                && b.Status == BetStatus.Pending);
+                if (duplicateInTx)
+                    throw new InvalidOperationException("You have already placed a bet on this horse.");
+
+                Bet bet = new Bet
+                {
+                    BetId = Guid.NewGuid(),
+                    SpectatorId = spectatorId,
+                    RegistrationId = req.RegistrationId,
+                    BetAmount = req.BetAmount,
+                    BetType = betType,
+                    PayoutRatio = null,
+                    Status = BetStatus.Pending,
+                    CreatedAt = DateTimeOffset.UtcNow
+                };
+                await _uow.GetRepository<Bet>().AddAsync(bet);
+                await _uow.SaveAsync();
+                await _uow.CommitTransactionAsync();
+                return MapToResponse(bet, registration);
+            }
+            catch
+            {
+                await _uow.RollbackTransactionAsync();
+                throw;
+            }
         }
 
         private static BetResponse MapToResponse(Bet b, Registration registration) => new BetResponse
@@ -136,11 +157,11 @@ namespace HorseRacingAPI.Services
             SpectatorId = b.SpectatorId,
             RegistrationId = b.RegistrationId,
             HorseName = registration.Horse.HorseName,
-            RaceName = "Race " + registration.Race.RaceNumber,
+            RaceNumber = registration.Race.RaceNumber,
             BetAmount = b.BetAmount,
-            BetType = b.BetType,
+            BetType = b.BetType?.ToString(),
             PayoutRatio = b.PayoutRatio,
-            Status = b.Status,
+            Status = b.Status.ToString(),
             CreatedAt = b.CreatedAt
         };
     }

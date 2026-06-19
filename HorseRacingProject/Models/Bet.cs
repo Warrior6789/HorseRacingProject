@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
+using HorseRacingAPI.Enums;
 
 namespace HorseRacingAPI.Models;
 
@@ -13,19 +12,15 @@ public partial class Bet
 
     public decimal BetAmount { get; set; }
 
-    public string? BetType { get; set; }
+    public BetType? BetType { get; set; }
 
     public float? PayoutRatio { get; set; }
 
-    public string? Status { get; set; }
+    public BetStatus Status { get; set; }
 
     public DateTimeOffset? CreatedAt { get; set; }
-
-    public Guid? BetPayoutConfigId { get; set; }
 
     public virtual Registration Registration { get; set; } = null!;
 
     public virtual Account Spectator { get; set; } = null!;
-
-    public virtual BetPayoutConfig? BetPayoutConfig { get; set; }
 }

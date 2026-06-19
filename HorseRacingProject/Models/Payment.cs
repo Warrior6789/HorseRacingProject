@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using HorseRacingAPI.Enums;
 
 namespace HorseRacingAPI.Models;
 
@@ -13,7 +14,9 @@ public partial class Payment
 
     public decimal Amount { get; set; }
 
-    public string? Status { get; set; }
+    public long? OrderCode { get; set; }
+
+    public PaymentStatus Status { get; set; }
 
     public DateTimeOffset? CreateAt { get; set; }
 

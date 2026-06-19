@@ -1,10 +1,12 @@
 using HorseRacingAPI.Dtos;
 using HorseRacingAPI.Enums;
-using HorseRacingAPI.Helpers;
 using HorseRacingAPI.Models;
 using HorseRacingAPI.Repositories;
 using HorseRacingAPI.Repository;
 using Microsoft.EntityFrameworkCore;
+using PayOS;
+using PayOS.Models.V2.PaymentRequests;
+using PayOS.Models.Webhooks;
 
 namespace HorseRacingAPI.Services
 {
@@ -12,56 +14,134 @@ namespace HorseRacingAPI.Services
     {
         private readonly IUnitofWork _uow;
         private readonly IConfiguration _config;
+        private readonly PayOSClient _payOS;
+
         public PaymentService(IUnitofWork uow, IConfiguration config)
         {
             _uow = uow;
             _config = config;
+            _payOS = new PayOSClient(
+                _config["PayOS:ClientId"]!,
+                _config["PayOS:ApiKey"]!,
+                _config["PayOS:ChecksumKey"]!
+            );
         }
-        public async Task<string> CreateDepositUrlAsync(Guid Id, DepositRequest request, string ipAddress)
+
+        public async Task<string> CreateDepositUrlAsync(Guid accountId, DepositRequest request, string ipAddress)
         {
-            IGenericRepository<UserProfile> userProfiletRepo = _uow.GetRepository<UserProfile>();
-            UserProfile? userProfile = await userProfiletRepo.Entities.FirstOrDefaultAsync(a => a.AccountId == Id);
+            UserProfile? userProfile = await _uow.GetRepository<UserProfile>().Entities
+                .FirstOrDefaultAsync(a => a.AccountId == accountId);
             if (userProfile == null)
-            {
                 throw new KeyNotFoundException("User profile not found.");
-            }
-            IGenericRepository<ConversionRate> conversionRateRepo = _uow.GetRepository<ConversionRate>();
-            ConversionRate? converionRate = await conversionRateRepo.Entities.FirstOrDefaultAsync(c => c.Status == "Active");
-            if (converionRate == null)
-            {
+
+            ConversionRate? conversionRate = await _uow.GetRepository<ConversionRate>().Entities
+                .FirstOrDefaultAsync(c => c.Status == ConfigStatus.Active);
+            if (conversionRate == null)
                 throw new InvalidOperationException("No active conversion rate found.");
-            }
-            IGenericRepository<Payment> paymentRepo = _uow.GetRepository<Payment>();
-            Payment payment = new Payment()
+
+            long orderCode = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+
+            Payment payment = new Payment
             {
                 PaymentId        = Guid.NewGuid(),
-                AccountId        = Id,
+                AccountId        = accountId,
                 Amount           = request.Amount,
-                ConversionRateId = converionRate.ConversionRateId,
+                OrderCode        = orderCode,
+                ConversionRateId = conversionRate.ConversionRateId,
                 CreateAt         = DateTimeOffset.UtcNow,
-                Status           = PaymentStatus.Pending.ToString()
+                Status           = PaymentStatus.Pending
             };
-
-            await paymentRepo.AddAsync(payment);
+            await _uow.GetRepository<Payment>().AddAsync(payment);
             await _uow.SaveAsync();
 
-            string baseUrl = _config["VNPay:BaseUrl"]!;
-            string tmnCode = _config["VNPay:TmnCode"]!;
-            string hashSecret = _config["VNPay:HashSecret"]!;
-            string returnUrl = _config["VNPay:ReturnUrl"]!;
+            CreatePaymentLinkRequest paymentData = new CreatePaymentLinkRequest
+            {
+                OrderCode   = orderCode,
+                Amount      = (int)request.Amount,
+                Description = $"Nap tien {accountId.ToString("N")[..8]}",
+                ReturnUrl   = _config["PayOS:ReturnUrl"]!,
+                CancelUrl   = _config["PayOS:CancelUrl"]!
+            };
 
-            string url = VnPayHelper.BuildPaymentUrl(
-                baseUrl,
-                tmnCode,
-                hashSecret,
-                returnUrl,
-                payment.PaymentId.ToString("N"),
-                (long)(request.Amount * 100),
-                $"Deposit for account {Id}",
-                ipAddress,
-                DateTimeOffset.UtcNow
-                );
-            return url;
+            var result = await _payOS.PaymentRequests.CreateAsync(paymentData);
+            return result.CheckoutUrl;
+        }
+
+        public async Task<PaymentResponse> ProcessWebhookAsync(Webhook webhookBody)
+        {
+            WebhookData data = await _payOS.Webhooks.VerifyAsync(webhookBody);
+
+            Payment? payment = await _uow.GetRepository<Payment>().Entities
+                .FirstOrDefaultAsync(p => p.OrderCode == data.OrderCode);
+            if (payment == null)
+                throw new KeyNotFoundException("Payment not found.");
+
+            if (payment.Status != PaymentStatus.Pending)
+                throw new InvalidOperationException("Payment already processed.");
+
+            if (data.Code != "00")
+            {
+                await _uow.GetRepository<Payment>().Entities
+                    .Where(p => p.OrderCode == data.OrderCode && p.Status == PaymentStatus.Pending)
+                    .ExecuteUpdateAsync(s => s.SetProperty(p => p.Status, PaymentStatus.Failed));
+
+                return new PaymentResponse
+                {
+                    PaymentId       = payment.PaymentId,
+                    Amount          = payment.Amount,
+                    Status          = PaymentStatus.Failed.ToString(),
+                    TransactionType = PaymentType.Deposit.ToString(),
+                    BalanceChanged  = 0,
+                    CurrentBalance  = 0,
+                    CreateAt        = payment.CreateAt
+                };
+            }
+
+            ConversionRate? conversionRate = await _uow.GetRepository<ConversionRate>().Entities
+                .FirstOrDefaultAsync(c => c.ConversionRateId == payment.ConversionRateId);
+            if (conversionRate == null)
+                throw new KeyNotFoundException("Conversion rate not found.");
+
+            long balanceToAdd = (long)(payment.Amount * (decimal)conversionRate.RateValue);
+
+            await _uow.BeginTransactionAsync();
+            try
+            {
+                int claimed = await _uow.GetRepository<Payment>().Entities
+                    .Where(p => p.OrderCode == data.OrderCode && p.Status == PaymentStatus.Pending)
+                    .ExecuteUpdateAsync(s => s.SetProperty(p => p.Status, PaymentStatus.Completed));
+                if (claimed == 0)
+                    throw new InvalidOperationException("Payment already processed.");
+
+                int profileUpdated = await _uow.GetRepository<UserProfile>().Entities
+                    .Where(u => u.AccountId == payment.AccountId)
+                    .ExecuteUpdateAsync(s => s.SetProperty(u => u.Balance, u => (u.Balance ?? 0) + balanceToAdd));
+                if (profileUpdated == 0)
+                    throw new InvalidOperationException("User profile not found. Cannot credit balance.");
+
+                long currentBalance = await _uow.GetRepository<UserProfile>().Entities
+                    .Where(u => u.AccountId == payment.AccountId)
+                    .Select(u => u.Balance ?? 0)
+                    .FirstOrDefaultAsync();
+
+                await _uow.CommitTransactionAsync();
+
+                return new PaymentResponse
+                {
+                    PaymentId       = payment.PaymentId,
+                    Amount          = payment.Amount,
+                    Status          = PaymentStatus.Completed.ToString(),
+                    TransactionType = PaymentType.Deposit.ToString(),
+                    BalanceChanged  = balanceToAdd,
+                    CurrentBalance  = currentBalance,
+                    CreateAt        = payment.CreateAt
+                };
+            }
+            catch
+            {
+                await _uow.RollbackTransactionAsync();
+                throw;
+            }
         }
 
         public async Task<PagedResponse<PaymentResponse>> GetHistoryPagingAsync(Guid accountId, int page, int pageSize)
@@ -71,107 +151,31 @@ namespace HorseRacingAPI.Services
             if (pageSize > 100) pageSize = 100;
 
             IGenericRepository<Payment> paymentRepo = _uow.GetRepository<Payment>();
-            int totalCount = await paymentRepo.Entities
-          .CountAsync(p => p.AccountId == accountId);
+            int totalCount = await paymentRepo.Entities.CountAsync(p => p.AccountId == accountId);
 
             IEnumerable<PaymentResponse> items = await paymentRepo.FindAsync<PaymentResponse>(
-          predicate: p => p.AccountId == accountId,
-          orderBy: q => q.OrderByDescending(p => p.CreateAt),
-          selector: p => new PaymentResponse
-          {
-              PaymentId = p.PaymentId,
-              Amount = p.Amount,
-              Status = p.Status,
-              TransactionType = p.Status!.StartsWith("Withdraw")
-                                  ? PaymentType.Withdraw.ToString()
-                                  : PaymentType.Deposit.ToString(),
-              BalanceChanged = 0,
-              CurrentBalance = 0,
-              CreateAt = p.CreateAt
-          },
-          pageIndex: page - 1,
-          pageSize: pageSize
-                );
+                predicate: p => p.AccountId == accountId,
+                orderBy: q => q.OrderByDescending(p => p.CreateAt),
+                selector: p => new PaymentResponse
+                {
+                    PaymentId       = p.PaymentId,
+                    Amount          = p.Amount,
+                    Status          = p.Status.ToString(),
+                    TransactionType = PaymentType.Deposit.ToString(),
+                    BalanceChanged  = 0,
+                    CurrentBalance  = 0,
+                    CreateAt        = p.CreateAt
+                },
+                pageIndex: page - 1,
+                pageSize: pageSize
+            );
+
             return new PagedResponse<PaymentResponse>
             {
-                Items = items.ToList(),
-                Page = page,
-                PageSize = pageSize,
+                Items      = items.ToList(),
+                Page       = page,
+                PageSize   = pageSize,
                 TotalCount = totalCount
-            };
-        }
-
-        public async Task<PaymentResponse> ProcessCallbackAsync(IQueryCollection queryParams)
-        {
-            string hashSecret = _config["VNPay:HashSecret"]!;
-            if (!VnPayHelper.VerifySignature(queryParams, hashSecret))
-                throw new InvalidOperationException("Invalid payment signature.");
-
-            string txnRef = queryParams["vnp_TxnRef"].ToString();
-            string responseCode = queryParams["vnp_ResponseCode"].ToString();
-
-            if (!Guid.TryParse(txnRef, out Guid paymentId))
-            {
-                throw new InvalidOperationException("Invalid transaction reference.");
-            }
-
-            IGenericRepository<Payment> paymentRepo = _uow.GetRepository<Payment>();
-            Payment? payment = await paymentRepo.Entities.FirstOrDefaultAsync(p => p.PaymentId == paymentId);
-
-            if (payment == null)
-                throw new KeyNotFoundException("Payment not found.");
-
-            if (payment.Status != PaymentStatus.Pending.ToString())
-                throw new InvalidOperationException("Payment already processed.");
-            if (responseCode != "00")
-            {
-                payment.Status = PaymentStatus.Failed.ToString();
-                await _uow.GetRepository<Payment>().UpdateAsync(payment);
-                await _uow.SaveAsync();
-                return new PaymentResponse
-                {
-                    PaymentId = payment.PaymentId,
-                    Amount = payment.Amount,
-                    Status = payment.Status,
-                    TransactionType = PaymentType.Deposit.ToString(),
-                    BalanceChanged = 0,
-                    CurrentBalance = 0,
-                    CreateAt = payment.CreateAt
-                };
-            }
-            UserProfile? profile = await _uow.GetRepository<UserProfile>()
-               .Entities
-               .FirstOrDefaultAsync(u => u.AccountId == payment.AccountId);
-            if (profile == null)
-            {
-                throw new KeyNotFoundException("User profile not found.");
-            }
-            ConversionRate? conversionRate = await _uow.GetRepository<ConversionRate>()
-                .Entities
-                .FirstOrDefaultAsync(c => c.ConversionRateId == payment.ConversionRateId);
-
-            if (conversionRate == null)
-                throw new KeyNotFoundException("Conversion rate not found.");
-
-            long balanceToAdd = (long)(payment.Amount * (decimal)conversionRate.RateValue);
-            long currentBalance = profile.Balance ?? 0;
-            profile.Balance = currentBalance + balanceToAdd;
-
-            payment.Status = PaymentStatus.Completed.ToString();
-
-            await _uow.GetRepository<UserProfile>().UpdateAsync(profile);
-            await _uow.GetRepository<Payment>().UpdateAsync(payment);
-            await _uow.SaveAsync();
-
-            return new PaymentResponse
-            {
-                PaymentId = payment.PaymentId,
-                Amount = payment.Amount,
-                Status = payment.Status,
-                TransactionType = PaymentType.Deposit.ToString(),
-                BalanceChanged = balanceToAdd,
-                CurrentBalance = profile.Balance ?? 0,
-                CreateAt = payment.CreateAt
             };
         }
     }
