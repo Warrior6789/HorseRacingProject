@@ -217,8 +217,8 @@ namespace HorseRacingAPI.Services
                         }
 
                         await uow.SaveAsync();
-                        await SettleBetsAsync(uow, race.RaceId, sortedRegs);
-                        await DistributePrizesAsync(uow, race, sortedRegs);
+                        decimal carryover = await SettleBetsAsync(uow, race.RaceId, sortedRegs);
+                        await DistributePrizesAsync(uow, race, sortedRegs, carryover);
 
                         await _hubContext.Clients.Group($"race-{race.RaceId}")
                             .SendAsync("RaceUpdate", new
@@ -234,6 +234,7 @@ namespace HorseRacingAPI.Services
                             _angles.Remove(reg.HorseId);
                             _baseSpeeds.Remove(reg.HorseId);
                             _momentum.Remove(reg.HorseId);
+                            _finishTimes.Remove(reg.HorseId);
                         }
                     }
                 }
@@ -253,8 +254,12 @@ namespace HorseRacingAPI.Services
             }
         }
 
-        private async Task SettleBetsAsync(IUnitofWork uow, Guid raceId, List<Registration> sortedRegs)
+        private async Task<decimal> SettleBetsAsync(IUnitofWork uow, Guid raceId, List<Registration> sortedRegs)
         {
+            TakeoutConfig? takeoutConfig = await uow.GetRepository<TakeoutConfig>().Entities
+                .FirstOrDefaultAsync(c => c.Status == "Active");
+            decimal takeout = (decimal)(takeoutConfig?.TakeoutPercentage ?? 0.20f);
+
             Dictionary<Guid, int> positions = sortedRegs
                 .Select((r, i) => new { r.RegistrationId, Position = i + 1 })
                 .ToDictionary(x => x.RegistrationId, x => x.Position);
@@ -264,71 +269,96 @@ namespace HorseRacingAPI.Services
                 .Where(b => b.Registration.RaceId == raceId && b.Status == "Pending")
                 .ToListAsync();
 
-            foreach (Bet bet in bets)
+            decimal carryover = 0;
+
+            foreach (string betType in new[] { "Win", "Place", "Show" })
             {
-                if (!positions.TryGetValue(bet.RegistrationId, out int pos))
+                List<Bet> typeBets = bets.Where(b => b.BetType == betType).ToList();
+                if (!typeBets.Any()) continue;
+
+                decimal totalPool = typeBets.Sum(b => b.BetAmount);
+                decimal netPool = totalPool * (1 - takeout);
+
+                HashSet<Guid> winningRegIds = positions
+                    .Where(kvp => betType switch
+                    {
+                        "Win"   => kvp.Value == 1,
+                        "Place" => kvp.Value <= 2,
+                        "Show"  => kvp.Value <= 3,
+                        _       => false
+                    })
+                    .Select(kvp => kvp.Key)
+                    .ToHashSet();
+
+                decimal winningPool = typeBets
+                    .Where(b => winningRegIds.Contains(b.RegistrationId))
+                    .Sum(b => b.BetAmount);
+
+                if (winningPool <= 0)
                 {
-                    bet.Status = "Lost";
-                    await uow.GetRepository<Bet>().UpdateAsync(bet);
+                    // Không ai đặt vào ngựa thắng → chuyển netPool vào prize
+                    foreach (Bet bet in typeBets)
+                    {
+                        bet.Status = "Lost";
+                        bet.PayoutRatio = 0;
+                        await uow.GetRepository<Bet>().UpdateAsync(bet);
+                    }
+                    carryover += netPool;
                     continue;
                 }
 
-                bool won = bet.BetType switch
-                {
-                    "Win"   => pos == 1,
-                    "Place" => pos <= 2,
-                    "Show"  => pos <= 3,
-                    _       => false
-                };
+                float ratio = (float)(netPool / winningPool);
 
-                bet.Status = won ? "Won" : "Lost";
-                await uow.GetRepository<Bet>().UpdateAsync(bet);
-
-                if (won)
+                foreach (Bet bet in typeBets)
                 {
-                    long payout = (long)(bet.BetAmount * (decimal)(bet.PayoutRatio ?? 1));
-                    UserProfile? profile = await uow.GetRepository<UserProfile>().Entities
-                        .FirstOrDefaultAsync(p => p.AccountId == bet.SpectatorId && !p.IsDeleted);
-                    if (profile != null)
+                    bool won = winningRegIds.Contains(bet.RegistrationId);
+                    bet.Status = won ? "Won" : "Lost";
+                    bet.PayoutRatio = ratio;
+                    await uow.GetRepository<Bet>().UpdateAsync(bet);
+
+                    if (won)
                     {
-                        profile.Balance = (profile.Balance ?? 0) + payout;
-                        profile.UpdatedAt = DateTimeOffset.UtcNow;
-                        await uow.GetRepository<UserProfile>().UpdateAsync(profile);
+                        long payout = (long)(bet.BetAmount * (decimal)ratio);
+                        UserProfile? profile = await uow.GetRepository<UserProfile>().Entities
+                            .FirstOrDefaultAsync(p => p.AccountId == bet.SpectatorId && !p.IsDeleted);
+                        if (profile != null)
+                        {
+                            profile.Balance = (profile.Balance ?? 0) + payout;
+                            profile.UpdatedAt = DateTimeOffset.UtcNow;
+                            await uow.GetRepository<UserProfile>().UpdateAsync(profile);
+                        }
                     }
                 }
             }
 
             await uow.SaveAsync();
+            return carryover;
         }
 
-        private async Task DistributePrizesAsync(IUnitofWork uow, Race race, List<Registration> sortedRegs)
+        private async Task DistributePrizesAsync(IUnitofWork uow, Race race, List<Registration> sortedRegs, decimal carryover = 0)
         {
             Tournament? tournament = await uow.GetRepository<Tournament>().Entities
                 .FirstOrDefaultAsync(t => t.Id == race.TournamentId);
+            if (tournament == null) return;
 
-            if (tournament == null || tournament.FundsPrize <= 0) return;
-
-            GradePurseConfig? gradeConfig = await uow.GetRepository<GradePurseConfig>().Entities
-                .FirstOrDefaultAsync(c => c.Status == "Active");
             PositionPrizeConfig? posConfig = await uow.GetRepository<PositionPrizeConfig>().Entities
                 .FirstOrDefaultAsync(c => c.Status == "Active");
             JockeyRewardConfig? jockeyConfig = await uow.GetRepository<JockeyRewardConfig>().Entities
                 .FirstOrDefaultAsync(c => c.Status == "Active");
+            GradePurseConfig? gradeConfig = await uow.GetRepository<GradePurseConfig>().Entities
+                .FirstOrDefaultAsync(c => c.Status == "Active");
+            if (posConfig == null || jockeyConfig == null || gradeConfig == null) return;
 
-            if (gradeConfig == null || posConfig == null || jockeyConfig == null) return;
+            TakeoutConfig? takeoutConfig = await uow.GetRepository<TakeoutConfig>().Entities
+                .FirstOrDefaultAsync(c => c.Status == "Active");
+            decimal takeoutRate = (decimal)(takeoutConfig?.TakeoutPercentage ?? 0.20f);
 
-            race.GradePurseConfigId = gradeConfig.GradePurseConfigId;
-            race.PositionPrizeConfigId = posConfig.PositionPrizeConfigId;
-            race.JockeyRewardConfigId = jockeyConfig.JockeyRewardConfigId;
-            await uow.GetRepository<Race>().UpdateAsync(race);
+            decimal totalBets = await uow.GetRepository<Bet>().Entities
+                .Include(b => b.Registration)
+                .Where(b => b.Registration.RaceId == race.RaceId)
+                .SumAsync(b => b.BetAmount);
 
-            decimal alreadyDistributed = await uow.GetRepository<Prize>().Entities
-                .Include(p => p.Registration).ThenInclude(r => r.Race)
-                .Where(p => p.Registration.Race.TournamentId == race.TournamentId)
-                .SumAsync(p => p.Amount ?? 0);
-
-            decimal remaining = tournament.FundsPrize - alreadyDistributed;
-            if (remaining <= 0) return;
+            decimal takeoutAmount = totalBets * takeoutRate;
 
             double gradeRatio = race.Grade switch
             {
@@ -339,20 +369,50 @@ namespace HorseRacingAPI.Services
                 _        => gradeConfig.OpenRatio
             };
 
-            double[] positionRatios =
+            decimal racePurse;
+
+            if (tournament.FundsPrize > 0)
+            {
+                decimal alreadyDistributed = await uow.GetRepository<Prize>().Entities
+                    .Include(p => p.Registration).ThenInclude(r => r.Race)
+                    .Where(p => p.Registration.Race.TournamentId == race.TournamentId)
+                    .SumAsync(p => p.Amount ?? 0);
+
+                decimal remaining = tournament.FundsPrize - alreadyDistributed;
+                decimal fundsPortion = Math.Min(tournament.FundsPrize * (decimal)gradeRatio, remaining);
+                decimal takeoutPortion = takeoutAmount * (decimal)gradeRatio;
+                racePurse = fundsPortion + takeoutPortion;
+            }
+            else
+            {
+                racePurse = takeoutAmount * (decimal)gradeRatio;
+            }
+
+            racePurse += carryover;
+            if (racePurse <= 0) return;
+
+            race.GradePurseConfigId  = gradeConfig.GradePurseConfigId;
+            race.PositionPrizeConfigId = posConfig.PositionPrizeConfigId;
+            race.JockeyRewardConfigId  = jockeyConfig.JockeyRewardConfigId;
+            await uow.GetRepository<Race>().UpdateAsync(race);
+
+            // Fix 1: chuẩn hóa ratio theo số ngựa thực tế về đích
+            double[] allRatios =
             [
                 posConfig.Pos1Ratio, posConfig.Pos2Ratio, posConfig.Pos3Ratio,
                 posConfig.Pos4Ratio, posConfig.Pos5Ratio, posConfig.Pos6Ratio
             ];
+            int finisherCount = Math.Min(sortedRegs.Count, allRatios.Length);
+            double[] usedRatios = allRatios.Take(finisherCount).ToArray();
+            double ratioSum = usedRatios.Sum();
+            if (ratioSum <= 0) return;
+            double[] normalizedRatios = usedRatios.Select(r => r / ratioSum).ToArray();
 
-            decimal racePurse = Math.Min(tournament.FundsPrize * (decimal)gradeRatio, remaining);
-            if (racePurse <= 0) return;
-
-            for (int i = 0; i < sortedRegs.Count && i < positionRatios.Length; i++)
+            for (int i = 0; i < finisherCount; i++)
             {
                 Registration reg = sortedRegs[i];
                 int position = i + 1;
-                decimal positionPrize = racePurse * (decimal)positionRatios[i];
+                decimal positionPrize = racePurse * (decimal)normalizedRatios[i];
                 decimal jockeyAmount = positionPrize * (decimal)(position == 1 ? jockeyConfig.WinCut : jockeyConfig.PlaceCut);
                 decimal ownerAmount = positionPrize - jockeyAmount;
 
@@ -393,6 +453,40 @@ namespace HorseRacingAPI.Services
                 }
             }
 
+            await uow.SaveAsync();
+
+            // Fix 2: rollover FundsPrize dư sang tournament tiếp theo
+            await RolloverSurplusAsync(uow, tournament);
+        }
+
+        private async Task RolloverSurplusAsync(IUnitofWork uow, Tournament tournament)
+        {
+            if (tournament.FundsPrize <= 0) return;
+
+            bool allRacesDone = !await uow.GetRepository<Race>().Entities
+                .AnyAsync(r => r.TournamentId == tournament.Id
+                            && !r.IsDeleted
+                            && r.Status != "Finished"
+                            && r.Status != "Cancelled");
+            if (!allRacesDone) return;
+
+            decimal totalDistributed = await uow.GetRepository<Prize>().Entities
+                .Include(p => p.Registration).ThenInclude(r => r.Race)
+                .Where(p => p.Registration.Race.TournamentId == tournament.Id)
+                .SumAsync(p => p.Amount ?? 0);
+
+            decimal surplus = tournament.FundsPrize - totalDistributed;
+            if (surplus <= 0) return;
+
+            Tournament? nextTournament = await uow.GetRepository<Tournament>().Entities
+                .Where(t => t.Id != tournament.Id
+                         && (t.Status == "Upcoming" || t.Status == "Ongoing"))
+                .OrderBy(t => t.CreateAt)
+                .FirstOrDefaultAsync();
+            if (nextTournament == null) return;
+
+            nextTournament.FundsPrize += surplus;
+            await uow.GetRepository<Tournament>().UpdateAsync(nextTournament);
             await uow.SaveAsync();
         }
 

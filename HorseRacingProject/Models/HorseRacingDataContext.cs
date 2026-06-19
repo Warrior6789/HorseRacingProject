@@ -19,8 +19,6 @@ public partial class HorseRacingDataContext : DbContext
 
     public virtual DbSet<Bet> Bets { get; set; }
 
-    public virtual DbSet<BetPayoutConfig> BetPayoutConfigs { get; set; }
-
     public virtual DbSet<ConversionRate> ConversionRates { get; set; }
 
     public virtual DbSet<GradePurseConfig> GradePurseConfigs { get; set; }
@@ -48,6 +46,10 @@ public partial class HorseRacingDataContext : DbContext
     public virtual DbSet<Registration> Registrations { get; set; }
 
     public virtual DbSet<Tournament> Tournaments { get; set; }
+
+    public virtual DbSet<TakeoutConfig> TakeoutConfigs { get; set; }
+
+    public virtual DbSet<RacePool> RacePools { get; set; }
 
     public virtual DbSet<UserProfile> UserProfiles { get; set; }
 
@@ -101,6 +103,7 @@ public partial class HorseRacingDataContext : DbContext
                 .HasForeignKey(d => d.SpectatorId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_Bets_Account");
+
         });
 
         modelBuilder.Entity<ConversionRate>(entity =>
@@ -362,6 +365,34 @@ public partial class HorseRacingDataContext : DbContext
                 .HasForeignKey(d => d.AccountId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_UserProfiles_Account");
+        });
+
+        modelBuilder.Entity<TakeoutConfig>(entity =>
+        {
+            entity.HasKey(e => e.TakeoutConfigId).HasName("TakeoutConfig_pkey");
+            entity.ToTable("TakeoutConfig");
+            entity.Property(e => e.TakeoutConfigId)
+                .HasDefaultValueSql("gen_random_uuid()")
+                .HasColumnName("TakeoutConfigID");
+            entity.Property(e => e.Status).HasMaxLength(20);
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+        });
+
+        modelBuilder.Entity<RacePool>(entity =>
+        {
+            entity.HasKey(e => e.RacePoolId).HasName("RacePool_pkey");
+            entity.ToTable("RacePool");
+            entity.Property(e => e.RacePoolId)
+                .HasDefaultValueSql("gen_random_uuid()")
+                .HasColumnName("RacePoolID");
+            entity.Property(e => e.TotalAmount).HasPrecision(18, 2);
+            entity.Property(e => e.BetType).HasMaxLength(20);
+            entity.Property(e => e.RaceId).HasColumnName("RaceID");
+
+            entity.HasOne(d => d.Race).WithMany()
+                .HasForeignKey(d => d.RaceId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_RacePool_Races");
         });
 
         OnModelCreatingPartial(modelBuilder);

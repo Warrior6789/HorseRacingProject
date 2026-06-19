@@ -52,7 +52,6 @@ namespace HorseRacingAPI.Controllers
         [HttpPost("logout")]
         public IActionResult Logout()
         {
-            // Stateless JWT logout only confirms the request; the client must remove the token.
             return Ok(ApiResponse<object>.SuccessResponse("Logout successful."));
         }
     }

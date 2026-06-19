@@ -16,6 +16,9 @@ using System.Text.Json.Serialization;
 
 AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
 
+System.Globalization.CultureInfo.DefaultThreadCurrentCulture = System.Globalization.CultureInfo.InvariantCulture;
+System.Globalization.CultureInfo.DefaultThreadCurrentUICulture = System.Globalization.CultureInfo.InvariantCulture;
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddCors(options =>
@@ -88,10 +91,15 @@ builder.Services.AddScoped<IRegistrationService, RegistrationService>();
 builder.Services.AddScoped<ITournamentService, TournamentService>();
 builder.Services.AddScoped<IRacecourseService, RacecourseService>();
 builder.Services.AddScoped<IRaceService, RaceService>();
+builder.Services.AddScoped<IHorseService, HorseService>();
 builder.Services.AddScoped<IPaymentService, PaymentService>();
 builder.Services.AddScoped<IBetService, BetService>();
-builder.Services.AddScoped<IBetPayoutConfigService, BetPayoutConfigService>();
+builder.Services.AddScoped<ITakeoutConfigService, TakeoutConfigService>();
 builder.Services.AddScoped<IConversionRateService, ConversionRateService>();
+builder.Services.AddScoped<IGradePurseConfigService, GradePurseConfigService>();
+builder.Services.AddScoped<IPositionPrizeConfigService, PositionPrizeConfigService>();
+builder.Services.AddScoped<IJockeyRewardConfigService, JockeyRewardConfigService>();
+builder.Services.AddScoped<IRefereeReportService, RefereeReportService>();
 builder.Services.AddSingleton<RaceEngineService>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<RaceEngineService>());
 

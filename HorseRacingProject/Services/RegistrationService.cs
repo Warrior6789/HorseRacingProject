@@ -3,6 +3,7 @@ using HorseRacingAPI.Models;
 using HorseRacingAPI.Repositories;
 using HorseRacingAPI.Repository;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace HorseRacingAPI.Services
 {
@@ -38,10 +39,25 @@ namespace HorseRacingAPI.Services
                     throw new InvalidOperationException($"Race has reached the maximum number of participants ({registration.Race.MaxParticipants}).");
             }
 
-            registration.JockeyConfirmation = true;
-            registration.Status = "Confirmed";
-            registration.UpdatedAt = DateTimeOffset.UtcNow;
-            await _uow.SaveAsync();
+            await _uow.BeginTransactionAsync();
+            try
+            {
+                registration.JockeyConfirmation = true;
+                registration.Status = "Confirmed";
+                registration.UpdatedAt = DateTimeOffset.UtcNow;
+                await _uow.SaveAsync();
+                await _uow.CommitTransactionAsync();
+            }
+            catch (DbUpdateException ex) when (ex.InnerException is PostgresException pg && pg.SqlState == "P0001")
+            {
+                await _uow.RollbackTransactionAsync();
+                throw new InvalidOperationException($"Race has reached the maximum number of participants ({registration.Race.MaxParticipants}).", ex);
+            }
+            catch
+            {
+                await _uow.RollbackTransactionAsync();
+                throw;
+            }
         }
 
         public async Task<List<RegistrationResponse>> GetMyRequestAsync(Guid jockeyAccountId)
@@ -203,6 +219,70 @@ namespace HorseRacingAPI.Services
             registration.UpdatedAt = DateTimeOffset.UtcNow;
 
             await _uow.SaveAsync();
+        }
+
+        public async Task ScratchHorseAsync(Guid registrationId)
+        {
+            Registration? registration = await _uow.GetRepository<Registration>().Entities
+                .Include(r => r.Race)
+                .FirstOrDefaultAsync(r => r.RegistrationId == registrationId);
+
+            if (registration == null)
+                throw new KeyNotFoundException("Registration not found.");
+
+            if (registration.Status != "Confirmed")
+                throw new InvalidOperationException("Only confirmed registrations can be scratched.");
+
+            string raceStatus = registration.Race.Status ?? "";
+            if (raceStatus == "Live" || raceStatus == "Finished" || raceStatus == "Cancelled")
+                throw new InvalidOperationException($"Cannot scratch a horse when race is {raceStatus}.");
+
+            await _uow.BeginTransactionAsync();
+            try
+            {
+                registration.Status = "Scratched";
+                registration.UpdatedAt = DateTimeOffset.UtcNow;
+                await _uow.GetRepository<Registration>().UpdateAsync(registration);
+
+                // Hoàn tiền tất cả bets Pending vào con ngựa này
+                List<Bet> bets = await _uow.GetRepository<Bet>().Entities
+                    .Where(b => b.RegistrationId == registrationId && b.Status == "Pending")
+                    .ToListAsync();
+
+                foreach (Bet bet in bets)
+                {
+                    bet.Status = "Refunded";
+                    await _uow.GetRepository<Bet>().UpdateAsync(bet);
+
+                    UserProfile? profile = await _uow.GetRepository<UserProfile>().Entities
+                        .FirstOrDefaultAsync(p => p.AccountId == bet.SpectatorId && !p.IsDeleted);
+                    if (profile != null)
+                    {
+                        profile.Balance = (profile.Balance ?? 0) + (long)bet.BetAmount;
+                        profile.UpdatedAt = DateTimeOffset.UtcNow;
+                        await _uow.GetRepository<UserProfile>().UpdateAsync(profile);
+                    }
+                }
+
+                // Trừ khỏi RacePool theo từng BetType
+                var grouped = bets.GroupBy(b => b.BetType);
+                foreach (var group in grouped)
+                {
+                    decimal totalRefunded = group.Sum(b => b.BetAmount);
+                    await _uow.GetRepository<RacePool>().Entities
+                        .Where(p => p.RaceId == registration.RaceId && p.BetType == group.Key)
+                        .ExecuteUpdateAsync(s => s.SetProperty(p => p.TotalAmount,
+                            p => p.TotalAmount - totalRefunded));
+                }
+
+                await _uow.SaveAsync();
+                await _uow.CommitTransactionAsync();
+            }
+            catch
+            {
+                await _uow.RollbackTransactionAsync();
+                throw;
+            }
         }
     }
 }

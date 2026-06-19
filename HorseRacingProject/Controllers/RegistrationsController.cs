@@ -53,6 +53,14 @@ namespace HorseRacingAPI.Controllers
             return Ok(ApiResponse<object>.SuccessResponse("Registration rejected successfully."));
         }
 
+        [Authorize(Roles = "Admin,Referee")]
+        [HttpPut("{registrationId}/scratch")]
+        public async Task<IActionResult> Scratch(Guid registrationId)
+        {
+            await _registrationService.ScratchHorseAsync(registrationId);
+            return Ok(ApiResponse<object>.SuccessResponse("Horse scratched and bets refunded successfully."));
+        }
+
         private Guid GetAccountIdFromToken()
         {
             string? value = HttpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;

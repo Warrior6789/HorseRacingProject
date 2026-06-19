@@ -10,5 +10,8 @@ namespace HorseRacingAPI.Repository
         void BeginTransaction();
         void CommitTransaction();
         void RollBack();
+        Task BeginTransactionAsync();
+        Task CommitTransactionAsync();
+        Task RollbackTransactionAsync();
     }
 }

@@ -6,7 +6,7 @@
         public Guid SpectatorId { get; set; }
         public Guid RegistrationId { get; set; }
         public string? HorseName { get; set; }
-        public string? RaceName { get; set; }
+        public int? RaceNumber { get; set; }
         public decimal BetAmount { get; set; }
         public string? BetType { get; set; }
         public float? PayoutRatio { get; set; }

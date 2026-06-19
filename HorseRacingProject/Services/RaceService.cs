@@ -308,9 +308,6 @@ public async Task<RegistrationResponse> RegisterHorseAsync(Guid raceId, Guid own
             if (horse == null)
                 throw new KeyNotFoundException($"Horse with id {request.HorseId} not found.");
 
-            if (horse.Status != "Active")
-                throw new InvalidOperationException("Horse must be in Active status to be registered.");
-
             if (horse.OwnerId != ownerId)
                 throw new ForbiddenAccessException("You do not own this horse.");
 
@@ -475,6 +472,7 @@ public async Task<List<RaceResultResponse>> GetRaceResultsAsync(Guid raceId)
                     Horse = new RaceResultHorseDto
                     {
                         Id = r.Registration.Horse.Id,
+                        RegistrationId = r.RegistrationId,
                         HorseName = r.Registration.Horse.HorseName,
                         Breed = r.Registration.Horse.Breed,
                         Color = r.Registration.Horse.Color,
@@ -546,7 +544,7 @@ public async Task<List<RaceResultResponse>> GetRaceResultsAsync(Guid raceId)
                     if (bet.Status == "Won")
                     {
                         long payout = (long)(bet.BetAmount * (decimal)(bet.PayoutRatio ?? 1));
-                        profile.Balance = (profile.Balance ?? 0) - payout + (long)bet.BetAmount;
+                        profile.Balance = Math.Max(0, (profile.Balance ?? 0) - payout + (long)bet.BetAmount);
                     }
                     else if (bet.Status == "Lost" || bet.Status == "Pending")
                     {
@@ -596,6 +594,23 @@ public async Task<List<RaceResultResponse>> GetRaceResultsAsync(Guid raceId)
 
             if (nextStatus == null)
                 throw new InvalidOperationException($"Race is in '{race.Status}' status and cannot be advanced.");
+
+            if (nextStatus == "BettingOpen")
+            {
+                GradePurseConfig? gradeConfig = await _uow.GetRepository<GradePurseConfig>().Entities
+                    .FirstOrDefaultAsync(c => c.Status == "Active");
+                PositionPrizeConfig? posConfig = await _uow.GetRepository<PositionPrizeConfig>().Entities
+                    .FirstOrDefaultAsync(c => c.Status == "Active");
+                JockeyRewardConfig? jockeyConfig = await _uow.GetRepository<JockeyRewardConfig>().Entities
+                    .FirstOrDefaultAsync(c => c.Status == "Active");
+
+                if (gradeConfig == null || posConfig == null || jockeyConfig == null)
+                    throw new InvalidOperationException("All prize configs (grade, position, jockey) must be active before opening betting.");
+
+                race.GradePurseConfigId = gradeConfig.GradePurseConfigId;
+                race.PositionPrizeConfigId = posConfig.PositionPrizeConfigId;
+                race.JockeyRewardConfigId = jockeyConfig.JockeyRewardConfigId;
+            }
 
             if (nextStatus == "Live")
             {

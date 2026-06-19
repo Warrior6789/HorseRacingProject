@@ -11,10 +11,12 @@ namespace HorseRacingAPI.Services
     public class HorseService : IHorseService
     {
         private readonly IUnitofWork _uow;
+        private readonly ICloudinaryService _cloudinaryService;
 
-        public HorseService(IUnitofWork uow)
+        public HorseService(IUnitofWork uow, ICloudinaryService cloudinaryService)
         {
             _uow = uow;
+            _cloudinaryService = cloudinaryService;
         }
 
         public async Task<PagedResponse<HorseDetailResponse>> GetHorsesAsync(Guid accountId, bool isAdmin, HorseQueryRequest query)
@@ -111,6 +113,9 @@ namespace HorseRacingAPI.Services
 
             await ValidateOwnerAsync(ownerId);
 
+            if (request.Image != null)
+                request.ImageUrl = await _cloudinaryService.UploadImageAsync(request.Image, "horses");
+
             IGenericRepository<Horse> horseRepo = _uow.GetRepository<Horse>();
             Horse horse = new Horse
             {
@@ -128,8 +133,22 @@ namespace HorseRacingAPI.Services
                 IsDeleted = false
             };
 
-            await horseRepo.AddAsync(horse);
-            await _uow.SaveAsync();
+            try
+            {
+                await horseRepo.AddAsync(horse);
+                await _uow.SaveAsync();
+            }
+            catch
+            {
+                if (request.ImageUrl != null)
+                {
+                    string publicId = Uri.TryCreate(request.ImageUrl, UriKind.Absolute, out Uri? uri)
+                        ? string.Join("/", uri.AbsolutePath.TrimStart('/').Split('/').TakeLast(2)).Split('.')[0]
+                        : request.ImageUrl;
+                    await _cloudinaryService.DeleteImageAsync(publicId);
+                }
+                throw;
+            }
 
             return MapToResponse(horse);
         }

@@ -36,6 +36,7 @@ namespace HorseRacingAPI.Services
             IGenericRepository<Tournament> tournamentRepo = _uow.GetRepository<Tournament>();
             Tournament tournament = new Tournament
             {
+                Id = Guid.NewGuid(),
                 TournamentName = request.TournamentName,
                 Description = request.Description,
                 StartDate = request.StartDate,

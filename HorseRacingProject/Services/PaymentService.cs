@@ -123,56 +123,76 @@ namespace HorseRacingAPI.Services
 
             if (payment.Status != PaymentStatus.Pending.ToString())
                 throw new InvalidOperationException("Payment already processed.");
+
             if (responseCode != "00")
             {
-                payment.Status = PaymentStatus.Failed.ToString();
-                await _uow.GetRepository<Payment>().UpdateAsync(payment);
-                await _uow.SaveAsync();
+                int failed = await _uow.GetRepository<Payment>().Entities
+                    .Where(p => p.PaymentId == paymentId && p.Status == PaymentStatus.Pending.ToString())
+                    .ExecuteUpdateAsync(s => s.SetProperty(p => p.Status, PaymentStatus.Failed.ToString()));
+                string failedStatus = failed > 0
+                    ? PaymentStatus.Failed.ToString()
+                    : (await _uow.GetRepository<Payment>().Entities
+                        .Where(p => p.PaymentId == paymentId)
+                        .Select(p => p.Status)
+                        .FirstOrDefaultAsync()) ?? PaymentStatus.Failed.ToString();
                 return new PaymentResponse
                 {
                     PaymentId = payment.PaymentId,
                     Amount = payment.Amount,
-                    Status = payment.Status,
+                    Status = failedStatus,
                     TransactionType = PaymentType.Deposit.ToString(),
                     BalanceChanged = 0,
                     CurrentBalance = 0,
                     CreateAt = payment.CreateAt
                 };
             }
-            UserProfile? profile = await _uow.GetRepository<UserProfile>()
-               .Entities
-               .FirstOrDefaultAsync(u => u.AccountId == payment.AccountId);
-            if (profile == null)
-            {
-                throw new KeyNotFoundException("User profile not found.");
-            }
+
             ConversionRate? conversionRate = await _uow.GetRepository<ConversionRate>()
                 .Entities
                 .FirstOrDefaultAsync(c => c.ConversionRateId == payment.ConversionRateId);
-
             if (conversionRate == null)
                 throw new KeyNotFoundException("Conversion rate not found.");
 
             long balanceToAdd = (long)(payment.Amount * (decimal)conversionRate.RateValue);
-            long currentBalance = profile.Balance ?? 0;
-            profile.Balance = currentBalance + balanceToAdd;
 
-            payment.Status = PaymentStatus.Completed.ToString();
-
-            await _uow.GetRepository<UserProfile>().UpdateAsync(profile);
-            await _uow.GetRepository<Payment>().UpdateAsync(payment);
-            await _uow.SaveAsync();
-
-            return new PaymentResponse
+            await _uow.BeginTransactionAsync();
+            try
             {
-                PaymentId = payment.PaymentId,
-                Amount = payment.Amount,
-                Status = payment.Status,
-                TransactionType = PaymentType.Deposit.ToString(),
-                BalanceChanged = balanceToAdd,
-                CurrentBalance = profile.Balance ?? 0,
-                CreateAt = payment.CreateAt
-            };
+                int claimed = await _uow.GetRepository<Payment>().Entities
+                    .Where(p => p.PaymentId == paymentId && p.Status == PaymentStatus.Pending.ToString())
+                    .ExecuteUpdateAsync(s => s.SetProperty(p => p.Status, PaymentStatus.Completed.ToString()));
+                if (claimed == 0)
+                    throw new InvalidOperationException("Payment already processed.");
+
+                int profileUpdated = await _uow.GetRepository<UserProfile>().Entities
+                    .Where(u => u.AccountId == payment.AccountId)
+                    .ExecuteUpdateAsync(s => s.SetProperty(u => u.Balance, u => (u.Balance ?? 0) + balanceToAdd));
+                if (profileUpdated == 0)
+                    throw new InvalidOperationException("User profile not found. Cannot credit balance.");
+
+                long currentBalance = await _uow.GetRepository<UserProfile>().Entities
+                    .Where(u => u.AccountId == payment.AccountId)
+                    .Select(u => u.Balance ?? 0)
+                    .FirstOrDefaultAsync();
+
+                await _uow.CommitTransactionAsync();
+
+                return new PaymentResponse
+                {
+                    PaymentId = payment.PaymentId,
+                    Amount = payment.Amount,
+                    Status = PaymentStatus.Completed.ToString(),
+                    TransactionType = PaymentType.Deposit.ToString(),
+                    BalanceChanged = balanceToAdd,
+                    CurrentBalance = currentBalance,
+                    CreateAt = payment.CreateAt
+                };
+            }
+            catch
+            {
+                await _uow.RollbackTransactionAsync();
+                throw;
+            }
         }
     }
 }

@@ -1,6 +1,3 @@
-﻿using System;
-using System.Collections.Generic;
-
 namespace HorseRacingAPI.Models;
 
 public partial class Bet
@@ -21,11 +18,7 @@ public partial class Bet
 
     public DateTimeOffset? CreatedAt { get; set; }
 
-    public Guid? BetPayoutConfigId { get; set; }
-
     public virtual Registration Registration { get; set; } = null!;
 
     public virtual Account Spectator { get; set; } = null!;
-
-    public virtual BetPayoutConfig? BetPayoutConfig { get; set; }
 }
