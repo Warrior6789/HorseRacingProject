@@ -14,6 +14,8 @@ public partial class Account
 
     public AccountRole Role { get; set; } = AccountRole.Spectator;
 
+    public AccountRole? RequestedRole { get; set; }
+
     public AccountStatus Status { get; set; }
 
     public DateTimeOffset? CreateAt { get; set; }

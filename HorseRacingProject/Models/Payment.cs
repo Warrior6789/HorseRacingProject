@@ -14,6 +14,8 @@ public partial class Payment
 
     public decimal Amount { get; set; }
 
+    public long? OrderCode { get; set; }
+
     public PaymentStatus Status { get; set; }
 
     public DateTimeOffset? CreateAt { get; set; }

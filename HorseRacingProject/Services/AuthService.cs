@@ -17,10 +17,13 @@ namespace HorseRacingAPI.Services
     {
         private readonly IUnitofWork _unitOfWork;
         private readonly IConfiguration _configuration;
-        public AuthService(IUnitofWork unitOfWork, IConfiguration configuration)
+        private readonly ICloudinaryService _cloudinary;
+
+        public AuthService(IUnitofWork unitOfWork, IConfiguration configuration, ICloudinaryService cloudinary)
         {
             _unitOfWork = unitOfWork;
             _configuration = configuration;
+            _cloudinary = cloudinary;
         }
 
         public async Task<string?> LoginAsync(LoginDto loginDto)
@@ -50,27 +53,104 @@ namespace HorseRacingAPI.Services
             IGenericRepository<Account> accountRepo = _unitOfWork.GetRepository<Account>();
             bool emailExists = await accountRepo.Entities.AnyAsync(a => a.Email == registerDto.Email);
             if (emailExists)
-            {
                 throw new InvalidOperationException("Email already exists");
-            }
 
-            AccountStatus status = AccountStatus.Pending;
-            if (string.IsNullOrWhiteSpace(registerDto.RequestedRole) ||
-    string.Equals(registerDto.RequestedRole, AccountRole.Spectator.ToString(), StringComparison.OrdinalIgnoreCase))
-            {
-                status = AccountStatus.Active;
-            }
-            Enum.TryParse<AccountRole>(registerDto.RequestedRole, true, out var parsedRole);
+            if (string.IsNullOrWhiteSpace(registerDto.FullName))
+                throw new ArgumentException("FullName is required.");
+            if (string.IsNullOrWhiteSpace(registerDto.Phone))
+                throw new ArgumentException("Phone is required.");
+
             var newAccount = new Account
             {
+                Id = Guid.NewGuid(),
                 Email = registerDto.Email,
                 PasswordHash = HashPassword(registerDto.Password),
-                Role = string.IsNullOrWhiteSpace(registerDto.RequestedRole) ? AccountRole.Spectator : parsedRole,
-                Status = status,
+                Role = AccountRole.Spectator,
+                Status = AccountStatus.Active,
                 CreateAt = DateTimeOffset.UtcNow,
                 IsDeleted = false
             };
             await accountRepo.AddAsync(newAccount);
+
+            string? avatarUrl = null;
+            if (registerDto.Avatar != null)
+                avatarUrl = await _cloudinary.UploadImageAsync(registerDto.Avatar, "avatars");
+
+            await _unitOfWork.GetRepository<UserProfile>().AddAsync(new UserProfile
+            {
+                ProfileId = Guid.NewGuid(),
+                AccountId = newAccount.Id,
+                FullName = registerDto.FullName,
+                Phone = registerDto.Phone,
+                ImageUrl = avatarUrl,
+                Balance = 0,
+                CreateAt = DateTimeOffset.UtcNow,
+                IsDeleted = false
+            });
+
+            await _unitOfWork.SaveAsync();
+        }
+
+        public async Task RequestRoleUpgradeAsync(Guid accountId, RequestRoleUpgradeDto dto)
+        {
+            var allowedRoles = new[] { AccountRole.HorseOwner, AccountRole.Jockey, AccountRole.Referee };
+
+            if (!Enum.TryParse<AccountRole>(dto.RequestedRole, ignoreCase: true, out var parsedRole) || !allowedRoles.Contains(parsedRole))
+                throw new ArgumentException("Requested role must be HorseOwner, Jockey, or Referee.");
+
+            IGenericRepository<Account> accountRepo = _unitOfWork.GetRepository<Account>();
+            Account? account = await accountRepo.Entities.FirstOrDefaultAsync(a => a.Id == accountId && !a.IsDeleted);
+
+            if (account == null)
+                throw new KeyNotFoundException("Account not found.");
+
+            if (account.Role != AccountRole.Spectator || account.Status != AccountStatus.Active)
+                throw new InvalidOperationException("Only active Spectator accounts can request a role upgrade.");
+
+            if (account.RequestedRole != null)
+                throw new InvalidOperationException("You already have a pending role upgrade request.");
+
+            string? imageUrl = null;
+            if (dto.CertificateImage != null)
+                imageUrl = await _cloudinary.UploadImageAsync(dto.CertificateImage, "certificates");
+
+            if (parsedRole == AccountRole.Jockey)
+            {
+                if (string.IsNullOrWhiteSpace(dto.LicenseNumber))
+                    throw new ArgumentException("LicenseNumber is required for Jockey.");
+
+                await _unitOfWork.GetRepository<JockeyProfile>().AddAsync(new JockeyProfile
+                {
+                    JockeyProfileId = Guid.NewGuid(),
+                    AccountId = accountId,
+                    FullName = dto.FullName,
+                    DateOfBirth = dto.DateOfBirth,
+                    Nationality = dto.Nationality,
+                    LicenseNumber = dto.LicenseNumber,
+                    Weight = dto.Weight,
+                    Height = dto.Height,
+                    CertificateImageUrl = imageUrl,
+                    TotalRaces = 0,
+                    TotalWins = 0,
+                    CreateAt = DateTimeOffset.UtcNow,
+                    IsDeleted = false
+                });
+            }
+            else
+            {
+                UserProfile? userProfile = await _unitOfWork.GetRepository<UserProfile>().Entities
+                    .FirstOrDefaultAsync(p => p.AccountId == accountId && !p.IsDeleted);
+
+                if (userProfile == null)
+                    throw new InvalidOperationException("User profile not found.");
+
+                userProfile.CertificateImageUrl = imageUrl;
+                userProfile.UpdatedAt = DateTimeOffset.UtcNow;
+                await _unitOfWork.GetRepository<UserProfile>().UpdateAsync(userProfile);
+            }
+
+            account.RequestedRole = parsedRole;
+            account.UpdatedAt = DateTimeOffset.UtcNow;
             await _unitOfWork.SaveAsync();
         }
 

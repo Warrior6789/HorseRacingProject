@@ -53,6 +53,8 @@ public partial class HorseRacingDataContext : DbContext
 
     public virtual DbSet<UserProfile> UserProfiles { get; set; }
 
+    public virtual DbSet<Withdrawal> Withdrawals { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Account>(entity =>
@@ -69,6 +71,7 @@ public partial class HorseRacingDataContext : DbContext
             entity.Property(e => e.CreateAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
             entity.Property(e => e.Email).HasMaxLength(100);
             entity.Property(e => e.Role).HasMaxLength(20).HasConversion<string>();
+            entity.Property(e => e.RequestedRole).HasMaxLength(20).HasConversion<string>().IsRequired(false);
             entity.Property(e => e.Status).HasMaxLength(20).HasConversion<string>();
             entity.Property(e => e.UpdatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
         });
@@ -416,6 +419,29 @@ public partial class HorseRacingDataContext : DbContext
                 .HasForeignKey(d => d.RaceId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_RacePool_Races");
+        });
+
+        modelBuilder.Entity<Withdrawal>(entity =>
+        {
+            entity.HasKey(e => e.WithdrawalId).HasName("Withdrawal_pkey");
+
+            entity.ToTable("Withdrawal");
+
+            entity.Property(e => e.WithdrawalId)
+                .ValueGeneratedNever()
+                .HasColumnName("WithdrawalId");
+            entity.Property(e => e.AccountId).HasColumnName("AccountId");
+            entity.Property(e => e.Status).HasConversion<int>();
+            entity.Property(e => e.BankAccountNumber).HasMaxLength(50);
+            entity.Property(e => e.BankName).HasMaxLength(100);
+            entity.Property(e => e.AccountHolderName).HasMaxLength(100);
+            entity.Property(e => e.AdminNote).HasMaxLength(255);
+            entity.Property(e => e.CreateAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            entity.HasOne(d => d.Account).WithMany()
+                .HasForeignKey(d => d.AccountId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_Withdrawal_Account");
         });
 
         OnModelCreatingPartial(modelBuilder);

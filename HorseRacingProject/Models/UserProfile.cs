@@ -17,6 +17,8 @@ public partial class UserProfile
 
     public string? ImageUrl { get; set; }
 
+    public string? CertificateImageUrl { get; set; }
+
     public DateTimeOffset? CreateAt { get; set; }
 
     public DateTimeOffset? UpdatedAt { get; set; }

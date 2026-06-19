@@ -100,6 +100,7 @@ builder.Services.AddScoped<IGradePurseConfigService, GradePurseConfigService>();
 builder.Services.AddScoped<IPositionPrizeConfigService, PositionPrizeConfigService>();
 builder.Services.AddScoped<IJockeyRewardConfigService, JockeyRewardConfigService>();
 builder.Services.AddScoped<IRefereeReportService, RefereeReportService>();
+builder.Services.AddScoped<IWithdrawalService, WithdrawalService>();
 builder.Services.AddSingleton<RaceEngineService>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<RaceEngineService>());
 

@@ -2,7 +2,9 @@ using HorseRacingAPI.Dtos;
 using HorseRacingAPI.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using PayOS.Models.Webhooks;
 using System.Security.Claims;
+using System.Text.Json;
 
 namespace HorseRacingAPI.Controllers;
 
@@ -27,11 +29,20 @@ public class PaymentsController : ControllerBase
         return Ok(ApiResponse<string>.SuccessResponse(url, "Payment URL created successfully."));
     }
 
-    [HttpGet("deposit/callback")]
-    public async Task<IActionResult> DepositCallback()
+    [HttpPost("webhook")]
+    public async Task<IActionResult> Webhook()
     {
-        PaymentResponse result = await _paymentService.ProcessCallbackAsync(Request.Query);
-        return Ok(ApiResponse<PaymentResponse>.SuccessResponse(result, "Payment processed successfully."));
+        try
+        {
+            using var reader = new System.IO.StreamReader(Request.Body);
+            string body = await reader.ReadToEndAsync();
+            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            var webhookBody = JsonSerializer.Deserialize<Webhook>(body, options);
+            if (webhookBody != null)
+                await _paymentService.ProcessWebhookAsync(webhookBody);
+        }
+        catch { }
+        return Ok(new { success = true });
     }
 
     [Authorize]
@@ -45,7 +56,7 @@ public class PaymentsController : ControllerBase
         return Ok(ApiResponse<PagedResponse<PaymentResponse>>.SuccessResponse(result, "Get payment history successfully."));
     }
 
-    private Guid GetAccountIdFromToken()
+private Guid GetAccountIdFromToken()
     {
         string? value = HttpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (!Guid.TryParse(value, out Guid accountId))
