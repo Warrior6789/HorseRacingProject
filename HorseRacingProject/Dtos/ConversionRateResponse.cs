@@ -6,6 +6,6 @@ namespace HorseRacingAPI.Dtos
     {
         public Guid Id { get; set; }
         public float RateValue { get; set; }
-        public ConversionRateStatus Status { get; set; }
+        public ConfigStatus Status { get; set; }
     }
 }

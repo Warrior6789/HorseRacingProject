@@ -1,3 +1,5 @@
+using HorseRacingAPI.Enums;
+
 namespace HorseRacingAPI.Models;
 
 public partial class Bet
@@ -10,11 +12,11 @@ public partial class Bet
 
     public decimal BetAmount { get; set; }
 
-    public string? BetType { get; set; }
+    public BetType? BetType { get; set; }
 
     public float? PayoutRatio { get; set; }
 
-    public string? Status { get; set; }
+    public BetStatus Status { get; set; }
 
     public DateTimeOffset? CreatedAt { get; set; }
 

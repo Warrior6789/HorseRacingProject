@@ -1,5 +1,6 @@
 using HorseRacingAPI.Dtos;
 using HorseRacingAPI.Enums;
+using HorseRacingAPI.Helpers;
 using HorseRacingAPI.Middlewares;
 using HorseRacingAPI.Models;
 using HorseRacingAPI.Repositories;
@@ -31,14 +32,13 @@ namespace HorseRacingAPI.Services
                 horses = horses.Where(h =>
                     h.HorseName.ToLower().Contains(search) ||
                     (h.Breed != null && h.Breed.ToLower().Contains(search)) ||
-                    (h.Color != null && h.Color.ToLower().Contains(search)) ||
-                    (h.Status != null && h.Status.ToLower().Contains(search)));
+                    (h.Color != null && h.Color.ToLower().Contains(search)));
             }
 
-            if (!string.IsNullOrWhiteSpace(query.Status))
+            if (!string.IsNullOrWhiteSpace(query.Status) &&
+                Enum.TryParse<HorseStatus>(query.Status.Trim(), ignoreCase: true, out var statusFilter))
             {
-                string status = query.Status.Trim().ToLower();
-                horses = horses.Where(h => h.Status != null && h.Status.ToLower() == status);
+                horses = horses.Where(h => h.Status == statusFilter);
             }
 
             if (!string.IsNullOrWhiteSpace(query.Breed))
@@ -55,14 +55,12 @@ namespace HorseRacingAPI.Services
 
             int totalCount = await horses.CountAsync();
 
-            string confirmedStatus = "Confirmed";
-            string liveStatus = RaceStatus.Live.ToString();
-            string[] upcomingRaceStatuses =
-            {
-                RaceStatus.Scheduled.ToString(),
-                RaceStatus.BettingOpen.ToString(),
-                RaceStatus.BettingClosed.ToString()
-            };
+            RaceStatus[] upcomingRaceStatuses =
+            [
+                RaceStatus.Scheduled,
+                RaceStatus.BettingOpen,
+                RaceStatus.BettingClosed
+            ];
 
             List<HorseDetailResponse> items = await horses
                 .OrderBy(h => h.HorseName)
@@ -76,12 +74,12 @@ namespace HorseRacingAPI.Services
                     Age = h.Age,
                     Breed = h.Breed,
                     Weight = h.Weight,
-                    Status = h.Status,
-                    DerivedStatus = h.Registrations.Any(r => r.Status == confirmedStatus && !r.Race.IsDeleted && r.Race.Status == liveStatus)
+                    Status = h.Status.ToString(),
+                    DerivedStatus = h.Registrations.Any(r => r.Status == RegistrationStatus.Confirmed && !r.Race.IsDeleted && r.Race.Status == RaceStatus.Live)
                         ? "Racing"
-                        : h.Registrations.Any(r => r.Status == confirmedStatus && !r.Race.IsDeleted && r.Race.Status != null && upcomingRaceStatuses.Contains(r.Race.Status))
+                        : h.Registrations.Any(r => r.Status == RegistrationStatus.Confirmed && !r.Race.IsDeleted && upcomingRaceStatuses.Contains(r.Race.Status))
                             ? "Registered"
-                            : h.Status,
+                            : h.Status.ToString(),
                     RecordWins = h.RecordWins,
                     Color = h.Color,
                     ImageUrl = h.ImageUrl,
@@ -124,7 +122,7 @@ namespace HorseRacingAPI.Services
                 Age = request.Age,
                 Breed = request.Breed,
                 Weight = request.Weight,
-                Status = HorseStatusPolicy.NormalizeOrDefault(request.Status).ToString(),
+                Status = HorseStatusPolicy.NormalizeOrDefault(request.Status),
                 RecordWins = request.RecordWins ?? 0,
                 Color = request.Color,
                 ImageUrl = request.ImageUrl,
@@ -170,7 +168,7 @@ namespace HorseRacingAPI.Services
                 horse.Weight = request.Weight;
 
             if (!string.IsNullOrWhiteSpace(request.Status))
-                horse.Status = HorseStatusPolicy.NormalizeRequired(request.Status).ToString();
+                horse.Status = HorseStatusPolicy.NormalizeRequired(request.Status);
 
             if (request.RecordWins.HasValue)
                 horse.RecordWins = request.RecordWins;
@@ -195,18 +193,15 @@ namespace HorseRacingAPI.Services
 
         public async Task<List<HorseResponse>> GetActiveHorsesAsync(Guid accountId, bool isAdmin)
         {
-            string[] activeStatuses = HorseStatusPolicy.ActiveStatuses.Select(s => s.ToLower()).ToArray();
-            string confirmedStatus = "Confirmed";
-            string liveStatus = RaceStatus.Live.ToString();
-            string[] upcomingRaceStatuses =
-            {
-                RaceStatus.Scheduled.ToString(),
-                RaceStatus.BettingOpen.ToString(),
-                RaceStatus.BettingClosed.ToString()
-            };
+            RaceStatus[] upcomingRaceStatuses =
+            [
+                RaceStatus.Scheduled,
+                RaceStatus.BettingOpen,
+                RaceStatus.BettingClosed
+            ];
 
             return await BuildHorseScope(accountId, isAdmin)
-                .Where(h => h.Status != null && activeStatuses.Contains(h.Status.ToLower()))
+                .Where(h => HorseStatusPolicy.ActiveStatuses.Contains(h.Status))
                 .OrderBy(h => h.HorseName)
                 .Select(h => new HorseResponse
                 {
@@ -215,12 +210,12 @@ namespace HorseRacingAPI.Services
                     Age = h.Age,
                     Breed = h.Breed,
                     Weight = h.Weight,
-                    Status = h.Status,
-                    DerivedStatus = h.Registrations.Any(r => r.Status == confirmedStatus && !r.Race.IsDeleted && r.Race.Status == liveStatus)
+                    Status = h.Status.ToString(),
+                    DerivedStatus = h.Registrations.Any(r => r.Status == RegistrationStatus.Confirmed && !r.Race.IsDeleted && r.Race.Status == RaceStatus.Live)
                         ? "Racing"
-                        : h.Registrations.Any(r => r.Status == confirmedStatus && !r.Race.IsDeleted && r.Race.Status != null && upcomingRaceStatuses.Contains(r.Race.Status))
+                        : h.Registrations.Any(r => r.Status == RegistrationStatus.Confirmed && !r.Race.IsDeleted && upcomingRaceStatuses.Contains(r.Race.Status))
                             ? "Registered"
-                            : h.Status,
+                            : h.Status.ToString(),
                     RecordWins = h.RecordWins,
                     Color = h.Color,
                     ImageUrl = h.ImageUrl
@@ -273,7 +268,7 @@ namespace HorseRacingAPI.Services
                     RaceNumber = p.Registration.Race.RaceNumber,
                     TournamentId = p.Registration.Race.TournamentId,
                     TournamentName = p.Registration.Race.Tournament.TournamentName,
-                    PrizeType = p.PrizeType,
+                    PrizeType = p.PrizeType.ToString(),
                     Amount = p.Amount,
                     DistributedAt = p.DistributedAt
                 })
@@ -293,6 +288,38 @@ namespace HorseRacingAPI.Services
                     TotalCount = rewardCount
                 }
             };
+        }
+
+        public async Task<string> UploadImageAsync(Guid horseId, Guid accountId, bool isAdmin, IFormFile file)
+        {
+            Horse horse = await GetHorseEntityAsync(horseId, accountId, isAdmin);
+
+            string? oldImageUrl = horse.ImageUrl;
+
+            string newImageUrl = await _cloudinaryService.UploadImageAsync(file, "horses");
+
+            try
+            {
+                horse.ImageUrl = newImageUrl;
+                horse.UpdatedAt = DateTimeOffset.UtcNow;
+                await _uow.SaveAsync();
+            }
+            catch
+            {
+                string newPublicId = string.Join("/", new Uri(newImageUrl).AbsolutePath
+                    .TrimStart('/').Split('/').TakeLast(2)).Split('.')[0];
+                await _cloudinaryService.DeleteImageAsync(newPublicId);
+                throw;
+            }
+
+            if (oldImageUrl != null)
+            {
+                string oldPublicId = string.Join("/", new Uri(oldImageUrl).AbsolutePath
+                    .TrimStart('/').Split('/').TakeLast(2)).Split('.')[0];
+                await _cloudinaryService.DeleteImageAsync(oldPublicId);
+            }
+
+            return newImageUrl;
         }
 
         private IQueryable<Horse> BuildHorseScope(Guid accountId, bool isAdmin)
@@ -377,7 +404,7 @@ namespace HorseRacingAPI.Services
             Age = horse.Age,
             Breed = horse.Breed,
             Weight = horse.Weight,
-            Status = horse.Status,
+            Status = horse.Status.ToString(),
             DerivedStatus = GetDerivedStatus(horse),
             RecordWins = horse.RecordWins,
             Color = horse.Color,
@@ -389,30 +416,29 @@ namespace HorseRacingAPI.Services
         private static string? GetDerivedStatus(Horse horse)
         {
             bool hasLiveRace = horse.Registrations.Any(r =>
-                r.Status == "Confirmed" &&
+                r.Status == RegistrationStatus.Confirmed &&
                 !r.Race.IsDeleted &&
-                r.Race.Status == RaceStatus.Live.ToString());
+                r.Race.Status == RaceStatus.Live);
 
             if (hasLiveRace)
                 return "Racing";
 
-            string[] upcomingRaceStatuses =
-            {
-                RaceStatus.Scheduled.ToString(),
-                RaceStatus.BettingOpen.ToString(),
-                RaceStatus.BettingClosed.ToString()
-            };
+            RaceStatus[] upcomingRaceStatuses =
+            [
+                RaceStatus.Scheduled,
+                RaceStatus.BettingOpen,
+                RaceStatus.BettingClosed
+            ];
 
             bool hasUpcomingRace = horse.Registrations.Any(r =>
-                r.Status == "Confirmed" &&
+                r.Status == RegistrationStatus.Confirmed &&
                 !r.Race.IsDeleted &&
-                r.Race.Status != null &&
                 upcomingRaceStatuses.Contains(r.Race.Status));
 
             if (hasUpcomingRace)
                 return "Registered";
 
-            return horse.Status;
+            return horse.Status.ToString();
         }
 
         private static HorseScheduleResponse MapToScheduleResponse(Registration registration) => new HorseScheduleResponse
@@ -424,18 +450,17 @@ namespace HorseRacingAPI.Services
             GateNumber = registration.GateNumber,
             OwnerConfirmation = registration.OwnerConfirmation,
             JockeyConfirmation = registration.JockeyConfirmation,
-            RegistrationStatus = registration.Status,
+            RegistrationStatus = registration.Status.ToString(),
             RaceId = registration.RaceId,
             RaceNumber = registration.Race.RaceNumber,
             StartTime = registration.Race.StartTime,
             TrackLength = registration.Race.TrackLength,
             MaxParticipants = registration.Race.MaxParticipants,
-            RaceStatus = registration.Race.Status,
+            RaceStatus = registration.Race.Status.ToString(),
             RacecourseName = registration.Race.Racecourse.RacecourseName,
             Location = registration.Race.Racecourse.Location,
             TournamentId = registration.Race.TournamentId,
             TournamentName = registration.Race.Tournament.TournamentName
         };
-
     }
 }

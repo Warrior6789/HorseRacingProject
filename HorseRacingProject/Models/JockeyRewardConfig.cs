@@ -1,4 +1,5 @@
 using System;
+using HorseRacingAPI.Enums;
 
 namespace HorseRacingAPI.Models;
 
@@ -10,7 +11,7 @@ public partial class JockeyRewardConfig
 
     public float PlaceCut { get; set; }
 
-    public string? Status { get; set; }
+    public ConfigStatus Status { get; set; }
 
     public DateTimeOffset CreatedAt { get; set; }
 

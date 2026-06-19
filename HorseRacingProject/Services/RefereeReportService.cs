@@ -20,7 +20,7 @@ namespace HorseRacingAPI.Services
             var race = await _uow.GetRepository<Race>().Entities
                 .FirstOrDefaultAsync(r => r.RaceId == dto.RaceId)
                 ?? throw new KeyNotFoundException("Race not found.");
-            if (race.Status != "Finished")
+            if (race.Status != RaceStatus.Finished)
                 throw new InvalidOperationException("Race has not finished yet.");
 
             _ = await _uow.GetRepository<Registration>().Entities
@@ -35,8 +35,8 @@ namespace HorseRacingAPI.Services
             bool existing = await _uow.GetRepository<RefereeReport>().Entities
                 .AnyAsync(r => r.RegistrationId == dto.RegistrationId
                             && r.RaceId == dto.RaceId
-                            && (r.Status == RefereeReportStatus.Pending.ToString()
-                             || r.Status == RefereeReportStatus.Approved.ToString()));
+                            && (r.Status == RefereeReportStatus.Pending
+                             || r.Status == RefereeReportStatus.Approved));
             if (existing)
                 throw new InvalidOperationException("A report already exists for this horse in this race.");
 
@@ -48,24 +48,14 @@ namespace HorseRacingAPI.Services
                 RegistrationId      = dto.RegistrationId,
                 IncidentDescription = dto.IncidentDescription,
                 PenaltyApplied      = dto.PenaltyApplied,
-                Status              = RefereeReportStatus.Pending.ToString(),
+                Status              = RefereeReportStatus.Pending,
                 CreatedAt           = DateTimeOffset.UtcNow
             };
 
             await _uow.GetRepository<RefereeReport>().AddAsync(report);
             await _uow.SaveAsync();
 
-            return new RefereeReportResponse
-            {
-                ReportId            = report.ReportId,
-                RaceId              = report.RaceId,
-                RefereeId           = report.RefereeId,
-                RegistrationId      = report.RegistrationId,
-                IncidentDescription = report.IncidentDescription,
-                PenaltyApplied      = report.PenaltyApplied,
-                Status              = report.Status ?? "",
-                CreatedAt           = (DateTimeOffset)report.CreatedAt!
-            };
+            return MapToResponse(report);
         }
 
         public async Task<RefereeReportResponse> ApproveReportAsync(Guid reportId)
@@ -73,7 +63,7 @@ namespace HorseRacingAPI.Services
             var report = await _uow.GetRepository<RefereeReport>().Entities
                 .FirstOrDefaultAsync(r => r.ReportId == reportId)
                 ?? throw new KeyNotFoundException("Report not found.");
-            if (report.Status != RefereeReportStatus.Pending.ToString())
+            if (report.Status != RefereeReportStatus.Pending)
                 throw new InvalidOperationException("Only pending reports can be approved.");
 
             var disqualifiedResult = await _uow.GetRepository<RaceResult>().Entities
@@ -97,11 +87,11 @@ namespace HorseRacingAPI.Services
 
             double gradeRatio = race.Grade switch
             {
-                "G1"     => race.GradePurseConfig.G1Ratio,
-                "G2"     => race.GradePurseConfig.G2Ratio,
-                "G3"     => race.GradePurseConfig.G3Ratio,
-                "Listed" => race.GradePurseConfig.ListedRatio,
-                _        => race.GradePurseConfig.OpenRatio
+                RaceGrade.G1     => race.GradePurseConfig.G1Ratio,
+                RaceGrade.G2     => race.GradePurseConfig.G2Ratio,
+                RaceGrade.G3     => race.GradePurseConfig.G3Ratio,
+                RaceGrade.Listed => race.GradePurseConfig.ListedRatio,
+                _                => race.GradePurseConfig.OpenRatio
             };
             decimal racePurse = race.Tournament.FundsPrize * (decimal)gradeRatio;
 
@@ -112,7 +102,7 @@ namespace HorseRacingAPI.Services
                 race.PositionPrizeConfig.Pos5Ratio, race.PositionPrizeConfig.Pos6Ratio
             ];
 
-            report.Status = RefereeReportStatus.Approved.ToString();
+            report.Status = RefereeReportStatus.Approved;
             disqualifiedResult.IsDisqualified = true;
             await _uow.GetRepository<RefereeReport>().UpdateAsync(report);
             await _uow.GetRepository<RaceResult>().UpdateAsync(disqualifiedResult);
@@ -124,7 +114,7 @@ namespace HorseRacingAPI.Services
 
             foreach (var prize in disqualifiedPrizes)
             {
-                if (prize.PrizeType == "Owner")
+                if (prize.PrizeType == PrizeType.Owner)
                 {
                     var ownerProfile = await _uow.GetRepository<UserProfile>().Entities
                         .FirstOrDefaultAsync(p => p.AccountId == prize.Registration.Horse.OwnerId && !p.IsDeleted);
@@ -135,7 +125,7 @@ namespace HorseRacingAPI.Services
                         await _uow.GetRepository<UserProfile>().UpdateAsync(ownerProfile);
                     }
                 }
-                else if (prize.PrizeType == "Jockey")
+                else if (prize.PrizeType == PrizeType.Jockey)
                 {
                     var jockeyProfile = await _uow.GetRepository<UserProfile>().Entities
                         .FirstOrDefaultAsync(p => p.AccountId == prize.Registration.JockeyId && !p.IsDeleted);
@@ -215,7 +205,7 @@ namespace HorseRacingAPI.Services
                     {
                         PrizeId        = Guid.NewGuid(),
                         RegistrationId = result.RegistrationId,
-                        PrizeType      = "Owner",
+                        PrizeType      = PrizeType.Owner,
                         Amount         = ownerNew,
                         DistributedAt  = DateTimeOffset.UtcNow
                     });
@@ -225,7 +215,7 @@ namespace HorseRacingAPI.Services
                     {
                         PrizeId        = Guid.NewGuid(),
                         RegistrationId = result.RegistrationId,
-                        PrizeType      = "Jockey",
+                        PrizeType      = PrizeType.Jockey,
                         Amount         = jockeyNew,
                         DistributedAt  = DateTimeOffset.UtcNow
                     });
@@ -233,17 +223,7 @@ namespace HorseRacingAPI.Services
 
             await _uow.SaveAsync();
 
-            return new RefereeReportResponse
-            {
-                ReportId            = report.ReportId,
-                RaceId              = report.RaceId,
-                RefereeId           = report.RefereeId,
-                RegistrationId      = report.RegistrationId,
-                IncidentDescription = report.IncidentDescription,
-                PenaltyApplied      = report.PenaltyApplied,
-                Status              = report.Status ?? "",
-                CreatedAt           = (DateTimeOffset)report.CreatedAt!
-            };
+            return MapToResponse(report);
         }
 
         public async Task<RefereeReportResponse> RejectReportAsync(Guid reportId)
@@ -251,24 +231,14 @@ namespace HorseRacingAPI.Services
             var report = await _uow.GetRepository<RefereeReport>().Entities
                 .FirstOrDefaultAsync(r => r.ReportId == reportId)
                 ?? throw new KeyNotFoundException("Report not found.");
-            if (report.Status != RefereeReportStatus.Pending.ToString())
+            if (report.Status != RefereeReportStatus.Pending)
                 throw new InvalidOperationException("Only pending reports can be rejected.");
 
-            report.Status = RefereeReportStatus.Rejected.ToString();
+            report.Status = RefereeReportStatus.Rejected;
             await _uow.GetRepository<RefereeReport>().UpdateAsync(report);
             await _uow.SaveAsync();
 
-            return new RefereeReportResponse
-            {
-                ReportId            = report.ReportId,
-                RaceId              = report.RaceId,
-                RefereeId           = report.RefereeId,
-                RegistrationId      = report.RegistrationId,
-                IncidentDescription = report.IncidentDescription,
-                PenaltyApplied      = report.PenaltyApplied,
-                Status              = report.Status ?? "",
-                CreatedAt           = (DateTimeOffset)report.CreatedAt!
-            };
+            return MapToResponse(report);
         }
 
         public async Task<PagedResponse<RefereeReportResponse>> GetReportsByRaceAsync(Guid raceId, int page, int pageSize, Guid? refereeId = null)
@@ -304,7 +274,7 @@ namespace HorseRacingAPI.Services
                     OriginalPosition    = r.Registration.RaceResults.FirstOrDefault() != null ? r.Registration.RaceResults.FirstOrDefault()!.FinishPosition : null,
                     IncidentDescription = r.IncidentDescription,
                     PenaltyApplied      = r.PenaltyApplied,
-                    Status              = r.Status ?? "",
+                    Status              = r.Status.ToString(),
                     CreatedAt           = r.CreatedAt,
                 })
                 .ToListAsync();
@@ -317,5 +287,17 @@ namespace HorseRacingAPI.Services
                 TotalCount = total
             };
         }
+
+        private static RefereeReportResponse MapToResponse(RefereeReport report) => new RefereeReportResponse
+        {
+            ReportId            = report.ReportId,
+            RaceId              = report.RaceId,
+            RefereeId           = report.RefereeId,
+            RegistrationId      = report.RegistrationId,
+            IncidentDescription = report.IncidentDescription,
+            PenaltyApplied      = report.PenaltyApplied,
+            Status              = report.Status.ToString(),
+            CreatedAt           = (DateTimeOffset)report.CreatedAt!
+        };
     }
 }

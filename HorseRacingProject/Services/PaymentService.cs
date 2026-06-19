@@ -22,15 +22,14 @@ namespace HorseRacingAPI.Services
             IGenericRepository<UserProfile> userProfiletRepo = _uow.GetRepository<UserProfile>();
             UserProfile? userProfile = await userProfiletRepo.Entities.FirstOrDefaultAsync(a => a.AccountId == Id);
             if (userProfile == null)
-            {
                 throw new KeyNotFoundException("User profile not found.");
-            }
+
             IGenericRepository<ConversionRate> conversionRateRepo = _uow.GetRepository<ConversionRate>();
-            ConversionRate? converionRate = await conversionRateRepo.Entities.FirstOrDefaultAsync(c => c.Status == "Active");
+            ConversionRate? converionRate = await conversionRateRepo.Entities
+                .FirstOrDefaultAsync(c => c.Status == ConfigStatus.Active);
             if (converionRate == null)
-            {
                 throw new InvalidOperationException("No active conversion rate found.");
-            }
+
             IGenericRepository<Payment> paymentRepo = _uow.GetRepository<Payment>();
             Payment payment = new Payment()
             {
@@ -39,7 +38,7 @@ namespace HorseRacingAPI.Services
                 Amount           = request.Amount,
                 ConversionRateId = converionRate.ConversionRateId,
                 CreateAt         = DateTimeOffset.UtcNow,
-                Status           = PaymentStatus.Pending.ToString()
+                Status           = PaymentStatus.Pending
             };
 
             await paymentRepo.AddAsync(payment);
@@ -72,26 +71,26 @@ namespace HorseRacingAPI.Services
 
             IGenericRepository<Payment> paymentRepo = _uow.GetRepository<Payment>();
             int totalCount = await paymentRepo.Entities
-          .CountAsync(p => p.AccountId == accountId);
+                .CountAsync(p => p.AccountId == accountId);
 
             IEnumerable<PaymentResponse> items = await paymentRepo.FindAsync<PaymentResponse>(
-          predicate: p => p.AccountId == accountId,
-          orderBy: q => q.OrderByDescending(p => p.CreateAt),
-          selector: p => new PaymentResponse
-          {
-              PaymentId = p.PaymentId,
-              Amount = p.Amount,
-              Status = p.Status,
-              TransactionType = p.Status!.StartsWith("Withdraw")
-                                  ? PaymentType.Withdraw.ToString()
-                                  : PaymentType.Deposit.ToString(),
-              BalanceChanged = 0,
-              CurrentBalance = 0,
-              CreateAt = p.CreateAt
-          },
-          pageIndex: page - 1,
-          pageSize: pageSize
-                );
+                predicate: p => p.AccountId == accountId,
+                orderBy: q => q.OrderByDescending(p => p.CreateAt),
+                selector: p => new PaymentResponse
+                {
+                    PaymentId = p.PaymentId,
+                    Amount = p.Amount,
+                    Status = p.Status.ToString(),
+                    TransactionType = p.Status == PaymentStatus.WithdrawPending
+                        ? PaymentType.Withdraw.ToString()
+                        : PaymentType.Deposit.ToString(),
+                    BalanceChanged = 0,
+                    CurrentBalance = 0,
+                    CreateAt = p.CreateAt
+                },
+                pageIndex: page - 1,
+                pageSize: pageSize
+            );
             return new PagedResponse<PaymentResponse>
             {
                 Items = items.ToList(),
@@ -111,9 +110,7 @@ namespace HorseRacingAPI.Services
             string responseCode = queryParams["vnp_ResponseCode"].ToString();
 
             if (!Guid.TryParse(txnRef, out Guid paymentId))
-            {
                 throw new InvalidOperationException("Invalid transaction reference.");
-            }
 
             IGenericRepository<Payment> paymentRepo = _uow.GetRepository<Payment>();
             Payment? payment = await paymentRepo.Entities.FirstOrDefaultAsync(p => p.PaymentId == paymentId);
@@ -121,20 +118,20 @@ namespace HorseRacingAPI.Services
             if (payment == null)
                 throw new KeyNotFoundException("Payment not found.");
 
-            if (payment.Status != PaymentStatus.Pending.ToString())
+            if (payment.Status != PaymentStatus.Pending)
                 throw new InvalidOperationException("Payment already processed.");
 
             if (responseCode != "00")
             {
                 int failed = await _uow.GetRepository<Payment>().Entities
-                    .Where(p => p.PaymentId == paymentId && p.Status == PaymentStatus.Pending.ToString())
-                    .ExecuteUpdateAsync(s => s.SetProperty(p => p.Status, PaymentStatus.Failed.ToString()));
+                    .Where(p => p.PaymentId == paymentId && p.Status == PaymentStatus.Pending)
+                    .ExecuteUpdateAsync(s => s.SetProperty(p => p.Status, PaymentStatus.Failed));
                 string failedStatus = failed > 0
                     ? PaymentStatus.Failed.ToString()
                     : (await _uow.GetRepository<Payment>().Entities
                         .Where(p => p.PaymentId == paymentId)
                         .Select(p => p.Status)
-                        .FirstOrDefaultAsync()) ?? PaymentStatus.Failed.ToString();
+                        .FirstOrDefaultAsync()).ToString();
                 return new PaymentResponse
                 {
                     PaymentId = payment.PaymentId,
@@ -159,8 +156,8 @@ namespace HorseRacingAPI.Services
             try
             {
                 int claimed = await _uow.GetRepository<Payment>().Entities
-                    .Where(p => p.PaymentId == paymentId && p.Status == PaymentStatus.Pending.ToString())
-                    .ExecuteUpdateAsync(s => s.SetProperty(p => p.Status, PaymentStatus.Completed.ToString()));
+                    .Where(p => p.PaymentId == paymentId && p.Status == PaymentStatus.Pending)
+                    .ExecuteUpdateAsync(s => s.SetProperty(p => p.Status, PaymentStatus.Completed));
                 if (claimed == 0)
                     throw new InvalidOperationException("Payment already processed.");
 

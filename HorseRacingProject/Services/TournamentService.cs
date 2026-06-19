@@ -1,4 +1,4 @@
-﻿using HorseRacingAPI.Dtos;
+using HorseRacingAPI.Dtos;
 using HorseRacingAPI.Enums;
 using HorseRacingAPI.Models;
 using HorseRacingAPI.Repositories;
@@ -23,7 +23,7 @@ namespace HorseRacingAPI.Services
             if (tournament == null || tournament.IsDeleted)
                 throw new KeyNotFoundException($"Tournament with id {tournamentId} not found.");
 
-            tournament.Status = newStatus.ToString();
+            tournament.Status = newStatus;
 
             await tournamentRepo.UpdateAsync(tournament);
             await _uow.SaveAsync();
@@ -41,7 +41,7 @@ namespace HorseRacingAPI.Services
                 Description = request.Description,
                 StartDate = request.StartDate,
                 EndDate = request.EndDate,
-                Status = TournamentStatus.Upcoming.ToString(),
+                Status = TournamentStatus.Upcoming,
                 FundsPrize = request.FundsPrize
             };
             await tournamentRepo.AddAsync(tournament);
@@ -71,16 +71,16 @@ namespace HorseRacingAPI.Services
         {
             IGenericRepository<Tournament> tournamentRepo = _uow.GetRepository<Tournament>();
             List<TournamentResponse> tournaments = await tournamentRepo.Entities
-                .Where(t => !t.IsDeleted && t.Status != TournamentStatus.Cancelled.ToString())
+                .Where(t => !t.IsDeleted && t.Status != TournamentStatus.Cancelled)
                 .Select(t => new TournamentResponse
-            {
-                TournamentId = t.Id,
-                TournamentName = t.TournamentName,
-                Description = t.Description,
-                StartDate = t.StartDate,
-                EndDate = t.EndDate,
-                Status = t.Status
-            }).ToListAsync();
+                {
+                    TournamentId = t.Id,
+                    TournamentName = t.TournamentName,
+                    Description = t.Description,
+                    StartDate = t.StartDate,
+                    EndDate = t.EndDate,
+                    Status = t.Status.ToString()
+                }).ToListAsync();
             return tournaments;
         }
 
@@ -93,7 +93,7 @@ namespace HorseRacingAPI.Services
 
             IEnumerable<TournamentResponse> items = await tournamentRepo
                 .FindAsync(
-                predicate: t => !t.IsDeleted && t.Status != TournamentStatus.Cancelled.ToString(),
+                predicate: t => !t.IsDeleted && t.Status != TournamentStatus.Cancelled,
                 orderBy: null,
                 selector: t => new TournamentResponse
                 {
@@ -102,15 +102,14 @@ namespace HorseRacingAPI.Services
                     Description = t.Description,
                     StartDate = t.StartDate,
                     EndDate = t.EndDate,
-                    Status = t.Status,
+                    Status = t.Status.ToString(),
                     FundsPrize = t.FundsPrize
                 },
                 pageIndex: page - 1,
                 pageSize: pageSize
                 );
-                
 
-            int total = await tournamentRepo.Entities.CountAsync(t => !t.IsDeleted && t.Status != TournamentStatus.Cancelled.ToString());
+            int total = await tournamentRepo.Entities.CountAsync(t => !t.IsDeleted && t.Status != TournamentStatus.Cancelled);
             PagedResponse<TournamentResponse> response = new PagedResponse<TournamentResponse>
             {
                 Items = items.ToList(),
@@ -125,10 +124,9 @@ namespace HorseRacingAPI.Services
         {
             IGenericRepository<Tournament> tournamentRepo = _uow.GetRepository<Tournament>();
             Tournament? tournament = await tournamentRepo.GetByIdAsync(id);
-            if(tournament == null || tournament.IsDeleted)
-            {
+            if (tournament == null || tournament.IsDeleted)
                 throw new KeyNotFoundException($"Tournament with id {id} not found.");
-            }
+
             return MapToResponse(tournament);
         }
 
@@ -169,7 +167,7 @@ namespace HorseRacingAPI.Services
             Description = t.Description,
             StartDate = t.StartDate,
             EndDate = t.EndDate,
-            Status = t.Status,
+            Status = t.Status.ToString(),
             FundsPrize = t.FundsPrize
         };
     }

@@ -68,15 +68,8 @@ public partial class HorseRacingDataContext : DbContext
                 .HasColumnName("ID");
             entity.Property(e => e.CreateAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
             entity.Property(e => e.Email).HasMaxLength(100);
-            entity.Property(e => e.Role)
-        .HasMaxLength(20)
-        .HasConversion<string>(); 
-
-            entity.Property(e => e.Status)
-                .HasMaxLength(20)
-                .HasConversion<string>();
-            entity.Property(e => e.Role).HasMaxLength(20);
-            entity.Property(e => e.Status).HasMaxLength(20);
+            entity.Property(e => e.Role).HasMaxLength(20).HasConversion<string>();
+            entity.Property(e => e.Status).HasMaxLength(20).HasConversion<string>();
             entity.Property(e => e.UpdatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
         });
 
@@ -88,11 +81,11 @@ public partial class HorseRacingDataContext : DbContext
                 .HasDefaultValueSql("gen_random_uuid()")
                 .HasColumnName("BetID");
             entity.Property(e => e.BetAmount).HasPrecision(18, 2);
-            entity.Property(e => e.BetType).HasMaxLength(20);
+            entity.Property(e => e.BetType).HasMaxLength(20).HasConversion<string>();
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
             entity.Property(e => e.RegistrationId).HasColumnName("RegistrationID");
             entity.Property(e => e.SpectatorId).HasColumnName("SpectatorID");
-            entity.Property(e => e.Status).HasMaxLength(20);
+            entity.Property(e => e.Status).HasMaxLength(20).HasConversion<string>();
 
             entity.HasOne(d => d.Registration).WithMany(p => p.Bets)
                 .HasForeignKey(d => d.RegistrationId)
@@ -103,7 +96,6 @@ public partial class HorseRacingDataContext : DbContext
                 .HasForeignKey(d => d.SpectatorId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_Bets_Account");
-
         });
 
         modelBuilder.Entity<ConversionRate>(entity =>
@@ -116,7 +108,37 @@ public partial class HorseRacingDataContext : DbContext
                 .HasDefaultValueSql("gen_random_uuid()")
                 .HasColumnName("ConversionRateID");
             entity.Property(e => e.RateValue).HasColumnName("RateValue");
-            entity.Property(e => e.Status).HasMaxLength(20);
+            entity.Property(e => e.Status).HasMaxLength(20).HasConversion<string>();
+        });
+
+        modelBuilder.Entity<GradePurseConfig>(entity =>
+        {
+            entity.HasKey(e => e.GradePurseConfigId).HasName("GradePurseConfig_pkey");
+            entity.Property(e => e.GradePurseConfigId)
+                .HasDefaultValueSql("gen_random_uuid()")
+                .HasColumnName("GradePurseConfigId");
+            entity.Property(e => e.Status).HasMaxLength(20).HasConversion<string>();
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+        });
+
+        modelBuilder.Entity<JockeyRewardConfig>(entity =>
+        {
+            entity.HasKey(e => e.JockeyRewardConfigId).HasName("JockeyRewardConfig_pkey");
+            entity.Property(e => e.JockeyRewardConfigId)
+                .HasDefaultValueSql("gen_random_uuid()")
+                .HasColumnName("JockeyRewardConfigId");
+            entity.Property(e => e.Status).HasMaxLength(20).HasConversion<string>();
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+        });
+
+        modelBuilder.Entity<PositionPrizeConfig>(entity =>
+        {
+            entity.HasKey(e => e.PositionPrizeConfigId).HasName("PositionPrizeConfig_pkey");
+            entity.Property(e => e.PositionPrizeConfigId)
+                .HasDefaultValueSql("gen_random_uuid()")
+                .HasColumnName("PositionPrizeConfigId");
+            entity.Property(e => e.Status).HasMaxLength(20).HasConversion<string>();
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
         });
 
         modelBuilder.Entity<Horse>(entity =>
@@ -132,7 +154,7 @@ public partial class HorseRacingDataContext : DbContext
             entity.Property(e => e.HorseName).HasMaxLength(100);
             entity.Property(e => e.OwnerId).HasColumnName("OwnerID");
             entity.Property(e => e.RecordWins).HasDefaultValue(0);
-            entity.Property(e => e.Status).HasMaxLength(20);
+            entity.Property(e => e.Status).HasMaxLength(20).HasConversion<string>();
             entity.Property(e => e.ImageUrl).HasMaxLength(500);
             entity.Property(e => e.UpdatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
 
@@ -180,7 +202,7 @@ public partial class HorseRacingDataContext : DbContext
             entity.Property(e => e.Amount).HasPrecision(18, 2);
             entity.Property(e => e.ConversionRateId).HasColumnName("ConversionRateID");
             entity.Property(e => e.CreateAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
-            entity.Property(e => e.Status).HasMaxLength(20);
+            entity.Property(e => e.Status).HasMaxLength(20).HasConversion<string>();
 
             entity.HasOne(d => d.ConversionRate).WithMany(p => p.Payments)
                 .HasForeignKey(d => d.ConversionRateId)
@@ -196,7 +218,7 @@ public partial class HorseRacingDataContext : DbContext
                 .ValueGeneratedNever()
                 .HasColumnName("PrizeID");
             entity.Property(e => e.Amount).HasPrecision(18, 2);
-            entity.Property(e => e.PrizeType).HasMaxLength(50);
+            entity.Property(e => e.PrizeType).HasMaxLength(50).HasConversion<string>();
             entity.Property(e => e.RegistrationId).HasColumnName("RegistrationID");
 
             entity.HasOne(d => d.Registration).WithMany(p => p.Prizes)
@@ -214,9 +236,9 @@ public partial class HorseRacingDataContext : DbContext
                 .HasColumnName("RaceID");
             entity.Property(e => e.CreateAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
             entity.Property(e => e.RacecourseId).HasColumnName("RacecourseID");
-            entity.Property(e => e.Status).HasMaxLength(20);
+            entity.Property(e => e.Status).HasMaxLength(20).HasConversion<string>();
             entity.Property(e => e.TournamentId).HasColumnName("TournamentID");
-            entity.Property(e => e.Grade).HasMaxLength(20).HasColumnName("Grade");
+            entity.Property(e => e.Grade).HasMaxLength(20).HasColumnName("Grade").HasConversion<string>();
 
             entity.HasOne(d => d.Racecourse).WithMany(p => p.Races)
                 .HasForeignKey(d => d.RacecourseId)
@@ -284,6 +306,7 @@ public partial class HorseRacingDataContext : DbContext
             entity.Property(e => e.PenaltyApplied).HasMaxLength(255);
             entity.Property(e => e.RaceId).HasColumnName("RaceID");
             entity.Property(e => e.RefereeId).HasColumnName("RefereeID");
+            entity.Property(e => e.Status).HasMaxLength(20).HasConversion<string>();
 
             entity.HasOne(d => d.Race).WithMany(p => p.RefereeReports)
                 .HasForeignKey(d => d.RaceId)
@@ -314,7 +337,7 @@ public partial class HorseRacingDataContext : DbContext
             entity.Property(e => e.JockeyId).HasColumnName("JockeyID");
             entity.Property(e => e.OwnerConfirmation).HasDefaultValue(false);
             entity.Property(e => e.RaceId).HasColumnName("RaceID");
-            entity.Property(e => e.Status).HasMaxLength(20);
+            entity.Property(e => e.Status).HasMaxLength(20).HasConversion<string>();
             entity.Property(e => e.UpdatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
 
             entity.HasOne(d => d.Horse).WithMany(p => p.Registrations)
@@ -341,7 +364,7 @@ public partial class HorseRacingDataContext : DbContext
                 .ValueGeneratedNever()
                 .HasColumnName("ID");
             entity.Property(e => e.CreateAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
-            entity.Property(e => e.Status).HasMaxLength(20);
+            entity.Property(e => e.Status).HasMaxLength(20).HasConversion<string>();
             entity.Property(e => e.TournamentName).HasMaxLength(150);
             entity.Property(e => e.FundsPrize).HasPrecision(18, 2).HasColumnName("FundsPrize");
         });
@@ -374,7 +397,7 @@ public partial class HorseRacingDataContext : DbContext
             entity.Property(e => e.TakeoutConfigId)
                 .HasDefaultValueSql("gen_random_uuid()")
                 .HasColumnName("TakeoutConfigID");
-            entity.Property(e => e.Status).HasMaxLength(20);
+            entity.Property(e => e.Status).HasMaxLength(20).HasConversion<string>();
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
         });
 
@@ -386,7 +409,7 @@ public partial class HorseRacingDataContext : DbContext
                 .HasDefaultValueSql("gen_random_uuid()")
                 .HasColumnName("RacePoolID");
             entity.Property(e => e.TotalAmount).HasPrecision(18, 2);
-            entity.Property(e => e.BetType).HasMaxLength(20);
+            entity.Property(e => e.BetType).HasMaxLength(20).HasConversion<string>();
             entity.Property(e => e.RaceId).HasColumnName("RaceID");
 
             entity.HasOne(d => d.Race).WithMany()

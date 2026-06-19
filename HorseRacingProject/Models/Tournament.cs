@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using HorseRacingAPI.Enums;
 
 namespace HorseRacingAPI.Models;
 
@@ -15,7 +16,7 @@ public partial class Tournament
 
     public DateOnly? EndDate { get; set; }
 
-    public string? Status { get; set; }
+    public TournamentStatus Status { get; set; }
 
     public decimal FundsPrize { get; set; }
 

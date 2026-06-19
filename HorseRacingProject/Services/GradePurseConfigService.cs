@@ -1,4 +1,5 @@
 using HorseRacingAPI.Dtos;
+using HorseRacingAPI.Enums;
 using HorseRacingAPI.Models;
 using HorseRacingAPI.Repositories;
 using HorseRacingAPI.Repository;
@@ -28,7 +29,7 @@ namespace HorseRacingAPI.Services
                 G3Ratio            = req.G3Ratio,
                 ListedRatio        = req.ListedRatio,
                 OpenRatio          = req.OpenRatio,
-                Status             = "Inactive",
+                Status             = ConfigStatus.Inactive,
                 CreatedAt          = DateTimeOffset.UtcNow
             };
             await _uow.GetRepository<GradePurseConfig>().AddAsync(config);
@@ -39,7 +40,7 @@ namespace HorseRacingAPI.Services
         public async Task<GradePurseConfigResponse> GetActiveAsync()
         {
             var config = await _uow.GetRepository<GradePurseConfig>().Entities
-                .FirstOrDefaultAsync(c => c.Status == "Active")
+                .FirstOrDefaultAsync(c => c.Status == ConfigStatus.Active)
                 ?? throw new KeyNotFoundException("No active grade purse config found.");
             return MapToResponse(config);
         }
@@ -78,9 +79,9 @@ namespace HorseRacingAPI.Services
             await _uow.BeginTransactionAsync();
             try
             {
-                await repo.Entities.ExecuteUpdateAsync(s => s.SetProperty(c => c.Status, "Inactive"));
+                await repo.Entities.ExecuteUpdateAsync(s => s.SetProperty(c => c.Status, ConfigStatus.Inactive));
                 var target = await repo.Entities.FirstOrDefaultAsync(c => c.GradePurseConfigId == id);
-                target!.Status = "Active";
+                target!.Status = ConfigStatus.Active;
                 await _uow.SaveAsync();
                 await _uow.CommitTransactionAsync();
             }
@@ -99,7 +100,7 @@ namespace HorseRacingAPI.Services
             G3Ratio     = c.G3Ratio,
             ListedRatio = c.ListedRatio,
             OpenRatio   = c.OpenRatio,
-            Status      = c.Status ?? "Inactive",
+            Status      = c.Status.ToString(),
             CreatedAt   = c.CreatedAt
         };
     }

@@ -1,4 +1,5 @@
 using HorseRacingAPI.Dtos;
+using HorseRacingAPI.Enums;
 using HorseRacingAPI.Models;
 using HorseRacingAPI.Repositories;
 using HorseRacingAPI.Repository;
@@ -30,7 +31,7 @@ namespace HorseRacingAPI.Services
                 Pos4Ratio             = req.Pos4Ratio,
                 Pos5Ratio             = req.Pos5Ratio,
                 Pos6Ratio             = req.Pos6Ratio,
-                Status                = "Inactive",
+                Status                = ConfigStatus.Inactive,
                 CreatedAt             = DateTimeOffset.UtcNow
             };
             await _uow.GetRepository<PositionPrizeConfig>().AddAsync(config);
@@ -41,7 +42,7 @@ namespace HorseRacingAPI.Services
         public async Task<PositionPrizeConfigResponse> GetActiveAsync()
         {
             var config = await _uow.GetRepository<PositionPrizeConfig>().Entities
-                .FirstOrDefaultAsync(c => c.Status == "Active")
+                .FirstOrDefaultAsync(c => c.Status == ConfigStatus.Active)
                 ?? throw new KeyNotFoundException("No active position prize config found.");
             return MapToResponse(config);
         }
@@ -80,9 +81,9 @@ namespace HorseRacingAPI.Services
             await _uow.BeginTransactionAsync();
             try
             {
-                await repo.Entities.ExecuteUpdateAsync(s => s.SetProperty(c => c.Status, "Inactive"));
+                await repo.Entities.ExecuteUpdateAsync(s => s.SetProperty(c => c.Status, ConfigStatus.Inactive));
                 var target = await repo.Entities.FirstOrDefaultAsync(c => c.PositionPrizeConfigId == id);
-                target!.Status = "Active";
+                target!.Status = ConfigStatus.Active;
                 await _uow.SaveAsync();
                 await _uow.CommitTransactionAsync();
             }
@@ -102,7 +103,7 @@ namespace HorseRacingAPI.Services
             Pos4Ratio = c.Pos4Ratio,
             Pos5Ratio = c.Pos5Ratio,
             Pos6Ratio = c.Pos6Ratio,
-            Status    = c.Status ?? "Inactive",
+            Status    = c.Status.ToString(),
             CreatedAt = c.CreatedAt
         };
     }

@@ -1,4 +1,5 @@
 using HorseRacingAPI.Dtos;
+using HorseRacingAPI.Enums;
 using HorseRacingAPI.Models;
 using HorseRacingAPI.Repository;
 using Microsoft.EntityFrameworkCore;
@@ -23,7 +24,7 @@ namespace HorseRacingAPI.Services
             {
                 TakeoutConfigId = Guid.NewGuid(),
                 TakeoutPercentage = req.TakeoutPercentage,
-                Status = "Inactive",
+                Status = ConfigStatus.Inactive,
                 CreatedAt = DateTimeOffset.UtcNow
             };
             await _uow.GetRepository<TakeoutConfig>().AddAsync(config);
@@ -34,7 +35,7 @@ namespace HorseRacingAPI.Services
         public async Task<TakeoutConfigResponse> GetActiveConfigAsync()
         {
             TakeoutConfig? config = await _uow.GetRepository<TakeoutConfig>().Entities
-                .FirstOrDefaultAsync(c => c.Status == "Active");
+                .FirstOrDefaultAsync(c => c.Status == ConfigStatus.Active);
             if (config == null)
                 throw new KeyNotFoundException("No active takeout config found.");
             return MapToResponse(config);
@@ -55,7 +56,7 @@ namespace HorseRacingAPI.Services
                 {
                     Id = c.TakeoutConfigId,
                     TakeoutPercentage = c.TakeoutPercentage,
-                    Status = c.Status,
+                    Status = c.Status.ToString(),
                     CreatedAt = c.CreatedAt
                 },
                 pageIndex: page - 1,
@@ -79,9 +80,9 @@ namespace HorseRacingAPI.Services
 
             List<TakeoutConfig> all = await repo.Entities.ToListAsync();
             foreach (TakeoutConfig c in all)
-                c.Status = "Inactive";
+                c.Status = ConfigStatus.Inactive;
 
-            target.Status = "Active";
+            target.Status = ConfigStatus.Active;
             await _uow.SaveAsync();
         }
 
@@ -89,7 +90,7 @@ namespace HorseRacingAPI.Services
         {
             Id = c.TakeoutConfigId,
             TakeoutPercentage = c.TakeoutPercentage,
-            Status = c.Status,
+            Status = c.Status.ToString(),
             CreatedAt = c.CreatedAt
         };
     }

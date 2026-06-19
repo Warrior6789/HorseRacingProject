@@ -79,6 +79,17 @@ namespace HorseRacingAPI.Controllers
             return Ok(ApiResponse<HorseDetailResponse>.SuccessResponse(horse, "Horse updated successfully."));
         }
 
+        [HttpPut("{id:guid}/image")]
+        [Consumes("multipart/form-data")]
+        public async Task<IActionResult> UploadHorseImage(Guid id, IFormFile file)
+        {
+            Guid accountId = GetAccountIdFromToken();
+            bool isAdmin = IsAdmin();
+
+            string imageUrl = await _horseService.UploadImageAsync(id, accountId, isAdmin, file);
+            return Ok(ApiResponse<string>.SuccessResponse(imageUrl, "Horse image uploaded successfully."));
+        }
+
         [HttpDelete("{id:guid}")]
         public async Task<IActionResult> DeleteHorse(Guid id)
         {

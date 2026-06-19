@@ -1,3 +1,4 @@
+
 using HorseRacingAPI.Dtos;
 using HorseRacingAPI.Enums;
 using HorseRacingAPI.Models;
@@ -34,10 +35,10 @@ namespace HorseRacingAPI.Services
             if (existingCount > 0)
                 throw new InvalidOperationException("A jockey profile already exists for this account.");
 
-            string? imageUrl = null;
-            if (req.Image != null)
-                imageUrl = await _cloudinaryService.UploadImageAsync(req.Image, "jockey-profiles");
-
+            string? imageUrl = req.Image != null
+                ? await _cloudinaryService.UploadImageAsync(req.Image, "jockey-profiles")
+                : null;
+            
             JockeyProfile jockeyProfile = new JockeyProfile
             {
                 JockeyProfileId = Guid.NewGuid(),
@@ -53,9 +54,21 @@ namespace HorseRacingAPI.Services
                 UpdatedAt = DateTimeOffset.UtcNow,
                 IsDeleted = false
             };
-            await repo.AddAsync(jockeyProfile);
-            await _uow.SaveAsync();
-
+            try
+            {
+                await repo.AddAsync(jockeyProfile);
+                await _uow.SaveAsync();
+            }
+            catch
+            {
+                if(imageUrl != null)
+                {
+                    string publicId = string.Join("/", new Uri(imageUrl).AbsolutePath
+                   .TrimStart('/').Split('/').TakeLast(2)).Split('.')[0];
+                    await _cloudinaryService.DeleteImageAsync(publicId);
+                }
+                throw;
+            }
             return MapToResponse(jockeyProfile);
         }
 
@@ -183,16 +196,37 @@ namespace HorseRacingAPI.Services
         public async Task<string> UploadImageAsync(Guid accountId, IFormFile file)
         {
             IGenericRepository<JockeyProfile> jockeyProfileRepo = _uow.GetRepository<JockeyProfile>();
-            JockeyProfile? profile = await jockeyProfileRepo.Entities.FirstOrDefaultAsync(p => p.AccountId == accountId && !p.IsDeleted);
+            JockeyProfile? profile = await jockeyProfileRepo.Entities
+                .FirstOrDefaultAsync(p => p.AccountId == accountId && !p.IsDeleted);
             if (profile == null)
-            {
                 throw new KeyNotFoundException("JockeyProfile not found.");
+
+            string? oldImageUrl = profile.ImageUrl;
+
+            string newImageUrl = await _cloudinaryService.UploadImageAsync(file, "jockey-profiles");
+
+            try
+            {
+                profile.ImageUrl = newImageUrl;
+                profile.UpdatedAt = DateTimeOffset.UtcNow;
+                await _uow.SaveAsync();
             }
-            string imageUrl = await _cloudinaryService.UploadImageAsync(file, "jockey-profiles");
-            profile.ImageUrl = imageUrl;
-            profile.UpdatedAt = DateTimeOffset.UtcNow;
-            await _uow.SaveAsync();
-            return imageUrl;
+            catch
+            {
+                string newPublicId = string.Join("/", new Uri(newImageUrl).AbsolutePath
+                    .TrimStart('/').Split('/').TakeLast(2)).Split('.')[0];
+                await _cloudinaryService.DeleteImageAsync(newPublicId);
+                throw;
+            }
+
+            if (oldImageUrl != null)
+            {
+                string oldPublicId = string.Join("/", new Uri(oldImageUrl).AbsolutePath
+                    .TrimStart('/').Split('/').TakeLast(2)).Split('.')[0];
+                await _cloudinaryService.DeleteImageAsync(oldPublicId);
+            }
+
+            return newImageUrl;
         }
     }
 }

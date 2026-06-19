@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using HorseRacingAPI.Enums;
 
 namespace HorseRacingAPI.Models;
 
@@ -9,7 +10,7 @@ public partial class ConversionRate
 
     public float RateValue { get; set; }
 
-    public string? Status { get; set; }
+    public ConfigStatus Status { get; set; }
 
     public virtual ICollection<Payment> Payments { get; set; } = new List<Payment>();
 }

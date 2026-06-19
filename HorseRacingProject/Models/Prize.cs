@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using HorseRacingAPI.Enums;
 
 namespace HorseRacingAPI.Models;
 
@@ -9,7 +10,7 @@ public partial class Prize
 
     public Guid RegistrationId { get; set; }
 
-    public string? PrizeType { get; set; }
+    public PrizeType? PrizeType { get; set; }
 
     public decimal? Amount { get; set; }
 

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using HorseRacingAPI.Enums;
 
 namespace HorseRacingAPI.Models;
 
@@ -19,9 +20,9 @@ public partial class Race
 
     public int? MaxParticipants { get; set; }
 
-    public string? Status { get; set; }
+    public RaceStatus Status { get; set; }
 
-    public string Grade { get; set; } = "Open";
+    public RaceGrade Grade { get; set; } = RaceGrade.Open;
 
     public DateTimeOffset? CreateAt { get; set; }
 
