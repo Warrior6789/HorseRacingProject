@@ -49,39 +49,23 @@ public class WithdrawalService : IWithdrawalService
         if ((profile.Balance ?? 0) < request.Amount)
             throw new InvalidOperationException("Insufficient balance.");
 
-        await _uow.BeginTransactionAsync();
-        try
+        Withdrawal withdrawal = new Withdrawal
         {
-            int updated = await _uow.GetRepository<UserProfile>().Entities
-                .Where(u => u.AccountId == accountId && (u.Balance ?? 0) >= request.Amount)
-                .ExecuteUpdateAsync(s => s.SetProperty(u => u.Balance, u => (u.Balance ?? 0) - request.Amount));
-            if (updated == 0)
-                throw new InvalidOperationException("Insufficient balance.");
+            WithdrawalId      = Guid.NewGuid(),
+            AccountId         = accountId,
+            Amount            = request.Amount,
+            BankAccountNumber = request.BankAccountNumber,
+            BankName          = request.BankName,
+            AccountHolderName = request.AccountHolderName,
+            Status            = WithdrawalStatus.Pending,
+            CreateAt          = DateTimeOffset.UtcNow
+        };
+        await _uow.GetRepository<Withdrawal>().AddAsync(withdrawal);
+        await _uow.SaveAsync();
 
-            Withdrawal withdrawal = new Withdrawal
-            {
-                WithdrawalId      = Guid.NewGuid(),
-                AccountId         = accountId,
-                Amount            = request.Amount,
-                BankAccountNumber = request.BankAccountNumber,
-                BankName          = request.BankName,
-                AccountHolderName = request.AccountHolderName,
-                Status            = WithdrawalStatus.Pending,
-                CreateAt          = DateTimeOffset.UtcNow
-            };
-            await _uow.GetRepository<Withdrawal>().AddAsync(withdrawal);
-            await _uow.SaveAsync();
-            await _uow.CommitTransactionAsync();
+        await _hubContext.Clients.All.SendAsync("WithdrawalsUpdated", await GetWithdrawalKpiAsync());
 
-            await _hubContext.Clients.All.SendAsync("WithdrawalsUpdated", await GetWithdrawalKpiAsync());
-
-            return MapToResponse(withdrawal);
-        }
-        catch
-        {
-            await _uow.RollbackTransactionAsync();
-            throw;
-        }
+        return MapToResponse(withdrawal);
     }
 
     public async Task<PagedResponse<WithdrawalResponse>> GetMyHistoryAsync(Guid accountId, int page, int pageSize)
@@ -143,40 +127,28 @@ public class WithdrawalService : IWithdrawalService
         if (withdrawal.Status != WithdrawalStatus.Pending)
             throw new InvalidOperationException("Withdrawal is not in Pending status.");
 
-        withdrawal.Status      = WithdrawalStatus.Completed;
-        withdrawal.AdminNote   = dto.AdminNote;
-        withdrawal.ProcessedAt = DateTimeOffset.UtcNow;
-
-        await _uow.GetRepository<Withdrawal>().UpdateAsync(withdrawal);
-        await _uow.SaveAsync();
-
-        await _hubContext.Clients.All.SendAsync("WithdrawalsUpdated", await GetWithdrawalKpiAsync());
-
-        return MapToResponse(withdrawal);
-    }
-
-    public async Task<WithdrawalResponse> RejectAsync(Guid withdrawalId, ProcessWithdrawalDto dto)
-    {
-        Withdrawal? withdrawal = await _uow.GetRepository<Withdrawal>().Entities
-            .FirstOrDefaultAsync(w => w.WithdrawalId == withdrawalId);
-        if (withdrawal == null)
-            throw new KeyNotFoundException("Withdrawal not found.");
-        if (withdrawal.Status != WithdrawalStatus.Pending)
-            throw new InvalidOperationException("Withdrawal is not in Pending status.");
-
         await _uow.BeginTransactionAsync();
         try
         {
-            withdrawal.Status      = WithdrawalStatus.Rejected;
-            withdrawal.AdminNote   = dto.AdminNote;
-            withdrawal.ProcessedAt = DateTimeOffset.UtcNow;
+            int updated = await _uow.GetRepository<UserProfile>().Entities
+                .Where(u => u.AccountId == withdrawal.AccountId && (u.Balance ?? 0) >= withdrawal.Amount)
+                .ExecuteUpdateAsync(s => s.SetProperty(u => u.Balance, u => (u.Balance ?? 0) - withdrawal.Amount));
+
+            if (updated == 0)
+            {
+                withdrawal.Status      = WithdrawalStatus.Rejected;
+                withdrawal.AdminNote   = "Auto-rejected: insufficient balance at time of approval.";
+                withdrawal.ProcessedAt = DateTimeOffset.UtcNow;
+            }
+            else
+            {
+                withdrawal.Status      = WithdrawalStatus.Completed;
+                withdrawal.AdminNote   = dto.AdminNote;
+                withdrawal.ProcessedAt = DateTimeOffset.UtcNow;
+            }
+
             await _uow.GetRepository<Withdrawal>().UpdateAsync(withdrawal);
             await _uow.SaveAsync();
-
-            await _uow.GetRepository<UserProfile>().Entities
-                .Where(u => u.AccountId == withdrawal.AccountId)
-                .ExecuteUpdateAsync(s => s.SetProperty(u => u.Balance, u => (u.Balance ?? 0) + withdrawal.Amount));
-
             await _uow.CommitTransactionAsync();
 
             await _hubContext.Clients.All.SendAsync("WithdrawalsUpdated", await GetWithdrawalKpiAsync());
@@ -188,6 +160,26 @@ public class WithdrawalService : IWithdrawalService
             await _uow.RollbackTransactionAsync();
             throw;
         }
+    }
+
+    public async Task<WithdrawalResponse> RejectAsync(Guid withdrawalId, ProcessWithdrawalDto dto)
+    {
+        Withdrawal? withdrawal = await _uow.GetRepository<Withdrawal>().Entities
+            .FirstOrDefaultAsync(w => w.WithdrawalId == withdrawalId);
+        if (withdrawal == null)
+            throw new KeyNotFoundException("Withdrawal not found.");
+        if (withdrawal.Status != WithdrawalStatus.Pending)
+            throw new InvalidOperationException("Withdrawal is not in Pending status.");
+
+        withdrawal.Status      = WithdrawalStatus.Rejected;
+        withdrawal.AdminNote   = dto.AdminNote;
+        withdrawal.ProcessedAt = DateTimeOffset.UtcNow;
+        await _uow.GetRepository<Withdrawal>().UpdateAsync(withdrawal);
+        await _uow.SaveAsync();
+
+        await _hubContext.Clients.All.SendAsync("WithdrawalsUpdated", await GetWithdrawalKpiAsync());
+
+        return MapToResponse(withdrawal);
     }
 
     private static WithdrawalResponse MapToResponse(Withdrawal w) => new WithdrawalResponse
