@@ -7,6 +7,7 @@ public interface IPaymentService
 {
     Task<string> CreateDepositUrlAsync(Guid accountId, DepositRequest request, string ipAddress);
     Task<PaymentResponse> ProcessWebhookAsync(Webhook webhookBody);
+    Task CancelPaymentAsync(long orderCode);
     Task<PagedResponse<PaymentResponse>> GetHistoryPagingAsync(Guid accountId, int page, int pageSize);
     Task<PagedResponse<PaymentResponse>> GetAllPaymentsPagingAsync(int page, int pageSize);
 }

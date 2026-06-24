@@ -29,6 +29,13 @@ public class PaymentsController : ControllerBase
         return Ok(ApiResponse<string>.SuccessResponse(url, "Payment URL created successfully."));
     }
 
+    [HttpGet("cancel")]
+    public async Task<IActionResult> Cancel([FromQuery] long orderCode)
+    {
+        await _paymentService.CancelPaymentAsync(orderCode);
+        return Ok(ApiResponse<string>.SuccessResponse("Cancelled", "Payment cancelled."));
+    }
+
     [HttpPost("webhook")]
     public async Task<IActionResult> Webhook()
     {
