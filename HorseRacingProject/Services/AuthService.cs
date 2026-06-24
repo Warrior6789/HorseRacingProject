@@ -1,8 +1,10 @@
 ﻿using HorseRacingAPI.Dtos;
 using HorseRacingAPI.Enums;
+using HorseRacingAPI.Hubs;
 using HorseRacingAPI.Models;
 using HorseRacingAPI.Repositories;
 using HorseRacingAPI.Repository;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
@@ -18,12 +20,14 @@ namespace HorseRacingAPI.Services
         private readonly IUnitofWork _unitOfWork;
         private readonly IConfiguration _configuration;
         private readonly ICloudinaryService _cloudinary;
+        private readonly IHubContext<RaceHub> _hubContext;
 
-        public AuthService(IUnitofWork unitOfWork, IConfiguration configuration, ICloudinaryService cloudinary)
+        public AuthService(IUnitofWork unitOfWork, IConfiguration configuration, ICloudinaryService cloudinary, IHubContext<RaceHub> hubContext)
         {
             _unitOfWork = unitOfWork;
             _configuration = configuration;
             _cloudinary = cloudinary;
+            _hubContext = hubContext;
         }
 
         public async Task<string?> LoginAsync(LoginDto loginDto)
@@ -144,6 +148,10 @@ namespace HorseRacingAPI.Services
                 if (userProfile == null)
                     throw new InvalidOperationException("User profile not found.");
 
+                if (!string.IsNullOrWhiteSpace(dto.FullName))
+                    userProfile.FullName = dto.FullName;
+                if (!string.IsNullOrWhiteSpace(dto.Phone))
+                    userProfile.Phone = dto.Phone;
                 userProfile.CertificateImageUrl = imageUrl;
                 userProfile.UpdatedAt = DateTimeOffset.UtcNow;
                 await _unitOfWork.GetRepository<UserProfile>().UpdateAsync(userProfile);
@@ -152,6 +160,11 @@ namespace HorseRacingAPI.Services
             account.RequestedRole = parsedRole;
             account.UpdatedAt = DateTimeOffset.UtcNow;
             await _unitOfWork.SaveAsync();
+
+            int pendingCount = await _unitOfWork.GetRepository<Account>().Entities
+                .CountAsync(a => a.RequestedRole != null && !a.IsDeleted);
+
+            await _hubContext.Clients.All.SendAsync("UpgradeRequestsUpdated", new { pendingCount });
         }
 
         private string GenerateJwtToken(Account account)

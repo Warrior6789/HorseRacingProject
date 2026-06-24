@@ -37,7 +37,7 @@ namespace HorseRacingAPI.Controllers
             return Ok(apiResponse);
         }
 
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Admin,HorseOwner")]
         [HttpGet("paged")]
         public async Task<IActionResult> GetAllJockeyProfilesPaged([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
         {
@@ -61,6 +61,15 @@ namespace HorseRacingAPI.Controllers
             JockeyProfileResponse response = await _jockeyProfileService.GetJockeyProfileByAccountIdAsync(accountId);
             ApiResponse<JockeyProfileResponse> apiResponse = ApiResponse<JockeyProfileResponse>.SuccessResponse(response, "Get jockey profile details successfully.");
             return Ok(apiResponse);
+        }
+
+        [Authorize(Roles = "Jockey")]
+        [HttpGet("my/rewards")]
+        public async Task<IActionResult> GetMyRewards([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
+        {
+            Guid accountId = GetAccountIdFromToken();
+            JockeyRewardsResponse result = await _jockeyProfileService.GetJockeyRewardsAsync(accountId, page, pageSize);
+            return Ok(ApiResponse<JockeyRewardsResponse>.SuccessResponse(result, "Get jockey rewards successfully."));
         }
 
         [Authorize(Roles = "Jockey")]

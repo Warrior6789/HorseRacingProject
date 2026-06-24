@@ -9,10 +9,12 @@ namespace HorseRacingAPI.Services
     public class RacecourseService : IRacecourseService
     {
         private readonly IUnitofWork _uow;
+        private readonly ICloudinaryService _cloudinaryService;
 
-        public RacecourseService(IUnitofWork uow)
+        public RacecourseService(IUnitofWork uow, ICloudinaryService cloudinaryService)
         {
             _uow = uow;
+            _cloudinaryService = cloudinaryService;
         }
 
         public async Task<List<RacecourseResponse>> GetAllRacecoursesAsync()
@@ -25,7 +27,8 @@ namespace HorseRacingAPI.Services
                     RacecourseId = r.Id,
                     RacecourseName = r.RacecourseName,
                     Location = r.Location,
-                    TrackType = r.TrackType
+                    TrackType = r.TrackType,
+                    ImageUrl = r.ImageUrl
                 })
                 .ToListAsync();
         }
@@ -45,7 +48,8 @@ namespace HorseRacingAPI.Services
                     RacecourseId = r.Id,
                     RacecourseName = r.RacecourseName,
                     Location = r.Location,
-                    TrackType = r.TrackType
+                    TrackType = r.TrackType,
+                    ImageUrl = r.ImageUrl
                 },
                 pageIndex: page - 1,
                 pageSize: pageSize
@@ -77,11 +81,17 @@ namespace HorseRacingAPI.Services
         {
             IGenericRepository<Racecourse> repo = _uow.GetRepository<Racecourse>();
 
+            string? imageUrl = null;
+            if (request.Image != null)
+                imageUrl = await _cloudinaryService.UploadImageAsync(request.Image, "racecourses");
+
             Racecourse racecourse = new Racecourse
             {
+                Id = Guid.NewGuid(),
                 RacecourseName = request.RacecourseName,
                 Location = request.Location,
-                TrackType = request.TrackType
+                TrackType = request.TrackType,
+                ImageUrl = imageUrl
             };
 
             await repo.AddAsync(racecourse);
@@ -130,12 +140,46 @@ namespace HorseRacingAPI.Services
             return true;
         }
 
+        public async Task<string> UploadImageAsync(Guid id, IFormFile file)
+        {
+            IGenericRepository<Racecourse> repo = _uow.GetRepository<Racecourse>();
+            Racecourse? racecourse = await repo.GetByIdAsync(id);
+            if (racecourse == null || racecourse.IsDeleted)
+                throw new KeyNotFoundException($"Racecourse with id {id} not found.");
+
+            string? oldImageUrl = racecourse.ImageUrl;
+            string newImageUrl = await _cloudinaryService.UploadImageAsync(file, "racecourses");
+
+            try
+            {
+                racecourse.ImageUrl = newImageUrl;
+                await _uow.SaveAsync();
+            }
+            catch
+            {
+                string newPublicId = string.Join("/", new Uri(newImageUrl).AbsolutePath
+                    .TrimStart('/').Split('/').TakeLast(2)).Split('.')[0];
+                await _cloudinaryService.DeleteImageAsync(newPublicId);
+                throw;
+            }
+
+            if (oldImageUrl != null)
+            {
+                string oldPublicId = string.Join("/", new Uri(oldImageUrl).AbsolutePath
+                    .TrimStart('/').Split('/').TakeLast(2)).Split('.')[0];
+                await _cloudinaryService.DeleteImageAsync(oldPublicId);
+            }
+
+            return newImageUrl;
+        }
+
         private static RacecourseResponse MapToResponse(Racecourse r) => new RacecourseResponse
         {
             RacecourseId = r.Id,
             RacecourseName = r.RacecourseName,
             Location = r.Location,
-            TrackType = r.TrackType
+            TrackType = r.TrackType,
+            ImageUrl = r.ImageUrl
         };
     }
 }

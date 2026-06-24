@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Http;
 using System.ComponentModel.DataAnnotations;
 
 namespace HorseRacingAPI.Dtos
@@ -13,5 +14,7 @@ namespace HorseRacingAPI.Dtos
 
         [MaxLength(50)]
         public string? TrackType { get; set; }
+
+        public IFormFile? Image { get; set; }
     }
 }

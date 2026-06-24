@@ -32,6 +32,8 @@ public partial class Account
 
     public virtual ICollection<JockeyProfile> JockeyProfiles { get; set; } = new List<JockeyProfile>();
 
+    public virtual ICollection<Race> RefereeRaces { get; set; } = new List<Race>();
+
     public virtual ICollection<RefereeReport> RefereeReports { get; set; } = new List<RefereeReport>();
 
     public virtual ICollection<Registration> Registrations { get; set; } = new List<Registration>();

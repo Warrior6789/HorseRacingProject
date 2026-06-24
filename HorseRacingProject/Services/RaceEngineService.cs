@@ -12,9 +12,10 @@ namespace HorseRacingAPI.Services
     {
         private readonly IHubContext<RaceHub> _hubContext;
         private readonly IServiceScopeFactory _factory;
-        private readonly Dictionary<Guid, double> _angles = new();
+        private readonly Dictionary<Guid, double> _progress = new();
         private readonly Dictionary<Guid, double> _baseSpeeds = new();
         private readonly Dictionary<Guid, double> _momentum = new();
+        private readonly Dictionary<Guid, double> _stamina = new();
         private readonly Dictionary<Guid, DateTimeOffset> _finishTimes = new();
         private readonly Random _random = new();
 
@@ -86,7 +87,7 @@ namespace HorseRacingAPI.Services
                     int confirmedCount = await uow.GetRepository<Registration>().Entities
                         .CountAsync(reg => reg.RaceId == r.RaceId && reg.Status == RegistrationStatus.Confirmed);
 
-                    if (r.MaxParticipants.HasValue && confirmedCount < r.MaxParticipants.Value)
+                    if (confirmedCount < 2)
                     {
                         DateTimeOffset? previousEndTime = await uow.GetRepository<Race>().Entities
                             .Where(other => other.RacecourseId == r.RacecourseId
@@ -99,7 +100,7 @@ namespace HorseRacingAPI.Services
                             ? previousEndTime.Value.AddMinutes(30)
                             : r.StartTime!.Value.AddMinutes(30);
 
-                        if (now > cancelAfter)
+                        if (!previousStillRunning && now > cancelAfter)
                         {
                             r.Status = RaceStatus.Cancelled;
                             cancelledRaceIds.Add(r.RaceId);
@@ -113,11 +114,17 @@ namespace HorseRacingAPI.Services
                     startedRacecourses.Add(r.RacecourseId);
                 }
 
-                if (toOpen.Count > 0 || toClose.Count > 0 || toStart.Count > 0)
+                if (toOpen.Count > 0 || toClose.Count > 0 || toStart.Count > 0 || cancelledRaceIds.Count > 0)
+                {
                     await uow.SaveAsync();
+                    await _hubContext.Clients.All.SendAsync("RacesUpdated");
+                }
 
                 foreach (Guid cancelledId in cancelledRaceIds)
+                {
                     await RefundBetsAsync(uow, cancelledId);
+                    await RefundRegistrationFeesAsync(uow, cancelledId);
+                }
 
                 List<Race> liveRaces = await uow.GetRepository<Race>().Entities
                     .Where(r => r.Status == RaceStatus.Live && !r.IsDeleted)
@@ -135,31 +142,34 @@ namespace HorseRacingAPI.Services
 
                     foreach (Registration registration in registrations)
                     {
-                        if (!_angles.ContainsKey(registration.HorseId))
+                        if (!_progress.ContainsKey(registration.HorseId))
                         {
-                            _angles[registration.HorseId] = Math.PI;
-                            _baseSpeeds[registration.HorseId] = 0.18 + _random.NextDouble() * 0.04;
+                            _progress[registration.HorseId] = 0.0;
+                            _baseSpeeds[registration.HorseId] = 0.005 + _random.NextDouble() * 0.010;
+                            _stamina[registration.HorseId] = 0.2 + _random.NextDouble() * 0.8;
                             _momentum[registration.HorseId] = 0;
                         }
 
-                        double currentAngle = _angles[registration.HorseId];
-                        bool isFinished = currentAngle >= Math.PI + 2 * 2 * Math.PI;
+                        double currentProgress = _progress[registration.HorseId];
+                        bool isFinished = currentProgress >= 1.0;
 
                         double speed = 0;
                         if (!isFinished)
                         {
-                            if (_random.NextDouble() < 0.03)
-                                _momentum[registration.HorseId] = (_random.NextDouble() - 0.5) * 0.08;
+                            double fatigue = currentProgress * (1.0 - _stamina[registration.HorseId]) * 0.004;
 
-                            double noise = (_random.NextDouble() - 0.5) * 0.02;
-                            speed = _baseSpeeds[registration.HorseId] + _momentum[registration.HorseId] + noise;
-                            speed = Math.Max(0.12, Math.Min(0.28, speed));
-                            _angles[registration.HorseId] += speed * 0.1;
-                            currentAngle = _angles[registration.HorseId];
-                            isFinished = currentAngle >= Math.PI + 2 * 2 * Math.PI;
+                            if (_random.NextDouble() < 0.08)
+                                _momentum[registration.HorseId] = (_random.NextDouble() - 0.6) * 0.008;
+
+                            _momentum[registration.HorseId] *= 0.80;
+
+                            double noise = (_random.NextDouble() - 0.5) * 0.002;
+                            speed = _baseSpeeds[registration.HorseId] - fatigue + _momentum[registration.HorseId] + noise;
+                            speed = Math.Max(0.002, Math.Min(0.018, speed));
+                            _progress[registration.HorseId] += speed;
+                            currentProgress = _progress[registration.HorseId];
+                            isFinished = currentProgress >= 1.0;
                         }
-
-                        int lap = (int)((currentAngle - Math.PI) / (2 * Math.PI));
 
                         if (isFinished)
                         {
@@ -171,9 +181,8 @@ namespace HorseRacingAPI.Services
                         horseStates.Add(new
                         {
                             id = registration.HorseId,
-                            angle = currentAngle,
+                            progress = Math.Min(1.0, currentProgress),
                             speed = speed,
-                            lap = lap,
                             isFinished = isFinished
                         });
                     }
@@ -194,7 +203,7 @@ namespace HorseRacingAPI.Services
                         await uow.GetRepository<Race>().UpdateAsync(race);
 
                         var sortedRegs = registrations
-                            .OrderByDescending(r => _angles.GetValueOrDefault(r.HorseId, Math.PI))
+                            .OrderBy(r => _finishTimes.GetValueOrDefault(r.HorseId, DateTimeOffset.MaxValue))
                             .ToList();
 
                         for (int i = 0; i < sortedRegs.Count; i++)
@@ -231,15 +240,19 @@ namespace HorseRacingAPI.Services
 
                         foreach (var reg in registrations)
                         {
-                            _angles.Remove(reg.HorseId);
+                            _progress.Remove(reg.HorseId);
                             _baseSpeeds.Remove(reg.HorseId);
                             _momentum.Remove(reg.HorseId);
+                            _stamina.Remove(reg.HorseId);
                             _finishTimes.Remove(reg.HorseId);
                         }
+
+                        await _hubContext.Clients.All.SendAsync("RacesUpdated");
                     }
                 }
 
-                await Task.Delay(100, stoppingToken);
+                int delayMs = liveRaces.Count > 0 ? 100 : 5000;
+                await Task.Delay(delayMs, stoppingToken);
             }
         }
 
@@ -247,9 +260,10 @@ namespace HorseRacingAPI.Services
         {
             foreach (Guid id in horseIds)
             {
-                _angles.Remove(id);
+                _progress.Remove(id);
                 _baseSpeeds.Remove(id);
                 _momentum.Remove(id);
+                _stamina.Remove(id);
                 _finishTimes.Remove(id);
             }
         }
@@ -266,10 +280,11 @@ namespace HorseRacingAPI.Services
 
             List<Bet> bets = await uow.GetRepository<Bet>().Entities
                 .Include(b => b.Registration)
-                .Where(b => b.Registration.RaceId == raceId && b.Status == BetStatus.Pending)
+                .Where(b => b.Registration.RaceId == raceId && b.Status == BetStatus.Active)
                 .ToListAsync();
 
             decimal carryover = 0;
+            var betPayouts = new List<(Guid accountId, long amount, long newBalance)>();
 
             foreach (BetType betType in new[] { BetType.Win, BetType.Place, BetType.Show })
             {
@@ -325,72 +340,37 @@ namespace HorseRacingAPI.Services
                             profile.Balance = (profile.Balance ?? 0) + payout;
                             profile.UpdatedAt = DateTimeOffset.UtcNow;
                             await uow.GetRepository<UserProfile>().UpdateAsync(profile);
+                            betPayouts.Add((bet.SpectatorId, payout, profile.Balance ?? 0));
                         }
                     }
                 }
             }
 
             await uow.SaveAsync();
+
+            foreach (var (accountId, amount, newBalance) in betPayouts)
+                await _hubContext.Clients.All.SendAsync("BalanceUpdated", new
+                {
+                    accountId,
+                    amount,
+                    newBalance,
+                    reason = "BetPayout"
+                });
+
             return carryover;
         }
 
         private async Task DistributePrizesAsync(IUnitofWork uow, Race race, List<Registration> sortedRegs, decimal carryover = 0)
         {
-            Tournament? tournament = await uow.GetRepository<Tournament>().Entities
-                .FirstOrDefaultAsync(t => t.Id == race.TournamentId);
-            if (tournament == null) return;
-
             PositionPrizeConfig? posConfig = await uow.GetRepository<PositionPrizeConfig>().Entities
                 .FirstOrDefaultAsync(c => c.Status == ConfigStatus.Active);
             JockeyRewardConfig? jockeyConfig = await uow.GetRepository<JockeyRewardConfig>().Entities
                 .FirstOrDefaultAsync(c => c.Status == ConfigStatus.Active);
-            GradePurseConfig? gradeConfig = await uow.GetRepository<GradePurseConfig>().Entities
-                .FirstOrDefaultAsync(c => c.Status == ConfigStatus.Active);
-            if (posConfig == null || jockeyConfig == null || gradeConfig == null) return;
+            if (posConfig == null || jockeyConfig == null) return;
 
-            TakeoutConfig? takeoutConfig = await uow.GetRepository<TakeoutConfig>().Entities
-                .FirstOrDefaultAsync(c => c.Status == ConfigStatus.Active);
-            decimal takeoutRate = (decimal)(takeoutConfig?.TakeoutPercentage ?? 0.20f);
-
-            decimal totalBets = await uow.GetRepository<Bet>().Entities
-                .Include(b => b.Registration)
-                .Where(b => b.Registration.RaceId == race.RaceId)
-                .SumAsync(b => b.BetAmount);
-
-            decimal takeoutAmount = totalBets * takeoutRate;
-
-            double gradeRatio = race.Grade switch
-            {
-                RaceGrade.G1     => gradeConfig.G1Ratio,
-                RaceGrade.G2     => gradeConfig.G2Ratio,
-                RaceGrade.G3     => gradeConfig.G3Ratio,
-                RaceGrade.Listed => gradeConfig.ListedRatio,
-                _                => gradeConfig.OpenRatio
-            };
-
-            decimal racePurse;
-
-            if (tournament.FundsPrize > 0)
-            {
-                decimal alreadyDistributed = await uow.GetRepository<Prize>().Entities
-                    .Include(p => p.Registration).ThenInclude(r => r.Race)
-                    .Where(p => p.Registration.Race.TournamentId == race.TournamentId)
-                    .SumAsync(p => p.Amount ?? 0);
-
-                decimal remaining = tournament.FundsPrize - alreadyDistributed;
-                decimal fundsPortion = Math.Min(tournament.FundsPrize * (decimal)gradeRatio, remaining);
-                decimal takeoutPortion = takeoutAmount * (decimal)gradeRatio;
-                racePurse = fundsPortion + takeoutPortion;
-            }
-            else
-            {
-                racePurse = takeoutAmount * (decimal)gradeRatio;
-            }
-
-            racePurse += carryover;
+            decimal racePurse = race.PrizePool + carryover;
             if (racePurse <= 0) return;
 
-            race.GradePurseConfigId  = gradeConfig.GradePurseConfigId;
             race.PositionPrizeConfigId = posConfig.PositionPrizeConfigId;
             race.JockeyRewardConfigId  = jockeyConfig.JockeyRewardConfigId;
             await uow.GetRepository<Race>().UpdateAsync(race);
@@ -405,6 +385,7 @@ namespace HorseRacingAPI.Services
             double ratioSum = usedRatios.Sum();
             if (ratioSum <= 0) return;
             double[] normalizedRatios = usedRatios.Select(r => r / ratioSum).ToArray();
+            var prizePayouts = new List<(Guid accountId, long amount, long newBalance, string reason)>();
 
             for (int i = 0; i < finisherCount; i++)
             {
@@ -439,6 +420,7 @@ namespace HorseRacingAPI.Services
                     ownerProfile.Balance = (ownerProfile.Balance ?? 0) + (long)ownerAmount;
                     ownerProfile.UpdatedAt = DateTimeOffset.UtcNow;
                     await uow.GetRepository<UserProfile>().UpdateAsync(ownerProfile);
+                    prizePayouts.Add((reg.Horse.OwnerId, (long)ownerAmount, ownerProfile.Balance ?? 0, "PrizePayout"));
                 }
 
                 UserProfile? jockeyProfile = await uow.GetRepository<UserProfile>().Entities
@@ -448,51 +430,71 @@ namespace HorseRacingAPI.Services
                     jockeyProfile.Balance = (jockeyProfile.Balance ?? 0) + (long)jockeyAmount;
                     jockeyProfile.UpdatedAt = DateTimeOffset.UtcNow;
                     await uow.GetRepository<UserProfile>().UpdateAsync(jockeyProfile);
+                    prizePayouts.Add((reg.JockeyId, (long)jockeyAmount, jockeyProfile.Balance ?? 0, "PrizePayout"));
                 }
             }
 
             await uow.SaveAsync();
 
-            await RolloverSurplusAsync(uow, tournament);
+            foreach (var (accountId, amount, newBalance, reason) in prizePayouts)
+                await _hubContext.Clients.All.SendAsync("BalanceUpdated", new
+                {
+                    accountId,
+                    amount,
+                    newBalance,
+                    reason
+                });
         }
 
-        private async Task RolloverSurplusAsync(IUnitofWork uow, Tournament tournament)
+        private async Task RefundRegistrationFeesAsync(IUnitofWork uow, Guid raceId)
         {
-            if (tournament.FundsPrize <= 0) return;
+            Race? race = await uow.GetRepository<Race>().Entities
+                .FirstOrDefaultAsync(r => r.RaceId == raceId);
+            if (race == null || race.RegistrationFee <= 0) return;
 
-            bool allRacesDone = !await uow.GetRepository<Race>().Entities
-                .AnyAsync(r => r.TournamentId == tournament.Id
-                            && !r.IsDeleted
-                            && r.Status != RaceStatus.Finished
-                            && r.Status != RaceStatus.Cancelled);
-            if (!allRacesDone) return;
+            List<Registration> registrations = await uow.GetRepository<Registration>().Entities
+                .Include(r => r.Horse)
+                .Where(r => r.RaceId == raceId
+                    && (r.Status == RegistrationStatus.Confirmed || r.Status == RegistrationStatus.Pending))
+                .ToListAsync();
 
-            decimal totalDistributed = await uow.GetRepository<Prize>().Entities
-                .Include(p => p.Registration).ThenInclude(r => r.Race)
-                .Where(p => p.Registration.Race.TournamentId == tournament.Id)
-                .SumAsync(p => p.Amount ?? 0);
+            var refunds = new List<(Guid accountId, long amount, long newBalance)>();
 
-            decimal surplus = tournament.FundsPrize - totalDistributed;
-            if (surplus <= 0) return;
+            foreach (Registration reg in registrations)
+            {
+                UserProfile? profile = await uow.GetRepository<UserProfile>().Entities
+                    .FirstOrDefaultAsync(p => p.AccountId == reg.Horse.OwnerId && !p.IsDeleted);
+                if (profile != null)
+                {
+                    profile.Balance = (profile.Balance ?? 0) + (long)race.RegistrationFee;
+                    profile.UpdatedAt = DateTimeOffset.UtcNow;
+                    await uow.GetRepository<UserProfile>().UpdateAsync(profile);
+                    refunds.Add((reg.Horse.OwnerId, (long)race.RegistrationFee, profile.Balance ?? 0));
+                }
+            }
 
-            Tournament? nextTournament = await uow.GetRepository<Tournament>().Entities
-                .Where(t => t.Id != tournament.Id
-                         && (t.Status == TournamentStatus.Upcoming || t.Status == TournamentStatus.Ongoing))
-                .OrderBy(t => t.CreateAt)
-                .FirstOrDefaultAsync();
-            if (nextTournament == null) return;
-
-            nextTournament.FundsPrize += surplus;
-            await uow.GetRepository<Tournament>().UpdateAsync(nextTournament);
+            race.PrizePool = 0;
+            await uow.GetRepository<Race>().UpdateAsync(race);
             await uow.SaveAsync();
+
+            foreach (var (accountId, amount, newBalance) in refunds)
+                await _hubContext.Clients.All.SendAsync("BalanceUpdated", new
+                {
+                    accountId,
+                    amount,
+                    newBalance,
+                    reason = "RefundRegistrationFee"
+                });
         }
 
         private async Task RefundBetsAsync(IUnitofWork uow, Guid raceId)
         {
             List<Bet> bets = await uow.GetRepository<Bet>().Entities
                 .Include(b => b.Registration)
-                .Where(b => b.Registration.RaceId == raceId && b.Status == BetStatus.Pending)
+                .Where(b => b.Registration.RaceId == raceId && b.Status == BetStatus.Active)
                 .ToListAsync();
+
+            var refunds = new List<(Guid accountId, long amount, long newBalance)>();
 
             foreach (Bet bet in bets)
             {
@@ -506,10 +508,20 @@ namespace HorseRacingAPI.Services
                     profile.Balance = (profile.Balance ?? 0) + (long)bet.BetAmount;
                     profile.UpdatedAt = DateTimeOffset.UtcNow;
                     await uow.GetRepository<UserProfile>().UpdateAsync(profile);
+                    refunds.Add((bet.SpectatorId, (long)bet.BetAmount, profile.Balance ?? 0));
                 }
             }
 
             await uow.SaveAsync();
+
+            foreach (var (accountId, amount, newBalance) in refunds)
+                await _hubContext.Clients.All.SendAsync("BalanceUpdated", new
+                {
+                    accountId,
+                    amount,
+                    newBalance,
+                    reason = "RefundBet"
+                });
         }
     }
 }

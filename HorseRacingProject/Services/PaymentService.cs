@@ -1,8 +1,10 @@
 using HorseRacingAPI.Dtos;
 using HorseRacingAPI.Enums;
+using HorseRacingAPI.Hubs;
 using HorseRacingAPI.Models;
 using HorseRacingAPI.Repositories;
 using HorseRacingAPI.Repository;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using PayOS;
 using PayOS.Models.V2.PaymentRequests;
@@ -15,11 +17,13 @@ namespace HorseRacingAPI.Services
         private readonly IUnitofWork _uow;
         private readonly IConfiguration _config;
         private readonly PayOSClient _payOS;
+        private readonly IHubContext<RaceHub> _hubContext;
 
-        public PaymentService(IUnitofWork uow, IConfiguration config)
+        public PaymentService(IUnitofWork uow, IConfiguration config, IHubContext<RaceHub> hubContext)
         {
             _uow = uow;
             _config = config;
+            _hubContext = hubContext;
             _payOS = new PayOSClient(
                 _config["PayOS:ClientId"]!,
                 _config["PayOS:ApiKey"]!,
@@ -34,22 +38,16 @@ namespace HorseRacingAPI.Services
             if (userProfile == null)
                 throw new KeyNotFoundException("User profile not found.");
 
-            ConversionRate? conversionRate = await _uow.GetRepository<ConversionRate>().Entities
-                .FirstOrDefaultAsync(c => c.Status == ConfigStatus.Active);
-            if (conversionRate == null)
-                throw new InvalidOperationException("No active conversion rate found.");
-
             long orderCode = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
             Payment payment = new Payment
             {
-                PaymentId        = Guid.NewGuid(),
-                AccountId        = accountId,
-                Amount           = request.Amount,
-                OrderCode        = orderCode,
-                ConversionRateId = conversionRate.ConversionRateId,
-                CreateAt         = DateTimeOffset.UtcNow,
-                Status           = PaymentStatus.Pending
+                PaymentId = Guid.NewGuid(),
+                AccountId = accountId,
+                Amount    = request.Amount,
+                OrderCode = orderCode,
+                CreateAt  = DateTimeOffset.UtcNow,
+                Status    = PaymentStatus.Pending
             };
             await _uow.GetRepository<Payment>().AddAsync(payment);
             await _uow.SaveAsync();
@@ -97,12 +95,7 @@ namespace HorseRacingAPI.Services
                 };
             }
 
-            ConversionRate? conversionRate = await _uow.GetRepository<ConversionRate>().Entities
-                .FirstOrDefaultAsync(c => c.ConversionRateId == payment.ConversionRateId);
-            if (conversionRate == null)
-                throw new KeyNotFoundException("Conversion rate not found.");
-
-            long balanceToAdd = (long)(payment.Amount * (decimal)conversionRate.RateValue);
+            long balanceToAdd = (long)payment.Amount;
 
             await _uow.BeginTransactionAsync();
             try
@@ -125,6 +118,12 @@ namespace HorseRacingAPI.Services
                     .FirstOrDefaultAsync();
 
                 await _uow.CommitTransactionAsync();
+
+                await _hubContext.Clients.All.SendAsync("PaymentsUpdated", new
+                {
+                    amount    = payment.Amount,
+                    createdAt = DateTimeOffset.UtcNow
+                });
 
                 return new PaymentResponse
                 {
@@ -173,6 +172,39 @@ namespace HorseRacingAPI.Services
             return new PagedResponse<PaymentResponse>
             {
                 Items      = items.ToList(),
+                Page       = page,
+                PageSize   = pageSize,
+                TotalCount = totalCount
+            };
+        }
+        public async Task<PagedResponse<PaymentResponse>> GetAllPaymentsPagingAsync(int page, int pageSize)
+        {
+            if (page < 1) page = 1;
+            if (pageSize < 1) pageSize = 10;
+            if (pageSize > 100) pageSize = 100;
+
+            IGenericRepository<Payment> paymentRepo = _uow.GetRepository<Payment>();
+
+            int totalCount = await paymentRepo.Entities.CountAsync();
+
+            List<Payment> entities = await paymentRepo.Entities
+                .OrderByDescending(p => p.CreateAt)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
+            return new PagedResponse<PaymentResponse>
+            {
+                Items = entities.Select(p => new PaymentResponse
+                {
+                    PaymentId       = p.PaymentId,
+                    Amount          = p.Amount,
+                    Status          = p.Status.ToString(),
+                    TransactionType = PaymentType.Deposit.ToString(),
+                    BalanceChanged  = 0,
+                    CurrentBalance  = 0,
+                    CreateAt        = p.CreateAt
+                }).ToList(),
                 Page       = page,
                 PageSize   = pageSize,
                 TotalCount = totalCount

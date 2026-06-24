@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using HorseRacingAPI.Enums;
 
@@ -8,11 +8,11 @@ public partial class Race
 {
     public Guid RaceId { get; set; }
 
-    public Guid TournamentId { get; set; }
-
     public Guid RacecourseId { get; set; }
 
     public int? RaceNumber { get; set; }
+
+    public string? RaceName { get; set; }
 
     public DateTimeOffset? StartTime { get; set; }
 
@@ -22,7 +22,11 @@ public partial class Race
 
     public RaceStatus Status { get; set; }
 
-    public RaceGrade Grade { get; set; } = RaceGrade.Open;
+    public decimal RegistrationFee { get; set; } = 0;
+
+    public decimal PrizePool { get; set; } = 0;
+
+    public string? ImageUrl { get; set; }
 
     public DateTimeOffset? CreateAt { get; set; }
 
@@ -32,23 +36,25 @@ public partial class Race
 
     public DateTimeOffset? DeletedAt { get; set; }
 
-    public Guid? GradePurseConfigId { get; set; }
+    public Guid? RegistrationFeeConfigId { get; set; }
 
     public Guid? PositionPrizeConfigId { get; set; }
 
     public Guid? JockeyRewardConfigId { get; set; }
 
+    public Guid? RefereeId { get; set; }
+
     public virtual Racecourse Racecourse { get; set; } = null!;
 
-    public virtual GradePurseConfig? GradePurseConfig { get; set; }
+    public virtual RegistrationFeeConfig? RegistrationFeeConfig { get; set; }
 
     public virtual PositionPrizeConfig? PositionPrizeConfig { get; set; }
 
     public virtual JockeyRewardConfig? JockeyRewardConfig { get; set; }
 
+    public virtual Account? Referee { get; set; }
+
     public virtual ICollection<RefereeReport> RefereeReports { get; set; } = new List<RefereeReport>();
 
     public virtual ICollection<Registration> Registrations { get; set; } = new List<Registration>();
-
-    public virtual Tournament Tournament { get; set; } = null!;
 }

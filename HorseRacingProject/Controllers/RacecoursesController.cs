@@ -39,7 +39,8 @@ namespace HorseRacingAPI.Controllers
 
         [Authorize(Roles = "Admin")]
         [HttpPost]
-        public async Task<IActionResult> Create([FromBody] CreateRacecourseRequest request)
+        [Consumes("multipart/form-data")]
+        public async Task<IActionResult> Create([FromForm] CreateRacecourseRequest request)
         {
             RacecourseResponse racecourse = await _racecourseService.CreateRacecourseAsync(request);
             return Ok(ApiResponse<RacecourseResponse>.SuccessResponse(racecourse, "Racecourse created successfully."));
@@ -59,6 +60,15 @@ namespace HorseRacingAPI.Controllers
         {
             await _racecourseService.DeleteRacecourseAsync(id);
             return Ok(ApiResponse<object>.SuccessResponse("Racecourse deleted successfully."));
+        }
+
+        [Authorize(Roles = "Admin")]
+        [HttpPut("{id}/image")]
+        [Consumes("multipart/form-data")]
+        public async Task<IActionResult> UploadImage(Guid id, IFormFile file)
+        {
+            string imageUrl = await _racecourseService.UploadImageAsync(id, file);
+            return Ok(ApiResponse<string>.SuccessResponse(imageUrl, "Racecourse image uploaded successfully."));
         }
     }
 }

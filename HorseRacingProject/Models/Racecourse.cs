@@ -13,6 +13,8 @@ public partial class Racecourse
 
     public string? TrackType { get; set; }
 
+    public string? ImageUrl { get; set; }
+
     public bool IsDeleted { get; set; }
 
     public DateTimeOffset? DeletedAt { get; set; }

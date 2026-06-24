@@ -1,8 +1,10 @@
 using HorseRacingAPI.Dtos;
 using HorseRacingAPI.Enums;
+using HorseRacingAPI.Hubs;
 using HorseRacingAPI.Models;
 using HorseRacingAPI.Repositories;
 using HorseRacingAPI.Repository;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
@@ -11,9 +13,21 @@ namespace HorseRacingAPI.Services
     public class RegistrationService : IRegistrationService
     {
         private readonly IUnitofWork _uow;
-        public RegistrationService(IUnitofWork uow)
+        private readonly IHubContext<RaceHub> _hubContext;
+
+        public RegistrationService(IUnitofWork uow, IHubContext<RaceHub> hubContext)
         {
             _uow = uow;
+            _hubContext = hubContext;
+        }
+
+        private async Task<object> GetRegistrationKpiAsync()
+        {
+            var repo = _uow.GetRepository<Registration>();
+            int pendingCount  = await repo.Entities.CountAsync(r => r.Status == RegistrationStatus.Pending);
+            int approvedCount = await repo.Entities.CountAsync(r => r.Status == RegistrationStatus.Confirmed);
+            int rejectedCount = await repo.Entities.CountAsync(r => r.Status == RegistrationStatus.Rejected);
+            return new { pendingCount, approvedCount, rejectedCount };
         }
 
         public async Task AcceptRegistrationAsync(Guid registrationId, Guid jockeyAccountId)
@@ -69,12 +83,10 @@ namespace HorseRacingAPI.Services
                 .ThenInclude(r => r.Owner)
                 .Include(r => r.Race)
                 .ThenInclude(r => r.Racecourse)
-                .Include(r => r.Race)
-                .ThenInclude(r => r.Tournament)
                 .Where(j => j.JockeyId == jockeyAccountId
                     && j.Status == RegistrationStatus.Pending
                     && j.OwnerConfirmation == true
-                    && j.JockeyConfirmation == false)
+                    && j.JockeyConfirmation == null)
                 .Select(r => new RegistrationResponse
                 {
                     RegistrationId = r.RegistrationId,
@@ -101,16 +113,7 @@ namespace HorseRacingAPI.Services
                         MaxParticipants = r.Race.MaxParticipants,
                         Status = r.Race.Status.ToString(),
                         RacecourseName = r.Race.Racecourse.RacecourseName,
-                        Location = r.Race.Racecourse.Location,
-                        Tournament = new TournamentResponse
-                        {
-                            TournamentId = r.Race.Tournament.Id,
-                            TournamentName = r.Race.Tournament.TournamentName,
-                            Description = r.Race.Tournament.Description,
-                            StartDate = r.Race.Tournament.StartDate,
-                            EndDate = r.Race.Tournament.EndDate,
-                            Status = r.Race.Tournament.Status.ToString()
-                        }
+                        Location = r.Race.Racecourse.Location
                     },
                     OwnerConfirmation = r.OwnerConfirmation,
                     JockeyConfirmation = r.JockeyConfirmation,
@@ -167,16 +170,7 @@ namespace HorseRacingAPI.Services
                         MaxParticipants = r.Race.MaxParticipants,
                         Status = r.Race.Status.ToString(),
                         RacecourseName = r.Race.Racecourse.RacecourseName,
-                        Location = r.Race.Racecourse.Location,
-                        Tournament = new TournamentResponse
-                        {
-                            TournamentId = r.Race.Tournament.Id,
-                            TournamentName = r.Race.Tournament.TournamentName,
-                            Description = r.Race.Tournament.Description,
-                            StartDate = r.Race.Tournament.StartDate,
-                            EndDate = r.Race.Tournament.EndDate,
-                            Status = r.Race.Tournament.Status.ToString()
-                        }
+                        Location = r.Race.Racecourse.Location
                     },
                     OwnerConfirmation = r.OwnerConfirmation,
                     JockeyConfirmation = r.JockeyConfirmation,
@@ -194,6 +188,227 @@ namespace HorseRacingAPI.Services
                 Page = page,
                 PageSize = pageSize,
                 TotalCount = totalCount
+            };
+        }
+
+        public async Task<List<RegistrationResponse>> GetOwnerRequestAsync(Guid ownerAccountId)
+        {
+            IGenericRepository<Registration> registrationRepo = _uow.GetRepository<Registration>();
+            return await registrationRepo.Entities
+                .Include(r => r.Horse)
+                .ThenInclude(r => r.Owner)
+                .Include(r => r.Race)
+                .ThenInclude(r => r.Racecourse)
+                .Where(r => r.Horse.OwnerId == ownerAccountId
+                    && r.Status == RegistrationStatus.Pending)
+                .Select(r => new RegistrationResponse
+                {
+                    RegistrationId = r.RegistrationId,
+                    JockeyId = r.JockeyId,
+                    GateNumber = r.GateNumber,
+                    Horse = new HorseResponse
+                    {
+                        Id = r.HorseId,
+                        HorseName = r.Horse.HorseName,
+                        Breed = r.Horse.Breed,
+                        Color = r.Horse.Color,
+                        Age = r.Horse.Age,
+                        Weight = r.Horse.Weight,
+                        RecordWins = r.Horse.RecordWins,
+                        Status = r.Horse.Status.ToString(),
+                        DerivedStatus = r.Horse.Status.ToString()
+                    },
+                    Race = new RaceResponse
+                    {
+                        RaceId = r.RaceId,
+                        RaceNumber = r.Race.RaceNumber,
+                        StartTime = r.Race.StartTime,
+                        TrackLength = r.Race.TrackLength,
+                        MaxParticipants = r.Race.MaxParticipants,
+                        Status = r.Race.Status.ToString(),
+                        RacecourseName = r.Race.Racecourse.RacecourseName,
+                        Location = r.Race.Racecourse.Location
+                    },
+                    OwnerConfirmation = r.OwnerConfirmation,
+                    JockeyConfirmation = r.JockeyConfirmation,
+                    Status = r.Status.ToString(),
+                    CreateAt = r.CreateAt,
+                    UpdatedAt = r.UpdatedAt
+                }).ToListAsync();
+        }
+
+        public async Task<PagedResponse<RegistrationResponse>> GetOwnerRequestPagedAsync(Guid ownerAccountId, int page, int pageSize)
+        {
+            if (page < 1) page = 1;
+            if (pageSize < 1) pageSize = 10;
+            if (pageSize > 100) pageSize = 100;
+            IGenericRepository<Registration> registrationRepo = _uow.GetRepository<Registration>();
+
+            int totalCount = await registrationRepo.Entities
+                .Where(r => r.Horse.OwnerId == ownerAccountId
+                    && r.Status == RegistrationStatus.Pending)
+                .CountAsync();
+
+            IEnumerable<RegistrationResponse> items = await registrationRepo.FindAsync<RegistrationResponse>(
+                predicate: r => r.Horse.OwnerId == ownerAccountId
+                    && r.Status == RegistrationStatus.Pending
+                    && r.OwnerConfirmation == false,
+                orderBy: null,
+                selector: r => new RegistrationResponse
+                {
+                    RegistrationId = r.RegistrationId,
+                    JockeyId = r.JockeyId,
+                    GateNumber = r.GateNumber,
+                    Horse = new HorseResponse
+                    {
+                        Id = r.HorseId,
+                        HorseName = r.Horse.HorseName,
+                        Breed = r.Horse.Breed,
+                        Color = r.Horse.Color,
+                        Age = r.Horse.Age,
+                        Weight = r.Horse.Weight,
+                        RecordWins = r.Horse.RecordWins,
+                        Status = r.Horse.Status.ToString(),
+                        DerivedStatus = r.Horse.Status.ToString()
+                    },
+                    Race = new RaceResponse
+                    {
+                        RaceId = r.RaceId,
+                        RaceNumber = r.Race.RaceNumber,
+                        StartTime = r.Race.StartTime,
+                        TrackLength = r.Race.TrackLength,
+                        MaxParticipants = r.Race.MaxParticipants,
+                        Status = r.Race.Status.ToString(),
+                        RacecourseName = r.Race.Racecourse.RacecourseName,
+                        Location = r.Race.Racecourse.Location
+                    },
+                    OwnerConfirmation = r.OwnerConfirmation,
+                    JockeyConfirmation = r.JockeyConfirmation,
+                    Status = r.Status.ToString(),
+                    CreateAt = r.CreateAt,
+                    UpdatedAt = r.UpdatedAt
+                },
+                pageIndex: page - 1,
+                pageSize: pageSize
+            );
+
+            return new PagedResponse<RegistrationResponse>
+            {
+                Items = items.ToList(),
+                Page = page,
+                PageSize = pageSize,
+                TotalCount = totalCount
+            };
+        }
+
+        public async Task<List<RegistrationResponse>> GetAllOwnerRegistrationsAsync(Guid ownerAccountId)
+        {
+            IGenericRepository<Registration> registrationRepo = _uow.GetRepository<Registration>();
+            return await registrationRepo.Entities
+                .Include(r => r.Horse)
+                .Include(r => r.Race)
+                .ThenInclude(r => r.Racecourse)
+                .Where(r => r.Horse.OwnerId == ownerAccountId)
+                .OrderByDescending(r => r.CreateAt)
+                .Select(r => new RegistrationResponse
+                {
+                    RegistrationId = r.RegistrationId,
+                    JockeyId = r.JockeyId,
+                    GateNumber = r.GateNumber,
+                    Horse = new HorseResponse
+                    {
+                        Id = r.HorseId,
+                        HorseName = r.Horse.HorseName,
+                        Breed = r.Horse.Breed,
+                        Color = r.Horse.Color,
+                        Age = r.Horse.Age,
+                        Weight = r.Horse.Weight,
+                        RecordWins = r.Horse.RecordWins,
+                        Status = r.Horse.Status.ToString(),
+                        DerivedStatus = r.Horse.Status.ToString()
+                    },
+                    Race = new RaceResponse
+                    {
+                        RaceId = r.RaceId,
+                        RaceNumber = r.Race.RaceNumber,
+                        RaceName = r.Race.RaceName,
+                        StartTime = r.Race.StartTime,
+                        TrackLength = r.Race.TrackLength,
+                        MaxParticipants = r.Race.MaxParticipants,
+                        Status = r.Race.Status.ToString(),
+                        RacecourseName = r.Race.Racecourse.RacecourseName,
+                        Location = r.Race.Racecourse.Location
+                    },
+                    OwnerConfirmation = r.OwnerConfirmation,
+                    JockeyConfirmation = r.JockeyConfirmation,
+                    Status = r.Status.ToString(),
+                    CreateAt = r.CreateAt,
+                    UpdatedAt = r.UpdatedAt
+                }).ToListAsync();
+        }
+
+        public async Task<PagedResponse<RegistrationResponse>> GetAllOwnerRegistrationsPagedAsync(Guid ownerAccountId, int page, int pageSize)
+        {
+            if (page < 1) page = 1;
+            if (pageSize < 1) pageSize = 10;
+            if (pageSize > 100) pageSize = 100;
+
+            IGenericRepository<Registration> repo = _uow.GetRepository<Registration>();
+
+            IQueryable<Registration> query = repo.Entities
+                .Include(r => r.Horse)
+                .Include(r => r.Race).ThenInclude(r => r.Racecourse)
+                .Where(r => r.Horse.OwnerId == ownerAccountId)
+                .OrderByDescending(r => r.CreateAt);
+
+            int total = await query.CountAsync();
+
+            List<RegistrationResponse> items = await query
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(r => new RegistrationResponse
+                {
+                    RegistrationId    = r.RegistrationId,
+                    JockeyId          = r.JockeyId,
+                    GateNumber        = r.GateNumber,
+                    OwnerConfirmation = r.OwnerConfirmation,
+                    JockeyConfirmation = r.JockeyConfirmation,
+                    Status            = r.Status.ToString(),
+                    CreateAt          = r.CreateAt,
+                    UpdatedAt         = r.UpdatedAt,
+                    Horse = new HorseResponse
+                    {
+                        Id            = r.HorseId,
+                        HorseName     = r.Horse.HorseName,
+                        Breed         = r.Horse.Breed,
+                        Color         = r.Horse.Color,
+                        Age           = r.Horse.Age,
+                        Weight        = r.Horse.Weight,
+                        RecordWins    = r.Horse.RecordWins,
+                        Status        = r.Horse.Status.ToString(),
+                        DerivedStatus = r.Horse.Status.ToString()
+                    },
+                    Race = new RaceResponse
+                    {
+                        RaceId          = r.RaceId,
+                        RaceNumber      = r.Race.RaceNumber,
+                        RaceName        = r.Race.RaceName,
+                        StartTime       = r.Race.StartTime,
+                        TrackLength     = r.Race.TrackLength,
+                        MaxParticipants = r.Race.MaxParticipants,
+                        Status          = r.Race.Status.ToString(),
+                        RacecourseName  = r.Race.Racecourse.RacecourseName,
+                        Location        = r.Race.Racecourse.Location
+                    }
+                })
+                .ToListAsync();
+
+            return new PagedResponse<RegistrationResponse>
+            {
+                Items      = items,
+                Page       = page,
+                PageSize   = pageSize,
+                TotalCount = total
             };
         }
 
@@ -218,10 +433,135 @@ namespace HorseRacingAPI.Services
             await _uow.SaveAsync();
         }
 
+        public async Task AdminAcceptRegistrationAsync(Guid registrationId)
+        {
+            IGenericRepository<Registration> registrationRepo = _uow.GetRepository<Registration>();
+
+            Registration? registration = await registrationRepo.Entities
+                .Include(r => r.Race)
+                .FirstOrDefaultAsync(r => r.RegistrationId == registrationId);
+            if (registration == null)
+                throw new ArgumentException("Registration not found.");
+
+            if (registration.Status != RegistrationStatus.Pending)
+                throw new InvalidOperationException("Only pending registrations can be accepted.");
+
+            if (registration.Race.MaxParticipants.HasValue)
+            {
+                int confirmedCount = await registrationRepo.Entities
+                    .CountAsync(r => r.RaceId == registration.RaceId && r.Status == RegistrationStatus.Confirmed);
+                if (confirmedCount >= registration.Race.MaxParticipants.Value)
+                    throw new InvalidOperationException($"Race has reached the maximum number of participants ({registration.Race.MaxParticipants}).");
+            }
+
+            await _uow.BeginTransactionAsync();
+            try
+            {
+                registration.JockeyConfirmation = true;
+                registration.Status = RegistrationStatus.Confirmed;
+                registration.UpdatedAt = DateTimeOffset.UtcNow;
+                await _uow.SaveAsync();
+                await _uow.CommitTransactionAsync();
+            }
+            catch (DbUpdateException ex) when (ex.InnerException is PostgresException pg && pg.SqlState == "P0001")
+            {
+                await _uow.RollbackTransactionAsync();
+                throw new InvalidOperationException($"Race has reached the maximum number of participants ({registration.Race.MaxParticipants}).", ex);
+            }
+            catch
+            {
+                await _uow.RollbackTransactionAsync();
+                throw;
+            }
+
+            await _hubContext.Clients.All.SendAsync("RegistrationsUpdated", await GetRegistrationKpiAsync());
+        }
+
+        public async Task AdminRejectRegistrationAsync(Guid registrationId)
+        {
+            IGenericRepository<Registration> registrationRepo = _uow.GetRepository<Registration>();
+
+            Registration? registration = await registrationRepo.Entities.FirstOrDefaultAsync(r => r.RegistrationId == registrationId);
+            if (registration == null)
+                throw new ArgumentException("Registration not found.");
+
+            if (registration.Status != RegistrationStatus.Pending)
+                throw new InvalidOperationException("Only pending registrations can be rejected.");
+
+            registration.JockeyConfirmation = false;
+            registration.Status = RegistrationStatus.Rejected;
+            registration.UpdatedAt = DateTimeOffset.UtcNow;
+
+            await _uow.SaveAsync();
+
+            await _hubContext.Clients.All.SendAsync("RegistrationsUpdated", await GetRegistrationKpiAsync());
+        }
+
+        public async Task<PagedResponse<RegistrationResponse>> GetAllRegistrationsPagedAsync(int page, int pageSize)
+        {
+            if (page < 1) page = 1;
+            if (pageSize < 1) pageSize = 10;
+            if (pageSize > 100) pageSize = 100;
+
+            IGenericRepository<Registration> registrationRepo = _uow.GetRepository<Registration>();
+
+            int totalCount = await registrationRepo.Entities.CountAsync();
+
+            List<RegistrationResponse> items = await registrationRepo.Entities
+                .Include(r => r.Horse).ThenInclude(r => r.Owner)
+                .Include(r => r.Race).ThenInclude(r => r.Racecourse)
+                .OrderByDescending(r => r.CreateAt)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(r => new RegistrationResponse
+                {
+                    RegistrationId = r.RegistrationId,
+                    JockeyId = r.JockeyId,
+                    GateNumber = r.GateNumber,
+                    Horse = new HorseResponse
+                    {
+                        Id = r.HorseId,
+                        HorseName = r.Horse.HorseName,
+                        Breed = r.Horse.Breed,
+                        Color = r.Horse.Color,
+                        Age = r.Horse.Age,
+                        Weight = r.Horse.Weight,
+                        RecordWins = r.Horse.RecordWins,
+                        Status = r.Horse.Status.ToString(),
+                        DerivedStatus = r.Horse.Status.ToString()
+                    },
+                    Race = new RaceResponse
+                    {
+                        RaceId = r.RaceId,
+                        RaceNumber = r.Race.RaceNumber,
+                        StartTime = r.Race.StartTime,
+                        TrackLength = r.Race.TrackLength,
+                        MaxParticipants = r.Race.MaxParticipants,
+                        Status = r.Race.Status.ToString(),
+                        RacecourseName = r.Race.Racecourse.RacecourseName,
+                        Location = r.Race.Racecourse.Location
+                    },
+                    OwnerConfirmation = r.OwnerConfirmation,
+                    JockeyConfirmation = r.JockeyConfirmation,
+                    Status = r.Status.ToString(),
+                    CreateAt = r.CreateAt,
+                    UpdatedAt = r.UpdatedAt
+                }).ToListAsync();
+
+            return new PagedResponse<RegistrationResponse>
+            {
+                Items = items,
+                Page = page,
+                PageSize = pageSize,
+                TotalCount = totalCount
+            };
+        }
+
         public async Task ScratchHorseAsync(Guid registrationId)
         {
             Registration? registration = await _uow.GetRepository<Registration>().Entities
                 .Include(r => r.Race)
+                .Include(r => r.Horse)
                 .FirstOrDefaultAsync(r => r.RegistrationId == registrationId);
 
             if (registration == null)
@@ -241,8 +581,22 @@ namespace HorseRacingAPI.Services
                 registration.UpdatedAt = DateTimeOffset.UtcNow;
                 await _uow.GetRepository<Registration>().UpdateAsync(registration);
 
+                if (registration.Race.RegistrationFee > 0)
+                {
+                    UserProfile? ownerProfile = await _uow.GetRepository<UserProfile>().Entities
+                        .FirstOrDefaultAsync(p => p.AccountId == registration.Horse.OwnerId && !p.IsDeleted);
+                    if (ownerProfile != null)
+                    {
+                        ownerProfile.Balance = (ownerProfile.Balance ?? 0) + (long)registration.Race.RegistrationFee;
+                        ownerProfile.UpdatedAt = DateTimeOffset.UtcNow;
+                        await _uow.GetRepository<UserProfile>().UpdateAsync(ownerProfile);
+                    }
+                    registration.Race.PrizePool = Math.Max(0, registration.Race.PrizePool - registration.Race.RegistrationFee);
+                    await _uow.GetRepository<Race>().UpdateAsync(registration.Race);
+                }
+
                 List<Bet> bets = await _uow.GetRepository<Bet>().Entities
-                    .Where(b => b.RegistrationId == registrationId && b.Status == BetStatus.Pending)
+                    .Where(b => b.RegistrationId == registrationId && b.Status == BetStatus.Active)
                     .ToListAsync();
 
                 foreach (Bet bet in bets)
