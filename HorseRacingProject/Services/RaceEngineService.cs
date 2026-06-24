@@ -181,6 +181,8 @@ namespace HorseRacingAPI.Services
                         horseStates.Add(new
                         {
                             id = registration.HorseId,
+                            horseId = registration.HorseId,
+                            registrationId = registration.RegistrationId,
                             progress = Math.Min(1.0, currentProgress),
                             speed = speed,
                             isFinished = isFinished
