@@ -281,6 +281,104 @@ namespace HorseRacingAPI.Services
             };
         }
 
+        public async Task<PagedResponse<RefereeReportResponse>> GetMyReportsPagedAsync(Guid refereeId, int page, int pageSize)
+        {
+            if (page <= 0) page = 1;
+            if (pageSize <= 0) pageSize = 10;
+            if (pageSize > 100) pageSize = 100;
+
+            IGenericRepository<RefereeReport> reportRepo = _uow.GetRepository<RefereeReport>();
+            int total = await reportRepo.Entities
+                .CountAsync(r => r.RefereeId == refereeId);
+            List<RefereeReportResponse> items = await reportRepo.Entities
+                .Include(r => r.Race)
+                .Include(r => r.Registration)
+                    .ThenInclude(r => r.Horse)
+                .Include(r => r.Referee)
+                    .ThenInclude(r => r.UserProfiles)
+                .Include(r => r.Registration)
+                    .ThenInclude(r => r.RaceResults)
+                .Where(r => r.RefereeId == refereeId)
+                .OrderByDescending(r => r.CreatedAt)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(r => new RefereeReportResponse
+                {
+                    ReportId            = r.ReportId,
+                    RaceId              = r.RaceId,
+                    RaceNumber          = r.Race.RaceNumber,
+                    RefereeId           = r.RefereeId,
+                    RefereeName         = r.Referee.UserProfiles.Select(up => up.FullName).FirstOrDefault() ?? r.Referee.Email ?? "",
+                    RegistrationId      = r.RegistrationId,
+                    HorseName           = r.Registration.Horse.HorseName,
+                    OriginalPosition    = r.Registration.RaceResults.FirstOrDefault() != null ? r.Registration.RaceResults.FirstOrDefault()!.FinishPosition : null,
+                    IncidentDescription = r.IncidentDescription,
+                    PenaltyApplied      = r.PenaltyApplied,
+                    Status              = r.Status.ToString(),
+                    CreatedAt           = r.CreatedAt,
+                })
+                .ToListAsync();
+
+            return new PagedResponse<RefereeReportResponse>
+            {
+                Items      = items,
+                Page       = page,
+                PageSize   = pageSize,
+                TotalCount = total
+            };
+        }
+
+        public async Task<RefereeReportResponse> GetReportByIdAsync(Guid reportId, Guid requesterId, bool isAdmin)
+        {
+            RefereeReport? report = await _uow.GetRepository<RefereeReport>().Entities
+                .Include(r => r.Race)
+                .Include(r => r.Registration).ThenInclude(r => r.Horse)
+                .Include(r => r.Referee).ThenInclude(r => r.UserProfiles)
+                .Include(r => r.Registration).ThenInclude(r => r.RaceResults)
+                .FirstOrDefaultAsync(r => r.ReportId == reportId)
+                ?? throw new KeyNotFoundException("Report not found.");
+
+            if (!isAdmin && report.RefereeId != requesterId)
+                throw new UnauthorizedAccessException("Access denied.");
+
+            return new RefereeReportResponse
+            {
+                ReportId            = report.ReportId,
+                RaceId              = report.RaceId,
+                RaceNumber          = report.Race.RaceNumber,
+                RefereeId           = report.RefereeId,
+                RefereeName         = report.Referee.UserProfiles.Select(p => p.FullName).FirstOrDefault() ?? report.Referee.Email ?? "",
+                RegistrationId      = report.RegistrationId,
+                HorseName           = report.Registration.Horse.HorseName,
+                OriginalPosition    = report.Registration.RaceResults.FirstOrDefault()?.FinishPosition,
+                IncidentDescription = report.IncidentDescription,
+                PenaltyApplied      = report.PenaltyApplied,
+                Status              = report.Status.ToString(),
+                CreatedAt           = report.CreatedAt,
+            };
+        }
+
+        public async Task<RefereeReportResponse> UpdateReportAsync(Guid reportId, Guid refereeId, UpdateRefereeReportDto dto)
+        {
+            RefereeReport? report = await _uow.GetRepository<RefereeReport>().Entities
+                .FirstOrDefaultAsync(r => r.ReportId == reportId)
+                ?? throw new KeyNotFoundException("Report not found.");
+
+            if (report.RefereeId != refereeId)
+                throw new UnauthorizedAccessException("Access denied.");
+
+            if (report.Status != RefereeReportStatus.Pending)
+                throw new InvalidOperationException("Only Pending reports can be edited.");
+
+            report.IncidentDescription = dto.IncidentDescription ?? report.IncidentDescription;
+            report.PenaltyApplied      = dto.PenaltyApplied ?? report.PenaltyApplied;
+
+            await _uow.GetRepository<RefereeReport>().UpdateAsync(report);
+            await _uow.SaveAsync();
+
+            return MapToResponse(report);
+        }
+
         private static RefereeReportResponse MapToResponse(RefereeReport report) => new RefereeReportResponse
         {
             ReportId            = report.ReportId,
