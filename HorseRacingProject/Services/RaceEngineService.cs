@@ -145,7 +145,9 @@ namespace HorseRacingAPI.Services
                         if (!_progress.ContainsKey(registration.HorseId))
                         {
                             _progress[registration.HorseId] = 0.0;
-                            _baseSpeeds[registration.HorseId] = 0.005 + _random.NextDouble() * 0.010;
+                            double wins = registration.Horse.RecordWins ?? 0;
+                            double winBonus = Math.Min(wins * 0.0004, 0.005);
+                            _baseSpeeds[registration.HorseId] = 0.005 + _random.NextDouble() * 0.012 + winBonus;
                             _stamina[registration.HorseId] = 0.2 + _random.NextDouble() * 0.8;
                             _momentum[registration.HorseId] = 0;
                         }
@@ -163,9 +165,9 @@ namespace HorseRacingAPI.Services
 
                             _momentum[registration.HorseId] *= 0.80;
 
-                            double noise = (_random.NextDouble() - 0.5) * 0.002;
+                            double noise = (_random.NextDouble() - 0.5) * 0.0008;
                             speed = _baseSpeeds[registration.HorseId] - fatigue + _momentum[registration.HorseId] + noise;
-                            speed = Math.Max(0.002, Math.Min(0.018, speed));
+                            speed = Math.Max(0.002, Math.Min(0.025, speed));
                             _progress[registration.HorseId] += speed;
                             currentProgress = _progress[registration.HorseId];
                             isFinished = currentProgress >= 1.0;
