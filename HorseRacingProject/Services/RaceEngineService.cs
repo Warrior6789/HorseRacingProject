@@ -308,7 +308,7 @@ namespace HorseRacingAPI.Services
             for (int i = 0; i < ordered.Count; i++)
             {
                 Guid horseId = ordered[i].HorseId;
-                _targetFinishTick[horseId] = 350 + i * 8 + _random.Next(-3, 4);
+                _targetFinishTick[horseId] = 350 + i * 25 + _random.Next(-5, 6);
                 _raceStyle[horseId] = _random.NextDouble() * 2 - 1;
                 _progress[horseId] = 0.0;
             }
