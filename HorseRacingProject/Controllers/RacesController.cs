@@ -13,11 +13,13 @@ namespace HorseRacingAPI.Controllers
     {
         private readonly IRaceService _raceService;
         private readonly IHubContext<RaceHub> _hubContext;
+        private readonly RaceEngineService _engineService;
 
-        public RacesController(IRaceService raceService, IHubContext<RaceHub> hubContext)
+        public RacesController(IRaceService raceService, IHubContext<RaceHub> hubContext, RaceEngineService engineService)
         {
             _raceService = raceService;
             _hubContext = hubContext;
+            _engineService = engineService;
         }
 
       
@@ -92,6 +94,15 @@ namespace HorseRacingAPI.Controllers
         {
             RaceResponse result = await _raceService.UpdateRaceAsync(raceId, request);
             return Ok(ApiResponse<RaceResponse>.SuccessResponse(result, "Race updated successfully."));
+        }
+
+        [Authorize(Roles = "Admin")]
+        [HttpPost("{raceId}/engine/override-result")]
+        public IActionResult OverrideResult(Guid raceId, [FromBody] List<HorseRankOverrideDto> ranks)
+        {
+            var horseRanks = ranks.ToDictionary(r => r.HorseId, r => r.Rank);
+            _engineService.OverrideResult(raceId, horseRanks);
+            return Ok(ApiResponse<object>.SuccessResponse(null!, "Result override applied."));
         }
 
         [Authorize(Roles = "Admin")]
