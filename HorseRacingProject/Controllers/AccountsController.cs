@@ -25,9 +25,13 @@ namespace HorseRacingAPI.Controllers
         }
 
         [HttpGet("paged")]
-        public async Task<IActionResult> GetAccountsByStatusPaged([FromQuery] string status = "Active", [FromQuery] int page = 1, [FromQuery] int pageSize = 10)
+        public async Task<IActionResult> GetAccountsByStatusPaged(
+            [FromQuery] string status = "Active",
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 10,
+            [FromQuery] string? role = null)
         {
-            PagedResponse<AccountResponse> accounts = await _accountService.GetAccountByStatusPagedAsync(status, page, pageSize);
+            PagedResponse<AccountResponse> accounts = await _accountService.GetAccountByStatusPagedAsync(status, page, pageSize, role);
             return Ok(ApiResponse<PagedResponse<AccountResponse>>.SuccessResponse(accounts, "Get accounts successfully."));
         }
 
