@@ -1,7 +1,9 @@
 using HorseRacingAPI.Dtos;
+using HorseRacingAPI.Hubs;
 using HorseRacingAPI.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 
 namespace HorseRacingAPI.Controllers
 {
@@ -10,10 +12,12 @@ namespace HorseRacingAPI.Controllers
     public class RacesController : ControllerBase
     {
         private readonly IRaceService _raceService;
+        private readonly IHubContext<RaceHub> _hubContext;
 
-        public RacesController(IRaceService raceService)
+        public RacesController(IRaceService raceService, IHubContext<RaceHub> hubContext)
         {
             _raceService = raceService;
+            _hubContext = hubContext;
         }
 
       
@@ -22,11 +26,10 @@ namespace HorseRacingAPI.Controllers
         public async Task<IActionResult> GetRaces(
             [FromQuery] int page = 1,
             [FromQuery] int pageSize = 10,
-            [FromQuery] Guid? tournamentId = null,
             [FromQuery] Guid? racecourseId = null,
             [FromQuery] string? status = null)
         {
-            PagedResponse<RaceResponse> result = await _raceService.GetRacesAsync(page, pageSize, tournamentId, racecourseId, status);
+            PagedResponse<RaceResponse> result = await _raceService.GetRacesAsync(page, pageSize, racecourseId, status);
             return Ok(ApiResponse<PagedResponse<RaceResponse>>.SuccessResponse(result, "Get races successfully."));
         }
 
@@ -51,14 +54,12 @@ namespace HorseRacingAPI.Controllers
             return Ok(ApiResponse<PagedResponse<UpcomingRaceResponse>>.SuccessResponse(result, "Get upcoming races successfully."));
         }
 
-        [HttpGet("tournament/{tournamentId}")]
-        public async Task<IActionResult> GetRacesByTournament(Guid tournamentId)
+        [HttpGet("{raceId}/registrations")]
+        public async Task<IActionResult> GetRaceRegistrations(Guid raceId)
         {
-            List<RaceResponse> result = await _raceService.GetRacesByTournamentAsync(tournamentId);
-            return Ok(ApiResponse<List<RaceResponse>>.SuccessResponse(result, "Get races by tournament successfully."));
+            List<RegistrationResponse> result = await _raceService.GetRaceRegistrationsAsync(raceId);
+            return Ok(ApiResponse<List<RegistrationResponse>>.SuccessResponse(result, "Get race registrations successfully."));
         }
-
-      
 
         [HttpGet("{raceId}/horses")]
         public async Task<IActionResult> GetRaceHorses(Guid raceId)
@@ -78,7 +79,8 @@ namespace HorseRacingAPI.Controllers
 
         [Authorize(Roles = "Admin")]
         [HttpPost]
-        public async Task<IActionResult> CreateRace([FromBody] CreateRaceRequest request)
+        [Consumes("multipart/form-data")]
+        public async Task<IActionResult> CreateRace([FromForm] CreateRaceRequest request)
         {
             RaceResponse result = await _raceService.CreateRaceAsync(request);
             return Ok(ApiResponse<RaceResponse>.SuccessResponse(result, "Race created successfully."));
@@ -97,6 +99,7 @@ namespace HorseRacingAPI.Controllers
         public async Task<IActionResult> ResetRace(Guid raceId)
         {
             await _raceService.ResetRaceAsync(raceId);
+            await _hubContext.Clients.All.SendAsync("RacesUpdated");
             return Ok(ApiResponse<object>.SuccessResponse(null!, "Race reset to Scheduled successfully."));
         }
 
@@ -105,6 +108,7 @@ namespace HorseRacingAPI.Controllers
         public async Task<IActionResult> AdvanceRaceStatus(Guid raceId)
         {
             RaceResponse result = await _raceService.AdvanceRaceStatusAsync(raceId);
+            await _hubContext.Clients.All.SendAsync("RacesUpdated");
             return Ok(ApiResponse<RaceResponse>.SuccessResponse(result, $"Race advanced to '{result.Status}' successfully."));
         }
 
@@ -114,6 +118,15 @@ namespace HorseRacingAPI.Controllers
         {
             await _raceService.DeleteRaceAsync(raceId);
             return Ok(ApiResponse<object>.SuccessResponse("Race deleted successfully."));
+        }
+
+        [Authorize(Roles = "Admin")]
+        [HttpPut("{raceId}/image")]
+        [Consumes("multipart/form-data")]
+        public async Task<IActionResult> UploadImage(Guid raceId, IFormFile file)
+        {
+            string imageUrl = await _raceService.UploadImageAsync(raceId, file);
+            return Ok(ApiResponse<string>.SuccessResponse(imageUrl, "Race image uploaded successfully."));
         }
 
 

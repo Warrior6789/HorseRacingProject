@@ -8,7 +8,6 @@ namespace HorseRacingAPI.Dtos
         public float? TrackLength { get; set; }
         public int? MaxParticipants { get; set; }
         public string? Status { get; set; }
-        public string? TournamentName { get; set; }
         public string? RacecourseName { get; set; }
         public string? TrackType { get; set; }
         public string? Location { get; set; }

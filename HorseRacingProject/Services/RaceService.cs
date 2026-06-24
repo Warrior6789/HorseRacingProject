@@ -1,10 +1,12 @@
 using HorseRacingAPI.Dtos;
 using HorseRacingAPI.Enums;
 using HorseRacingAPI.Helpers;
+using HorseRacingAPI.Hubs;
 using HorseRacingAPI.Middlewares;
 using HorseRacingAPI.Models;
 using HorseRacingAPI.Repositories;
 using HorseRacingAPI.Repository;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 
 namespace HorseRacingAPI.Services
@@ -13,14 +15,18 @@ namespace HorseRacingAPI.Services
     {
         private readonly IUnitofWork _uow;
         private readonly RaceEngineService _engine;
+        private readonly ICloudinaryService _cloudinaryService;
+        private readonly IHubContext<RaceHub> _hubContext;
 
-        public RaceService(IUnitofWork uow, RaceEngineService engine)
+        public RaceService(IUnitofWork uow, RaceEngineService engine, ICloudinaryService cloudinaryService, IHubContext<RaceHub> hubContext)
         {
             _uow = uow;
             _engine = engine;
+            _cloudinaryService = cloudinaryService;
+            _hubContext = hubContext;
         }
 
-        public async Task<PagedResponse<RaceResponse>> GetRacesAsync(int page, int pageSize, Guid? tournamentId, Guid? racecourseId, string? status)
+        public async Task<PagedResponse<RaceResponse>> GetRacesAsync(int page, int pageSize, Guid? racecourseId, string? status)
         {
             if (page < 1) page = 1;
             if (pageSize < 1) pageSize = 10;
@@ -32,13 +38,11 @@ namespace HorseRacingAPI.Services
 
             int totalCount = await repo.Entities
                 .CountAsync(r => !r.IsDeleted
-                    && (tournamentId == null || r.TournamentId == tournamentId)
                     && (racecourseId == null || r.RacecourseId == racecourseId)
                     && (parsedStatus == null || r.Status == parsedStatus));
 
             IEnumerable<RaceResponse> items = await repo.FindAsync<RaceResponse>(
                 predicate: r => !r.IsDeleted
-                    && (tournamentId == null || r.TournamentId == tournamentId)
                     && (racecourseId == null || r.RacecourseId == racecourseId)
                     && (parsedStatus == null || r.Status == parsedStatus),
                 orderBy: q => q.OrderBy(r => r.StartTime),
@@ -46,23 +50,16 @@ namespace HorseRacingAPI.Services
                 {
                     RaceId = r.RaceId,
                     RaceNumber = r.RaceNumber,
+                    RaceName = r.RaceName,
                     StartTime = r.StartTime,
                     TrackLength = r.TrackLength,
                     MaxParticipants = r.MaxParticipants,
                     Status = r.Status.ToString(),
-                    Grade = r.Grade.ToString(),
+                    RegistrationFee = r.RegistrationFee,
+                    PrizePool = r.PrizePool,
                     RacecourseName = r.Racecourse.RacecourseName,
                     Location = r.Racecourse.Location,
-                    Tournament = new TournamentResponse
-                    {
-                        TournamentId = r.Tournament.Id,
-                        TournamentName = r.Tournament.TournamentName,
-                        Description = r.Tournament.Description,
-                        StartDate = r.Tournament.StartDate,
-                        EndDate = r.Tournament.EndDate,
-                        Status = r.Tournament.Status.ToString(),
-                        FundsPrize = r.Tournament.FundsPrize
-                    }
+                    ImageUrl = r.ImageUrl
                 },
                 pageIndex: page - 1,
                 pageSize: pageSize
@@ -81,7 +78,6 @@ namespace HorseRacingAPI.Services
         {
             Race? race = await _uow.GetRepository<Race>().Entities
                 .Include(r => r.Racecourse)
-                .Include(r => r.Tournament)
                 .FirstOrDefaultAsync(r => r.RaceId == raceId && !r.IsDeleted);
 
             if (race == null)
@@ -90,115 +86,67 @@ namespace HorseRacingAPI.Services
             return MapToResponse(race);
         }
 
-        public async Task<List<RaceResponse>> GetRacesByTournamentAsync(Guid tournamentId)
-        {
-            bool exists = await _uow.GetRepository<Tournament>().Entities
-                .AnyAsync(t => t.Id == tournamentId && !t.IsDeleted);
-            if (!exists)
-                throw new KeyNotFoundException($"Tournament with id {tournamentId} not found.");
-
-            return await _uow.GetRepository<Race>().Entities
-                .Where(r => r.TournamentId == tournamentId && !r.IsDeleted)
-                .OrderBy(r => r.RaceNumber)
-                .Select(r => new RaceResponse
-                {
-                    RaceId = r.RaceId,
-                    RaceNumber = r.RaceNumber,
-                    StartTime = r.StartTime,
-                    TrackLength = r.TrackLength,
-                    MaxParticipants = r.MaxParticipants,
-                    Status = r.Status.ToString(),
-                    Grade = r.Grade.ToString(),
-                    RacecourseName = r.Racecourse.RacecourseName,
-                    Location = r.Racecourse.Location,
-                    Tournament = new TournamentResponse
-                    {
-                        TournamentId = r.Tournament.Id,
-                        TournamentName = r.Tournament.TournamentName,
-                        Description = r.Tournament.Description,
-                        StartDate = r.Tournament.StartDate,
-                        EndDate = r.Tournament.EndDate,
-                        Status = r.Tournament.Status.ToString(),
-                        FundsPrize = r.Tournament.FundsPrize
-                    }
-                })
-                .ToListAsync();
-        }
-
         public async Task<RaceResponse> CreateRaceAsync(CreateRaceRequest request)
         {
-            Tournament? tournament = await _uow.GetRepository<Tournament>().Entities
-                .FirstOrDefaultAsync(t => t.Id == request.TournamentId && !t.IsDeleted);
-            if (tournament == null)
-                throw new KeyNotFoundException($"Tournament with id {request.TournamentId} not found.");
-
             Racecourse? racecourse = await _uow.GetRepository<Racecourse>().Entities
                 .FirstOrDefaultAsync(rc => rc.Id == request.RacecourseId && !rc.IsDeleted);
             if (racecourse == null)
                 throw new KeyNotFoundException($"Racecourse with id {request.RacecourseId} not found.");
 
-            if (request.StartTime <= DateTimeOffset.UtcNow.AddMinutes(30))
-                throw new InvalidOperationException("Start time must be at least 30 minutes from now.");
+            if (request.StartTime <= DateTimeOffset.UtcNow.AddMinutes(90))
+                throw new InvalidOperationException("Start time must be at least 90 minutes from now.");
 
             bool duplicate = await _uow.GetRepository<Race>().Entities
-                .AnyAsync(r => r.TournamentId == request.TournamentId
+                .AnyAsync(r => r.RacecourseId == request.RacecourseId
                     && r.RaceNumber == request.RaceNumber
                     && !r.IsDeleted);
             if (duplicate)
-                throw new InvalidOperationException($"Race number {request.RaceNumber} already exists in this tournament.");
+                throw new InvalidOperationException($"Race number {request.RaceNumber} already exists at this racecourse.");
 
-            GradePurseConfig? gradeConfig = await _uow.GetRepository<GradePurseConfig>().Entities
-                .FirstOrDefaultAsync(c => c.Status == ConfigStatus.Active);
-            if (gradeConfig == null)
-                throw new InvalidOperationException("No active grade purse config found. Please contact admin.");
-
-            List<RaceGrade> existingGrades = await _uow.GetRepository<Race>().Entities
-                .Where(r => r.TournamentId == request.TournamentId && !r.IsDeleted && r.Status != RaceStatus.Cancelled)
-                .Select(r => r.Grade)
-                .ToListAsync();
-
-            decimal totalExpected = existingGrades
-                .Sum(g => tournament.FundsPrize * (decimal)GetGradeRatio(gradeConfig, g));
-
-            decimal newRacePurse = tournament.FundsPrize * (decimal)GetGradeRatio(gradeConfig, request.Grade);
-
-            if (totalExpected + newRacePurse > tournament.FundsPrize)
-                throw new InvalidOperationException(
-                    $"Cannot create race. Total expected prize ({totalExpected + newRacePurse:N0}) would exceed tournament funds ({tournament.FundsPrize:N0}).");
-
-            Race? latestRace = await _uow.GetRepository<Race>().Entities
+            Race? lastRace = await _uow.GetRepository<Race>().Entities
                 .Where(r => r.RacecourseId == request.RacecourseId
                     && r.Status != RaceStatus.Cancelled
-                    && !r.IsDeleted)
-                .OrderByDescending(r => r.StartTime)
+                    && !r.IsDeleted
+                    && r.StartTime.HasValue)
+                .OrderByDescending(r => r.EndTime ?? r.StartTime!.Value.AddMinutes(5))
                 .FirstOrDefaultAsync();
 
-            if (latestRace != null)
+            if (lastRace != null)
             {
-                DateTimeOffset latestEnd = (latestRace.EndTime ?? latestRace.StartTime!.Value.AddMinutes(5)).AddMinutes(5);
-                if (request.StartTime < latestEnd)
-                    throw new InvalidOperationException($"This racecourse already has a race scheduled. Next race can start after {latestEnd:HH:mm} UTC.");
+                DateTimeOffset lastEnd = (lastRace.EndTime ?? lastRace.StartTime!.Value.AddMinutes(5)).AddMinutes(5);
+                if (request.StartTime < lastEnd)
+                    throw new InvalidOperationException($"This racecourse already has a race scheduled. Next race can start after {lastEnd:yyyy-MM-dd HH:mm} UTC.");
             }
+
+            string? imageUrl = null;
+            if (request.Image != null)
+                imageUrl = await _cloudinaryService.UploadImageAsync(request.Image, "races");
+
+            RegistrationFeeConfig? feeConfig = await _uow.GetRepository<RegistrationFeeConfig>().Entities
+                .FirstOrDefaultAsync(c => c.Status == ConfigStatus.Active);
 
             Race race = new Race
             {
-                TournamentId = request.TournamentId,
+                RaceId = Guid.NewGuid(),
                 RacecourseId = request.RacecourseId,
                 RaceNumber = request.RaceNumber,
+                RaceName = request.RaceName,
                 StartTime = request.StartTime,
                 TrackLength = request.TrackLength,
                 MaxParticipants = request.MaxParticipants,
-                Grade = request.Grade,
+                RegistrationFeeConfigId = feeConfig?.RegistrationFeeConfigId,
+                RegistrationFee = feeConfig?.FeeAmount ?? 0,
+                PrizePool = 0,
                 Status = RaceStatus.Scheduled,
                 CreateAt = DateTimeOffset.UtcNow,
-                IsDeleted = false
+                IsDeleted = false,
+                ImageUrl = imageUrl
             };
 
             await _uow.GetRepository<Race>().AddAsync(race);
             await _uow.SaveAsync();
 
             race.Racecourse = racecourse;
-            race.Tournament = tournament;
 
             return MapToResponse(race);
         }
@@ -207,7 +155,6 @@ namespace HorseRacingAPI.Services
         {
             Race? race = await _uow.GetRepository<Race>().Entities
                 .Include(r => r.Racecourse)
-                .Include(r => r.Tournament)
                 .FirstOrDefaultAsync(r => r.RaceId == raceId && !r.IsDeleted);
 
             if (race == null)
@@ -229,33 +176,37 @@ namespace HorseRacingAPI.Services
             if (request.RaceNumber.HasValue)
             {
                 bool duplicate = await _uow.GetRepository<Race>().Entities
-                    .AnyAsync(r => r.TournamentId == race.TournamentId
+                    .AnyAsync(r => r.RacecourseId == race.RacecourseId
                         && r.RaceNumber == request.RaceNumber
                         && r.RaceId != raceId
                         && !r.IsDeleted);
                 if (duplicate)
-                    throw new InvalidOperationException($"Race number {request.RaceNumber} already exists in this tournament.");
+                    throw new InvalidOperationException($"Race number {request.RaceNumber} already exists at this racecourse.");
                 race.RaceNumber = request.RaceNumber;
             }
 
+            if (request.RaceName != null)
+                race.RaceName = request.RaceName;
+
             if (request.StartTime.HasValue)
             {
-                if (request.StartTime.Value <= DateTimeOffset.UtcNow.AddMinutes(30))
-                    throw new InvalidOperationException("Start time must be at least 30 minutes from now.");
+                if (request.StartTime.Value <= DateTimeOffset.UtcNow.AddMinutes(90))
+                    throw new InvalidOperationException("Start time must be at least 90 minutes from now.");
 
-                Race? latestRace = await _uow.GetRepository<Race>().Entities
+                Race? lastRace = await _uow.GetRepository<Race>().Entities
                     .Where(r => r.RacecourseId == race.RacecourseId
                         && r.RaceId != raceId
                         && r.Status != RaceStatus.Cancelled
-                        && !r.IsDeleted)
-                    .OrderByDescending(r => r.StartTime)
+                        && !r.IsDeleted
+                        && r.StartTime.HasValue)
+                    .OrderByDescending(r => r.EndTime ?? r.StartTime!.Value.AddMinutes(5))
                     .FirstOrDefaultAsync();
 
-                if (latestRace != null)
+                if (lastRace != null)
                 {
-                    DateTimeOffset latestEnd = (latestRace.EndTime ?? latestRace.StartTime!.Value.AddMinutes(5)).AddMinutes(5);
-                    if (request.StartTime.Value < latestEnd)
-                        throw new InvalidOperationException($"This racecourse already has a race scheduled. Next race can start after {latestEnd:HH:mm} UTC.");
+                    DateTimeOffset lastEnd = (lastRace.EndTime ?? lastRace.StartTime!.Value.AddMinutes(5)).AddMinutes(5);
+                    if (request.StartTime.Value < lastEnd)
+                        throw new InvalidOperationException($"This racecourse already has a race scheduled. Next race can start after {lastEnd:yyyy-MM-dd HH:mm} UTC.");
                 }
 
                 race.StartTime = request.StartTime;
@@ -266,9 +217,6 @@ namespace HorseRacingAPI.Services
 
             if (request.MaxParticipants.HasValue)
                 race.MaxParticipants = request.MaxParticipants;
-
-            if (request.Grade != null)
-                race.Grade = request.Grade.Value;
 
             await _uow.GetRepository<Race>().UpdateAsync(race);
             await _uow.SaveAsync();
@@ -297,7 +245,6 @@ namespace HorseRacingAPI.Services
         {
             Race? race = await _uow.GetRepository<Race>().Entities
                 .Include(r => r.Racecourse)
-                .Include(r => r.Tournament)
                 .FirstOrDefaultAsync(r => r.RaceId == raceId && !r.IsDeleted);
 
             if (race == null)
@@ -368,8 +315,22 @@ namespace HorseRacingAPI.Services
             if (jockeyAlreadyRegistered)
                 throw new InvalidOperationException("This jockey is already assigned to another horse in this race.");
 
+            if (race.RegistrationFee > 0)
+            {
+                UserProfile? ownerProfile = await _uow.GetRepository<UserProfile>().Entities
+                    .FirstOrDefaultAsync(p => p.AccountId == ownerId && !p.IsDeleted);
+                if (ownerProfile == null || (ownerProfile.Balance ?? 0) < (long)race.RegistrationFee)
+                    throw new InvalidOperationException($"Insufficient balance. Registration fee is {race.RegistrationFee} coins.");
+                ownerProfile.Balance = (ownerProfile.Balance ?? 0) - (long)race.RegistrationFee;
+                ownerProfile.UpdatedAt = DateTimeOffset.UtcNow;
+                await _uow.GetRepository<UserProfile>().UpdateAsync(ownerProfile);
+                race.PrizePool += race.RegistrationFee;
+                await _uow.GetRepository<Race>().UpdateAsync(race);
+            }
+
             Registration registration = new Registration
             {
+                RegistrationId = Guid.NewGuid(),
                 RaceId = raceId,
                 HorseId = request.HorseId,
                 JockeyId = request.JockeyId,
@@ -383,6 +344,16 @@ namespace HorseRacingAPI.Services
 
             await _uow.GetRepository<Registration>().AddAsync(registration);
             await _uow.SaveAsync();
+
+            int pendingCount = await _uow.GetRepository<Registration>().Entities
+                .CountAsync(r => r.Status == RegistrationStatus.Pending);
+            await _hubContext.Clients.All.SendAsync("RegistrationsUpdated", new
+            {
+                pendingCount,
+                approvedCount = await _uow.GetRepository<Registration>().Entities.CountAsync(r => r.Status == RegistrationStatus.Confirmed),
+                rejectedCount = await _uow.GetRepository<Registration>().Entities.CountAsync(r => r.Status == RegistrationStatus.Rejected),
+                jockeyId = request.JockeyId
+            });
 
             return new RegistrationResponse
             {
@@ -434,12 +405,11 @@ namespace HorseRacingAPI.Services
                 selector: r => new UpcomingRaceResponse
                 {
                     RaceId = r.RaceId,
-                    RaceName = "Race " + r.RaceNumber,
+                    RaceName = r.RaceName,
                     StartTime = r.StartTime,
                     TrackLength = r.TrackLength,
                     MaxParticipants = r.MaxParticipants,
                     Status = r.Status.ToString(),
-                    TournamentName = r.Tournament.TournamentName,
                     RacecourseName = r.Racecourse.RacecourseName,
                     TrackType = r.Racecourse.TrackType,
                     Location = r.Racecourse.Location
@@ -514,11 +484,66 @@ namespace HorseRacingAPI.Services
                 .ToListAsync();
         }
 
+        public async Task<List<RegistrationResponse>> GetRaceRegistrationsAsync(Guid raceId)
+        {
+            bool exists = await _uow.GetRepository<Race>().Entities
+                .AnyAsync(r => r.RaceId == raceId && !r.IsDeleted);
+
+            if (!exists)
+                throw new KeyNotFoundException($"Race with id {raceId} not found.");
+
+            return await _uow.GetRepository<Registration>().Entities
+                .Include(r => r.Horse)
+                .Include(r => r.Race)
+                    .ThenInclude(r => r.Racecourse)
+                .Include(r => r.Jockey)
+                    .ThenInclude(a => a.JockeyProfiles)
+                .Where(r => r.RaceId == raceId && r.Status == RegistrationStatus.Confirmed)
+                .OrderBy(r => r.GateNumber)
+                .Select(r => new RegistrationResponse
+                {
+                    RegistrationId = r.RegistrationId,
+                    JockeyId = r.JockeyId,
+                    JockeyName = r.Jockey.JockeyProfiles.Where(p => !p.IsDeleted).Select(p => p.FullName).FirstOrDefault(),
+                    GateNumber = r.GateNumber,
+                    Horse = new HorseResponse
+                    {
+                        Id = r.HorseId,
+                        HorseName = r.Horse.HorseName,
+                        Breed = r.Horse.Breed,
+                        Color = r.Horse.Color,
+                        Age = r.Horse.Age,
+                        Weight = r.Horse.Weight,
+                        RecordWins = r.Horse.RecordWins,
+                        Status = r.Horse.Status.ToString(),
+                        DerivedStatus = r.Horse.Status.ToString(),
+                        ImageUrl = r.Horse.ImageUrl
+                    },
+                    Race = new RaceResponse
+                    {
+                        RaceId = r.RaceId,
+                        RaceNumber = r.Race.RaceNumber,
+                        RaceName = r.Race.RaceName,
+                        StartTime = r.Race.StartTime,
+                        TrackLength = r.Race.TrackLength,
+                        MaxParticipants = r.Race.MaxParticipants,
+                        Status = r.Race.Status.ToString(),
+                        RacecourseName = r.Race.Racecourse.RacecourseName,
+                        Location = r.Race.Racecourse.Location
+                    },
+                    OwnerConfirmation = r.OwnerConfirmation,
+                    JockeyConfirmation = r.JockeyConfirmation,
+                    Status = r.Status.ToString(),
+                    CreateAt = r.CreateAt,
+                    UpdatedAt = r.UpdatedAt
+                })
+                .ToListAsync();
+        }
+
         public async Task ResetRaceAsync(Guid raceId)
         {
             Race? race = await _uow.GetRepository<Race>().Entities
                 .Include(r => r.Racecourse)
-                .Include(r => r.Tournament)
                 .FirstOrDefaultAsync(r => r.RaceId == raceId && !r.IsDeleted);
 
             if (race == null)
@@ -550,7 +575,7 @@ namespace HorseRacingAPI.Services
                         long payout = (long)(bet.BetAmount * (decimal)(bet.PayoutRatio ?? 1));
                         profile.Balance = Math.Max(0, (profile.Balance ?? 0) - payout + (long)bet.BetAmount);
                     }
-                    else if (bet.Status == BetStatus.Lost || bet.Status == BetStatus.Pending)
+                    else if (bet.Status == BetStatus.Lost || bet.Status == BetStatus.Active)
                     {
                         profile.Balance = (profile.Balance ?? 0) + (long)bet.BetAmount;
                     }
@@ -568,6 +593,12 @@ namespace HorseRacingAPI.Services
 
             await _uow.GetRepository<RaceResult>().DeleteRangeAsync(results);
 
+            List<RacePool> racePools = await _uow.GetRepository<RacePool>().Entities
+                .Where(p => p.RaceId == raceId)
+                .ToListAsync();
+
+            await _uow.GetRepository<RacePool>().DeleteRangeAsync(racePools);
+
             race.Status = RaceStatus.Scheduled;
             race.EndTime = null;
             race.StartTime = DateTimeOffset.UtcNow.AddHours(24);
@@ -582,7 +613,6 @@ namespace HorseRacingAPI.Services
         {
             Race? race = await _uow.GetRepository<Race>().Entities
                 .Include(r => r.Racecourse)
-                .Include(r => r.Tournament)
                 .FirstOrDefaultAsync(r => r.RaceId == raceId && !r.IsDeleted);
 
             if (race == null)
@@ -601,17 +631,14 @@ namespace HorseRacingAPI.Services
 
             if (nextStatus == RaceStatus.BettingOpen)
             {
-                GradePurseConfig? gradeConfig = await _uow.GetRepository<GradePurseConfig>().Entities
-                    .FirstOrDefaultAsync(c => c.Status == ConfigStatus.Active);
                 PositionPrizeConfig? posConfig = await _uow.GetRepository<PositionPrizeConfig>().Entities
                     .FirstOrDefaultAsync(c => c.Status == ConfigStatus.Active);
                 JockeyRewardConfig? jockeyConfig = await _uow.GetRepository<JockeyRewardConfig>().Entities
                     .FirstOrDefaultAsync(c => c.Status == ConfigStatus.Active);
 
-                if (gradeConfig == null || posConfig == null || jockeyConfig == null)
-                    throw new InvalidOperationException("All prize configs (grade, position, jockey) must be active before opening betting.");
+                if (posConfig == null || jockeyConfig == null)
+                    throw new InvalidOperationException("Position prize config and jockey reward config must be active before opening betting.");
 
-                race.GradePurseConfigId = gradeConfig.GradePurseConfigId;
                 race.PositionPrizeConfigId = posConfig.PositionPrizeConfigId;
                 race.JockeyRewardConfigId = jockeyConfig.JockeyRewardConfigId;
             }
@@ -621,8 +648,8 @@ namespace HorseRacingAPI.Services
                 int confirmedCount = await _uow.GetRepository<Registration>().Entities
                     .CountAsync(r => r.RaceId == raceId && r.Status == RegistrationStatus.Confirmed);
 
-                if (confirmedCount == 0)
-                    throw new InvalidOperationException("Race must have at least one confirmed registration before going Live.");
+                if (confirmedCount < 3)
+                    throw new InvalidOperationException("Race must have at least 3 confirmed registrations before going Live.");
 
                 bool otherRaceLive = await _uow.GetRepository<Race>().Entities
                     .AnyAsync(r => r.RacecourseId == race.RacecourseId
@@ -632,6 +659,21 @@ namespace HorseRacingAPI.Services
 
                 if (otherRaceLive)
                     throw new InvalidOperationException("Another race at the same racecourse is currently Live.");
+
+                if (race.RefereeId.HasValue)
+                {
+                    var conflictingRace = await _uow.GetRepository<Race>().Entities
+                        .Where(r => r.RefereeId == race.RefereeId
+                                 && r.RaceId != raceId
+                                 && r.Status == RaceStatus.Live
+                                 && !r.IsDeleted)
+                        .Select(r => new { r.RaceNumber })
+                        .FirstOrDefaultAsync();
+
+                    if (conflictingRace != null)
+                        throw new InvalidOperationException(
+                            $"Cannot go Live: assigned referee is still active in Race #{conflictingRace.RaceNumber}.");
+                }
             }
 
             race.Status = nextStatus.Value;
@@ -641,36 +683,54 @@ namespace HorseRacingAPI.Services
             return MapToResponse(race);
         }
 
-        private static float GetGradeRatio(GradePurseConfig config, RaceGrade grade) => grade switch
+
+        public async Task<string> UploadImageAsync(Guid raceId, IFormFile file)
         {
-            RaceGrade.G1     => config.G1Ratio,
-            RaceGrade.G2     => config.G2Ratio,
-            RaceGrade.G3     => config.G3Ratio,
-            RaceGrade.Listed => config.ListedRatio,
-            _                => config.OpenRatio
-        };
+            Race? race = await _uow.GetRepository<Race>().Entities
+                .FirstOrDefaultAsync(r => r.RaceId == raceId && !r.IsDeleted);
+            if (race == null)
+                throw new KeyNotFoundException($"Race with id {raceId} not found.");
+
+            string? oldImageUrl = race.ImageUrl;
+            string newImageUrl = await _cloudinaryService.UploadImageAsync(file, "races");
+
+            try
+            {
+                race.ImageUrl = newImageUrl;
+                await _uow.SaveAsync();
+            }
+            catch
+            {
+                string newPublicId = string.Join("/", new Uri(newImageUrl).AbsolutePath
+                    .TrimStart('/').Split('/').TakeLast(2)).Split('.')[0];
+                await _cloudinaryService.DeleteImageAsync(newPublicId);
+                throw;
+            }
+
+            if (oldImageUrl != null)
+            {
+                string oldPublicId = string.Join("/", new Uri(oldImageUrl).AbsolutePath
+                    .TrimStart('/').Split('/').TakeLast(2)).Split('.')[0];
+                await _cloudinaryService.DeleteImageAsync(oldPublicId);
+            }
+
+            return newImageUrl;
+        }
 
         private static RaceResponse MapToResponse(Race race) => new RaceResponse
         {
             RaceId = race.RaceId,
             RaceNumber = race.RaceNumber,
+            RaceName = race.RaceName,
             StartTime = race.StartTime,
             TrackLength = race.TrackLength,
             MaxParticipants = race.MaxParticipants,
             Status = race.Status.ToString(),
-            Grade = race.Grade.ToString(),
+            RegistrationFee = race.RegistrationFee,
+            PrizePool = race.PrizePool,
             RacecourseName = race.Racecourse?.RacecourseName,
             Location = race.Racecourse?.Location,
-            Tournament = race.Tournament == null ? null : new TournamentResponse
-            {
-                TournamentId = race.Tournament.Id,
-                TournamentName = race.Tournament.TournamentName,
-                Description = race.Tournament.Description,
-                StartDate = race.Tournament.StartDate,
-                EndDate = race.Tournament.EndDate,
-                Status = race.Tournament.Status.ToString(),
-                FundsPrize = race.Tournament.FundsPrize
-            }
+            ImageUrl = race.ImageUrl
         };
     }
 }

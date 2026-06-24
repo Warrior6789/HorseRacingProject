@@ -23,6 +23,9 @@ namespace HorseRacingAPI.Services
             if (race.Status != RaceStatus.Finished)
                 throw new InvalidOperationException("Race has not finished yet.");
 
+            if (race.RefereeId != refereeId)
+                throw new UnauthorizedAccessException("You are not assigned to this race.");
+
             _ = await _uow.GetRepository<Registration>().Entities
                 .FirstOrDefaultAsync(r => r.RegistrationId == dto.RegistrationId && r.RaceId == dto.RaceId)
                 ?? throw new KeyNotFoundException("Registration not found.");
@@ -75,25 +78,15 @@ namespace HorseRacingAPI.Services
                 ?? throw new InvalidOperationException("Race result has no finish position.");
 
             var race = await _uow.GetRepository<Race>().Entities
-                .Include(r => r.Tournament)
-                .Include(r => r.GradePurseConfig)
                 .Include(r => r.PositionPrizeConfig)
                 .Include(r => r.JockeyRewardConfig)
                 .FirstOrDefaultAsync(r => r.RaceId == report.RaceId)
                 ?? throw new KeyNotFoundException("Race not found.");
 
-            if (race.GradePurseConfig == null || race.PositionPrizeConfig == null || race.JockeyRewardConfig == null)
+            if (race.PositionPrizeConfig == null || race.JockeyRewardConfig == null)
                 throw new InvalidOperationException("Race prize configs are not set.");
 
-            double gradeRatio = race.Grade switch
-            {
-                RaceGrade.G1     => race.GradePurseConfig.G1Ratio,
-                RaceGrade.G2     => race.GradePurseConfig.G2Ratio,
-                RaceGrade.G3     => race.GradePurseConfig.G3Ratio,
-                RaceGrade.Listed => race.GradePurseConfig.ListedRatio,
-                _                => race.GradePurseConfig.OpenRatio
-            };
-            decimal racePurse = race.Tournament.FundsPrize * (decimal)gradeRatio;
+            decimal racePurse = race.PrizePool;
 
             double[] positionRatios =
             [

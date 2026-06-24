@@ -1,8 +1,10 @@
 using HorseRacingAPI.Dtos;
 using HorseRacingAPI.Enums;
+using HorseRacingAPI.Hubs;
 using HorseRacingAPI.Models;
 using HorseRacingAPI.Repositories;
 using HorseRacingAPI.Repository;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 
 namespace HorseRacingAPI.Services
@@ -10,14 +12,16 @@ namespace HorseRacingAPI.Services
     public class BetService : IBetService
     {
         private readonly IUnitofWork _uow;
+        private readonly IHubContext<RaceHub> _hubContext;
         private static readonly HashSet<BetType> ValidBetTypes = [BetType.Win, BetType.Place, BetType.Show];
-        public BetService(IUnitofWork uow)
+        public BetService(IUnitofWork uow, IHubContext<RaceHub> hubContext)
         {
             _uow = uow;
+            _hubContext = hubContext;
         }
         public async Task<List<BetResponse>> GetMyBetsAsync(Guid spectatorId)
         {
-            return await _uow.GetRepository<Bet>().Entities
+            List<BetResponse> bets = await _uow.GetRepository<Bet>().Entities
                   .Include(b => b.Registration).ThenInclude(r => r.Horse)
                   .Include(b => b.Registration).ThenInclude(r => r.Race)
                   .Where(b => b.SpectatorId == spectatorId)
@@ -27,8 +31,10 @@ namespace HorseRacingAPI.Services
                       BetId = b.BetId,
                       SpectatorId = b.SpectatorId,
                       RegistrationId = b.RegistrationId,
+                      RaceId = b.Registration.RaceId,
                       HorseName = b.Registration.Horse.HorseName,
                       RaceNumber = b.Registration.Race.RaceNumber,
+                      RaceName = b.Registration.Race.RaceName,
                       BetAmount = b.BetAmount,
                       BetType = b.BetType.ToString(),
                       PayoutRatio = b.PayoutRatio,
@@ -36,6 +42,9 @@ namespace HorseRacingAPI.Services
                       CreatedAt = b.CreatedAt
                   })
                   .ToListAsync();
+
+            await EnrichEstimatedPayoutAsync(bets);
+            return bets;
         }
 
         public async Task<PagedResponse<BetResponse>> GetMyBetsPagedAsync(Guid spectatorId, int page, int pageSize)
@@ -53,8 +62,10 @@ namespace HorseRacingAPI.Services
                     BetId = b.BetId,
                     SpectatorId = b.SpectatorId,
                     RegistrationId = b.RegistrationId,
+                    RaceId = b.Registration.RaceId,
                     HorseName = b.Registration.Horse.HorseName,
                     RaceNumber = b.Registration.Race.RaceNumber,
+                    RaceName = b.Registration.Race.RaceName,
                     BetAmount = b.BetAmount,
                     BetType = b.BetType.ToString(),
                     PayoutRatio = b.PayoutRatio,
@@ -65,7 +76,9 @@ namespace HorseRacingAPI.Services
                 pageSize: pageSize,
                 include: q => q.Include(b => b.Registration).ThenInclude(r => r.Horse)
                                .Include(b => b.Registration).ThenInclude(r => r.Race));
-            return new PagedResponse<BetResponse> { Items = items.ToList(), Page = page, PageSize = pageSize, TotalCount = totalCount };
+            List<BetResponse> itemList = items.ToList();
+            await EnrichEstimatedPayoutAsync(itemList);
+            return new PagedResponse<BetResponse> { Items = itemList, Page = page, PageSize = pageSize, TotalCount = totalCount };
         }
 
         public async Task<BetResponse> PlaceBetAsync(Guid spectatorId, PlaceBetRequest req)
@@ -93,9 +106,10 @@ namespace HorseRacingAPI.Services
             bool alreadyBet = await _uow.GetRepository<Bet>().Entities
                  .AnyAsync(b => b.SpectatorId == spectatorId
                              && b.RegistrationId == req.RegistrationId
-                             && b.Status == BetStatus.Pending);
+                             && b.BetType == betType
+                             && b.Status == BetStatus.Active);
             if (alreadyBet)
-                throw new InvalidOperationException("You have already placed a bet on this horse.");
+                throw new InvalidOperationException($"You have already placed a {betType} bet on this horse.");
 
             await _uow.BeginTransactionAsync();
             try
@@ -124,7 +138,7 @@ namespace HorseRacingAPI.Services
                 bool duplicateInTx = await _uow.GetRepository<Bet>().Entities
                     .AnyAsync(b => b.SpectatorId == spectatorId
                                 && b.RegistrationId == req.RegistrationId
-                                && b.Status == BetStatus.Pending);
+                                && b.Status == BetStatus.Active);
                 if (duplicateInTx)
                     throw new InvalidOperationException("You have already placed a bet on this horse.");
 
@@ -136,12 +150,28 @@ namespace HorseRacingAPI.Services
                     BetAmount = req.BetAmount,
                     BetType = betType,
                     PayoutRatio = null,
-                    Status = BetStatus.Pending,
+                    Status = BetStatus.Active,
                     CreatedAt = DateTimeOffset.UtcNow
                 };
                 await _uow.GetRepository<Bet>().AddAsync(bet);
                 await _uow.SaveAsync();
                 await _uow.CommitTransactionAsync();
+
+                List<RacePool> pools = await _uow.GetRepository<RacePool>().Entities
+                    .Where(p => p.RaceId == registration.RaceId)
+                    .ToListAsync();
+
+                await _hubContext.Clients.Group($"race-{registration.RaceId}")
+                    .SendAsync("PoolUpdate", new
+                    {
+                        raceId = registration.RaceId,
+                        pools = pools.Select(p => new
+                        {
+                            betType = p.BetType.ToString(),
+                            totalAmount = p.TotalAmount
+                        })
+                    });
+
                 return MapToResponse(bet, registration);
             }
             catch
@@ -156,13 +186,51 @@ namespace HorseRacingAPI.Services
             BetId = b.BetId,
             SpectatorId = b.SpectatorId,
             RegistrationId = b.RegistrationId,
+            RaceId = registration.RaceId,
             HorseName = registration.Horse.HorseName,
             RaceNumber = registration.Race.RaceNumber,
+            RaceName = registration.Race.RaceName,
             BetAmount = b.BetAmount,
             BetType = b.BetType?.ToString(),
             PayoutRatio = b.PayoutRatio,
             Status = b.Status.ToString(),
             CreatedAt = b.CreatedAt
         };
+
+        private async Task EnrichEstimatedPayoutAsync(List<BetResponse> bets)
+        {
+            List<BetResponse> activeBets = bets.Where(b => b.Status == BetStatus.Active.ToString()).ToList();
+            if (!activeBets.Any()) return;
+
+            TakeoutConfig? takeoutConfig = await _uow.GetRepository<TakeoutConfig>().Entities
+                .FirstOrDefaultAsync(c => c.Status == ConfigStatus.Active);
+            decimal takeout = (decimal)(takeoutConfig?.TakeoutPercentage ?? 0.20f);
+
+            List<Guid> raceIds = activeBets.Select(b => b.RaceId).Distinct().ToList();
+            List<Guid> registrationIds = activeBets.Select(b => b.RegistrationId).Distinct().ToList();
+
+            List<RacePool> pools = await _uow.GetRepository<RacePool>().Entities
+                .Where(p => raceIds.Contains(p.RaceId))
+                .ToListAsync();
+
+            var perHorsePools = await _uow.GetRepository<Bet>().Entities
+                .Where(b => registrationIds.Contains(b.RegistrationId) && b.Status == BetStatus.Active)
+                .GroupBy(b => new { b.RegistrationId, b.BetType })
+                .Select(g => new { g.Key.RegistrationId, g.Key.BetType, Total = g.Sum(b => b.BetAmount) })
+                .ToListAsync();
+
+            foreach (BetResponse bet in activeBets)
+            {
+                if (!Enum.TryParse<BetType>(bet.BetType, ignoreCase: true, out BetType betType)) continue;
+
+                RacePool? pool = pools.FirstOrDefault(p => p.RaceId == bet.RaceId && p.BetType == betType);
+                var horsePool = perHorsePools.FirstOrDefault(p => p.RegistrationId == bet.RegistrationId && p.BetType == betType);
+
+                if (pool == null || horsePool == null || horsePool.Total <= 0) continue;
+
+                decimal netPool = pool.TotalAmount * (1 - takeout);
+                bet.EstimatedPayout = Math.Round(bet.BetAmount * (netPool / horsePool.Total), 0);
+            }
+        }
     }
 }

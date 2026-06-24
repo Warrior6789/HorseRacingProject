@@ -24,7 +24,7 @@ namespace HorseRacingAPI.Controllers
             Guid accountId = GetAccountIdFromToken();
             List<RegistrationResponse> result = await _registrationService.GetMyRequestAsync(accountId);
             return Ok(ApiResponse<List<RegistrationResponse>>.SuccessResponse(result, "Get registration requests successfully."));
-          }
+        }
 
         [Authorize(Roles = "Jockey")]
         [HttpGet("my-requests/paged")]
@@ -50,6 +50,66 @@ namespace HorseRacingAPI.Controllers
         {
             Guid accountId = GetAccountIdFromToken();
             await _registrationService.RejectRegistrationAsync(registrationId, accountId);
+            return Ok(ApiResponse<object>.SuccessResponse("Registration rejected successfully."));
+        }
+
+        [Authorize(Roles = "HorseOwner")]
+        [HttpGet("owner/my-requests")]
+        public async Task<IActionResult> GetOwnerRequests()
+        {
+            Guid accountId = GetAccountIdFromToken();
+            List<RegistrationResponse> result = await _registrationService.GetOwnerRequestAsync(accountId);
+            return Ok(ApiResponse<List<RegistrationResponse>>.SuccessResponse(result, "Get owner registration requests successfully."));
+        }
+
+        [Authorize(Roles = "HorseOwner")]
+        [HttpGet("owner/my-requests/paged")]
+        public async Task<IActionResult> GetOwnerRequestsPaged([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
+        {
+            Guid accountId = GetAccountIdFromToken();
+            PagedResponse<RegistrationResponse> result = await _registrationService.GetOwnerRequestPagedAsync(accountId, page, pageSize);
+            return Ok(ApiResponse<PagedResponse<RegistrationResponse>>.SuccessResponse(result, "Get owner registration requests successfully."));
+        }
+
+        [Authorize(Roles = "HorseOwner")]
+        [HttpGet("owner/all")]
+        public async Task<IActionResult> GetAllOwnerRegistrations()
+        {
+            Guid accountId = GetAccountIdFromToken();
+            List<RegistrationResponse> result = await _registrationService.GetAllOwnerRegistrationsAsync(accountId);
+            return Ok(ApiResponse<List<RegistrationResponse>>.SuccessResponse(result, "Get all owner registrations successfully."));
+        }
+
+        [Authorize(Roles = "HorseOwner")]
+        [HttpGet("owner/all/paged")]
+        public async Task<IActionResult> GetAllOwnerRegistrationsPaged([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
+        {
+            Guid accountId = GetAccountIdFromToken();
+            PagedResponse<RegistrationResponse> result = await _registrationService.GetAllOwnerRegistrationsPagedAsync(accountId, page, pageSize);
+            return Ok(ApiResponse<PagedResponse<RegistrationResponse>>.SuccessResponse(result, "Get all owner registrations successfully."));
+        }
+
+        [Authorize(Roles = "Admin")]
+        [HttpGet("paged-all")]
+        public async Task<IActionResult> GetAllRegistrationsPaged([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
+        {
+            PagedResponse<RegistrationResponse> result = await _registrationService.GetAllRegistrationsPagedAsync(page, pageSize);
+            return Ok(ApiResponse<PagedResponse<RegistrationResponse>>.SuccessResponse(result, "Get all registrations successfully."));
+        }
+
+        [Authorize(Roles = "Admin")]
+        [HttpPut("{registrationId}/admin-accept")]
+        public async Task<IActionResult> AdminAccept(Guid registrationId)
+        {
+            await _registrationService.AdminAcceptRegistrationAsync(registrationId);
+            return Ok(ApiResponse<object>.SuccessResponse("Registration accepted successfully."));
+        }
+
+        [Authorize(Roles = "Admin")]
+        [HttpPut("{registrationId}/admin-reject")]
+        public async Task<IActionResult> AdminReject(Guid registrationId)
+        {
+            await _registrationService.AdminRejectRegistrationAsync(registrationId);
             return Ok(ApiResponse<object>.SuccessResponse("Registration rejected successfully."));
         }
 

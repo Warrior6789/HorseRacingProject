@@ -1,7 +1,9 @@
 using HorseRacingAPI.Dtos;
 using HorseRacingAPI.Enums;
+using HorseRacingAPI.Hubs;
 using HorseRacingAPI.Models;
 using HorseRacingAPI.Repository;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 
 namespace HorseRacingAPI.Services;
@@ -9,10 +11,29 @@ namespace HorseRacingAPI.Services;
 public class WithdrawalService : IWithdrawalService
 {
     private readonly IUnitofWork _uow;
+    private readonly IHubContext<RaceHub> _hubContext;
 
-    public WithdrawalService(IUnitofWork uow)
+    public WithdrawalService(IUnitofWork uow, IHubContext<RaceHub> hubContext)
     {
         _uow = uow;
+        _hubContext = hubContext;
+    }
+
+    private async Task<object> GetWithdrawalKpiAsync()
+    {
+        var today = DateTimeOffset.UtcNow.Date;
+        var repo = _uow.GetRepository<Withdrawal>();
+
+        int pendingCount = await repo.Entities.CountAsync(w => w.Status == WithdrawalStatus.Pending);
+        long pendingAmount = await repo.Entities
+            .Where(w => w.Status == WithdrawalStatus.Pending)
+            .SumAsync(w => (long?)w.Amount) ?? 0;
+        int processedToday = await repo.Entities
+            .CountAsync(w => w.Status != WithdrawalStatus.Pending
+                          && w.ProcessedAt.HasValue
+                          && w.ProcessedAt.Value.Date == today);
+
+        return new { pendingCount, pendingAmount, processedToday };
     }
 
     public async Task<WithdrawalResponse> CreateWithdrawalAsync(Guid accountId, WithdrawalRequest request)
@@ -51,6 +72,8 @@ public class WithdrawalService : IWithdrawalService
             await _uow.GetRepository<Withdrawal>().AddAsync(withdrawal);
             await _uow.SaveAsync();
             await _uow.CommitTransactionAsync();
+
+            await _hubContext.Clients.All.SendAsync("WithdrawalsUpdated", await GetWithdrawalKpiAsync());
 
             return MapToResponse(withdrawal);
         }
@@ -127,6 +150,8 @@ public class WithdrawalService : IWithdrawalService
         await _uow.GetRepository<Withdrawal>().UpdateAsync(withdrawal);
         await _uow.SaveAsync();
 
+        await _hubContext.Clients.All.SendAsync("WithdrawalsUpdated", await GetWithdrawalKpiAsync());
+
         return MapToResponse(withdrawal);
     }
 
@@ -153,6 +178,9 @@ public class WithdrawalService : IWithdrawalService
                 .ExecuteUpdateAsync(s => s.SetProperty(u => u.Balance, u => (u.Balance ?? 0) + withdrawal.Amount));
 
             await _uow.CommitTransactionAsync();
+
+            await _hubContext.Clients.All.SendAsync("WithdrawalsUpdated", await GetWithdrawalKpiAsync());
+
             return MapToResponse(withdrawal);
         }
         catch

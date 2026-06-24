@@ -25,7 +25,10 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("FrontendPolicy", policy =>
     {
-        policy.WithOrigins("http://localhost:3000", "http://localhost:5173"
+        policy.WithOrigins(
+                "http://localhost:3000",
+                "http://localhost:5173",
+                "https://horse-racing-fe.vercel.app"
             )
               .AllowAnyHeader()
               .AllowAnyMethod()
@@ -88,18 +91,18 @@ builder.Services.AddScoped<IUserProfileService, UserProfileService>();
 builder.Services.AddScoped<IJockeyProfileService, JockeyProfileService>();
 builder.Services.AddScoped<IAccountService, AccountService>();
 builder.Services.AddScoped<IRegistrationService, RegistrationService>();
-builder.Services.AddScoped<ITournamentService, TournamentService>();
+builder.Services.AddScoped<IRegistrationFeeConfigService, RegistrationFeeConfigService>();
 builder.Services.AddScoped<IRacecourseService, RacecourseService>();
 builder.Services.AddScoped<IRaceService, RaceService>();
 builder.Services.AddScoped<IHorseService, HorseService>();
 builder.Services.AddScoped<IPaymentService, PaymentService>();
 builder.Services.AddScoped<IBetService, BetService>();
 builder.Services.AddScoped<ITakeoutConfigService, TakeoutConfigService>();
-builder.Services.AddScoped<IConversionRateService, ConversionRateService>();
-builder.Services.AddScoped<IGradePurseConfigService, GradePurseConfigService>();
 builder.Services.AddScoped<IPositionPrizeConfigService, PositionPrizeConfigService>();
 builder.Services.AddScoped<IJockeyRewardConfigService, JockeyRewardConfigService>();
 builder.Services.AddScoped<IRefereeReportService, RefereeReportService>();
+builder.Services.AddScoped<IRaceRefereeService, RaceRefereeService>();
+
 builder.Services.AddScoped<IWithdrawalService, WithdrawalService>();
 builder.Services.AddSingleton<RaceEngineService>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<RaceEngineService>());

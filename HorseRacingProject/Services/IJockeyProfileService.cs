@@ -10,5 +10,6 @@ namespace HorseRacingAPI.Services
         Task<PagedResponse<JockeyProfileResponse>> GetAllJockeyProfilesPagedAsync(int page, int pageSize);
         Task UpdateJockeyProfileAsync(Guid accountId, JockeyProfileUpdateRequest req);
         Task<string> UploadImageAsync(Guid accountId, IFormFile file);
+        Task<JockeyRewardsResponse> GetJockeyRewardsAsync(Guid accountId, int page, int pageSize);
     }
 }

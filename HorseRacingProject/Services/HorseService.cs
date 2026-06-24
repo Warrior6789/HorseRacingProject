@@ -117,12 +117,13 @@ namespace HorseRacingAPI.Services
             IGenericRepository<Horse> horseRepo = _uow.GetRepository<Horse>();
             Horse horse = new Horse
             {
+                Id = Guid.NewGuid(),
                 OwnerId = ownerId,
                 HorseName = request.HorseName,
                 Age = request.Age,
                 Breed = request.Breed,
                 Weight = request.Weight,
-                Status = HorseStatusPolicy.NormalizeOrDefault(request.Status),
+                Status = HorseStatus.Healthy,
                 RecordWins = request.RecordWins ?? 0,
                 Color = request.Color,
                 ImageUrl = request.ImageUrl,
@@ -223,6 +224,56 @@ namespace HorseRacingAPI.Services
                 .ToListAsync();
         }
 
+        public async Task<PagedResponse<HorseResponse>> GetActiveHorsesPagedAsync(Guid accountId, bool isAdmin, int page, int pageSize)
+        {
+            if (page < 1) page = 1;
+            if (pageSize < 1) pageSize = 10;
+            if (pageSize > 100) pageSize = 100;
+
+            RaceStatus[] upcomingRaceStatuses =
+            [
+                RaceStatus.Scheduled,
+                RaceStatus.BettingOpen,
+                RaceStatus.BettingClosed
+            ];
+
+            IQueryable<Horse> query = BuildHorseScope(accountId, isAdmin)
+                .Where(h => HorseStatusPolicy.ActiveStatuses.Contains(h.Status))
+                .OrderBy(h => h.HorseName);
+
+            int total = await query.CountAsync();
+
+            List<HorseResponse> items = await query
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(h => new HorseResponse
+                {
+                    Id         = h.Id,
+                    HorseName  = h.HorseName,
+                    Age        = h.Age,
+                    Breed      = h.Breed,
+                    Weight     = h.Weight,
+                    Status     = h.Status.ToString(),
+                    DerivedStatus = h.Registrations.Any(r => r.Status == RegistrationStatus.Confirmed && !r.Race.IsDeleted && r.Race.Status == RaceStatus.Live)
+                        ? "Racing"
+                        : h.Registrations.Any(r => r.Status == RegistrationStatus.Confirmed && !r.Race.IsDeleted && upcomingRaceStatuses.Contains(r.Race.Status))
+                            ? "Registered"
+                            : h.Status.ToString(),
+                    RecordWins = h.RecordWins,
+                    Color      = h.Color,
+                    ImageUrl   = h.ImageUrl
+                })
+                .ToListAsync();
+
+            return new PagedResponse<HorseResponse>
+            {
+                Items      = items,
+                Page       = page,
+                PageSize   = pageSize,
+                TotalCount = total
+            };
+        }
+
         public async Task<List<HorseScheduleResponse>> GetMyScheduleAsync(Guid ownerId)
         {
             return await BuildScheduleQuery()
@@ -266,8 +317,6 @@ namespace HorseRacingAPI.Services
                     RegistrationId = p.RegistrationId,
                     RaceId = p.Registration.RaceId,
                     RaceNumber = p.Registration.Race.RaceNumber,
-                    TournamentId = p.Registration.Race.TournamentId,
-                    TournamentName = p.Registration.Race.Tournament.TournamentName,
                     PrizeType = p.PrizeType.ToString(),
                     Amount = p.Amount,
                     DistributedAt = p.DistributedAt
@@ -333,6 +382,35 @@ namespace HorseRacingAPI.Services
             return query;
         }
 
+        public async Task<HorsePerformanceSummaryResponse> GetPerformanceSummaryAsync(Guid horseId, Guid accountId, bool isAdmin)
+        {
+            Horse horse = await GetHorseEntityAsync(horseId, accountId, isAdmin);
+
+            IGenericRepository<Registration> regRepo = _uow.GetRepository<Registration>();
+            IGenericRepository<Prize> prizeRepo = _uow.GetRepository<Prize>();
+
+            int totalRaces = await regRepo.Entities
+                .CountAsync(r => r.HorseId == horseId && r.Status == RegistrationStatus.Confirmed);
+
+            int totalWins = await _uow.GetRepository<RaceResult>().Entities
+                .CountAsync(rr => rr.Registration.HorseId == horseId
+                    && rr.FinishPosition == 1
+                    && rr.IsDisqualified != true);
+
+            decimal totalEarned = await prizeRepo.Entities
+                .Where(p => p.Registration.HorseId == horseId)
+                .SumAsync(p => p.Amount ?? 0);
+
+            return new HorsePerformanceSummaryResponse
+            {
+                HorseId = horse.Id,
+                HorseName = horse.HorseName,
+                TotalRaces = totalRaces,
+                TotalWins = totalWins,
+                TotalEarned = totalEarned
+            };
+        }
+
         private async Task<Horse> GetHorseEntityAsync(Guid horseId, Guid accountId, bool isAdmin)
         {
             Horse? horse = await _uow.GetRepository<Horse>().Entities
@@ -367,9 +445,7 @@ namespace HorseRacingAPI.Services
                 .Where(r => !r.Horse.IsDeleted && !r.Race.IsDeleted)
                 .Include(r => r.Horse)
                 .Include(r => r.Race)
-                    .ThenInclude(r => r.Racecourse)
-                .Include(r => r.Race)
-                    .ThenInclude(r => r.Tournament);
+                    .ThenInclude(r => r.Racecourse);
         }
 
         private static void NormalizePaging(HorseQueryRequest query)
@@ -458,9 +534,7 @@ namespace HorseRacingAPI.Services
             MaxParticipants = registration.Race.MaxParticipants,
             RaceStatus = registration.Race.Status.ToString(),
             RacecourseName = registration.Race.Racecourse.RacecourseName,
-            Location = registration.Race.Racecourse.Location,
-            TournamentId = registration.Race.TournamentId,
-            TournamentName = registration.Race.Tournament.TournamentName
+            Location = registration.Race.Racecourse.Location
         };
     }
 }

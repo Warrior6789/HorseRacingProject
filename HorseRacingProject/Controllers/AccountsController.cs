@@ -52,11 +52,25 @@ namespace HorseRacingAPI.Controllers
             return Ok(ApiResponse<object>.SuccessResponse("Account restored successfully."));
         }
 
+        [HttpGet("{accountId}/upgrade-detail")]
+        public async Task<IActionResult> GetUpgradeRequestDetail(Guid accountId)
+        {
+            UpgradeRequestResponse result = await _accountService.GetUpgradeRequestDetailAsync(accountId);
+            return Ok(ApiResponse<UpgradeRequestResponse>.SuccessResponse(result, "Get upgrade request detail successfully."));
+        }
+
         [HttpGet("upgrades")]
         public async Task<IActionResult> GetRoleUpgradeRequests()
         {
-            List<AccountResponse> result = await _accountService.GetRoleUpgradeRequestsAsync();
-            return Ok(ApiResponse<List<AccountResponse>>.SuccessResponse(result, "Get upgrade requests successfully."));
+            List<UpgradeRequestResponse> result = await _accountService.GetRoleUpgradeRequestsAsync();
+            return Ok(ApiResponse<List<UpgradeRequestResponse>>.SuccessResponse(result, "Get upgrade requests successfully."));
+        }
+
+        [HttpGet("upgrades/paged")]
+        public async Task<IActionResult> GetRoleUpgradeRequestsPaged([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
+        {
+            PagedResponse<UpgradeRequestResponse> result = await _accountService.GetRoleUpgradeRequestsPagedAsync(page, pageSize);
+            return Ok(ApiResponse<PagedResponse<UpgradeRequestResponse>>.SuccessResponse(result, "Get upgrade requests successfully."));
         }
 
         [HttpPut("{accountId}/approve-upgrade")]

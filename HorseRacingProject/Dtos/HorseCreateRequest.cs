@@ -20,9 +20,6 @@ namespace HorseRacingAPI.Dtos
         [Range(0, 2000)]
         public float? Weight { get; set; }
 
-        [MaxLength(20)]
-        public string? Status { get; set; }
-
         public int? RecordWins { get; set; }
 
         [MaxLength(20)]

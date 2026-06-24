@@ -9,7 +9,9 @@ namespace HorseRacingAPI.Services
         Task SuspendAccountAsync(Guid id);
         Task BanAccountAsync(Guid id);
         Task RestoreAccountAsync(Guid id);
-        Task<List<AccountResponse>> GetRoleUpgradeRequestsAsync();
+        Task<List<UpgradeRequestResponse>> GetRoleUpgradeRequestsAsync();
+        Task<PagedResponse<UpgradeRequestResponse>> GetRoleUpgradeRequestsPagedAsync(int page, int pageSize);
+        Task<UpgradeRequestResponse> GetUpgradeRequestDetailAsync(Guid accountId);
         Task ApproveRoleUpgradeAsync(Guid accountId);
         Task RejectRoleUpgradeAsync(Guid accountId);
     }

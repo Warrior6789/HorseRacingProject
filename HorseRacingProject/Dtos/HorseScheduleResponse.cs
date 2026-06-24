@@ -18,7 +18,5 @@ namespace HorseRacingAPI.Dtos
         public string? RaceStatus { get; set; }
         public string? RacecourseName { get; set; }
         public string? Location { get; set; }
-        public Guid TournamentId { get; set; }
-        public string? TournamentName { get; set; }
     }
 }

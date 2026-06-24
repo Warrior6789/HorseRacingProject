@@ -10,5 +10,6 @@ namespace HorseRacingAPI.Services
         Task<RacecourseResponse> CreateRacecourseAsync(CreateRacecourseRequest request);
         Task<RacecourseResponse> UpdateRacecourseAsync(Guid id, UpdateRacecourseRequest request);
         Task<bool> DeleteRacecourseAsync(Guid id);
+        Task<string> UploadImageAsync(Guid id, IFormFile file);
     }
 }

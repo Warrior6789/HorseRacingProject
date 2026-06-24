@@ -56,7 +56,17 @@ public class PaymentsController : ControllerBase
         return Ok(ApiResponse<PagedResponse<PaymentResponse>>.SuccessResponse(result, "Get payment history successfully."));
     }
 
-private Guid GetAccountIdFromToken()
+    [Authorize(Roles = "Admin")]
+    [HttpGet("all/paged")]
+    public async Task<IActionResult> GetAllPayments(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 10)
+    {
+        PagedResponse<PaymentResponse> result = await _paymentService.GetAllPaymentsPagingAsync(page, pageSize);
+        return Ok(ApiResponse<PagedResponse<PaymentResponse>>.SuccessResponse(result, "Get all payments successfully."));
+    }
+
+    private Guid GetAccountIdFromToken()
     {
         string? value = HttpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (!Guid.TryParse(value, out Guid accountId))

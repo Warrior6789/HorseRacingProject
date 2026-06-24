@@ -39,6 +39,16 @@ namespace HorseRacingAPI.Controllers
             return Ok(ApiResponse<List<HorseResponse>>.SuccessResponse(horses, "Get active horses successfully."));
         }
 
+        [HttpGet("active/paged")]
+        public async Task<IActionResult> GetActiveHorsesPaged([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
+        {
+            Guid accountId = GetAccountIdFromToken();
+            bool isAdmin = IsAdmin();
+
+            PagedResponse<HorseResponse> horses = await _horseService.GetActiveHorsesPagedAsync(accountId, isAdmin, page, pageSize);
+            return Ok(ApiResponse<PagedResponse<HorseResponse>>.SuccessResponse(horses, "Get active horses successfully."));
+        }
+
         [Authorize(Roles = "HorseOwner")]
         [HttpGet("my-schedule")]
         public async Task<IActionResult> GetMySchedule()
@@ -108,6 +118,16 @@ namespace HorseRacingAPI.Controllers
 
             List<HorseScheduleResponse> schedule = await _horseService.GetHorseScheduleAsync(horseId, accountId, isAdmin);
             return Ok(ApiResponse<List<HorseScheduleResponse>>.SuccessResponse(schedule, "Get horse schedule successfully."));
+        }
+
+        [HttpGet("{horseId:guid}/performance-summary")]
+        public async Task<IActionResult> GetPerformanceSummary(Guid horseId)
+        {
+            Guid accountId = GetAccountIdFromToken();
+            bool isAdmin = IsAdmin();
+
+            HorsePerformanceSummaryResponse summary = await _horseService.GetPerformanceSummaryAsync(horseId, accountId, isAdmin);
+            return Ok(ApiResponse<HorsePerformanceSummaryResponse>.SuccessResponse(summary, "Get horse performance summary successfully."));
         }
 
         [HttpGet("{horseId:guid}/rewards")]

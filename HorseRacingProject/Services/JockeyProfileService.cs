@@ -85,9 +85,12 @@ namespace HorseRacingAPI.Services
                     DateOfBirth = p.DateOfBirth,
                     Nationality = p.Nationality,
                     LicenseNumber = p.LicenseNumber,
+                    Weight = p.Weight,
+                    Height = p.Height,
                     TotalRaces = p.TotalRaces,
                     TotalWins = p.TotalWins,
                     ImageUrl = p.ImageUrl,
+                    CertificateImageUrl = p.CertificateImageUrl,
                     CreateAt = p.CreateAt,
                     UpdatedAt = p.UpdatedAt
                 }).ToListAsync();
@@ -111,9 +114,12 @@ namespace HorseRacingAPI.Services
                     DateOfBirth = p.DateOfBirth,
                     Nationality = p.Nationality,
                     LicenseNumber = p.LicenseNumber,
+                    Weight = p.Weight,
+                    Height = p.Height,
                     TotalRaces = p.TotalRaces,
                     TotalWins = p.TotalWins,
                     ImageUrl = p.ImageUrl,
+                    CertificateImageUrl = p.CertificateImageUrl,
                     CreateAt = p.CreateAt,
                     UpdatedAt = p.UpdatedAt
                 },
@@ -138,9 +144,12 @@ namespace HorseRacingAPI.Services
                     DateOfBirth = p.DateOfBirth,
                     Nationality = p.Nationality,
                     LicenseNumber = p.LicenseNumber,
+                    Weight = p.Weight,
+                    Height = p.Height,
                     TotalRaces = p.TotalRaces,
                     TotalWins = p.TotalWins,
                     ImageUrl = p.ImageUrl,
+                    CertificateImageUrl = p.CertificateImageUrl,
                     CreateAt = p.CreateAt,
                     UpdatedAt = p.UpdatedAt
                 }).FirstOrDefaultAsync();
@@ -227,6 +236,56 @@ namespace HorseRacingAPI.Services
             }
 
             return newImageUrl;
+        }
+
+        public async Task<JockeyRewardsResponse> GetJockeyRewardsAsync(Guid accountId, int page, int pageSize)
+        {
+            if (page < 1) page = 1;
+            if (pageSize < 1) pageSize = 10;
+            if (pageSize > 100) pageSize = 100;
+
+            JockeyProfile? profile = await _uow.GetRepository<JockeyProfile>().Entities
+                .FirstOrDefaultAsync(p => p.AccountId == accountId && !p.IsDeleted);
+            if (profile == null)
+                throw new KeyNotFoundException("Jockey profile not found.");
+
+            IQueryable<Prize> query = _uow.GetRepository<Prize>().Entities
+                .Where(p => p.PrizeType == PrizeType.Jockey
+                    && p.Registration.JockeyId == accountId);
+
+            int totalCount = await query.CountAsync();
+            decimal totalAmount = await query.SumAsync(p => p.Amount ?? 0);
+
+            List<HorseRewardItemResponse> items = await query
+                .OrderByDescending(p => p.DistributedAt ?? DateTimeOffset.MinValue)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(p => new HorseRewardItemResponse
+                {
+                    PrizeId = p.PrizeId,
+                    RegistrationId = p.RegistrationId,
+                    RaceId = p.Registration.RaceId,
+                    RaceNumber = p.Registration.Race.RaceNumber,
+                    PrizeType = p.PrizeType.ToString(),
+                    Amount = p.Amount,
+                    DistributedAt = p.DistributedAt
+                })
+                .ToListAsync();
+
+            return new JockeyRewardsResponse
+            {
+                JockeyAccountId = accountId,
+                FullName = profile.FullName ?? string.Empty,
+                TotalRewardAmount = totalAmount,
+                RewardCount = totalCount,
+                Rewards = new PagedResponse<HorseRewardItemResponse>
+                {
+                    Items = items,
+                    Page = page,
+                    PageSize = pageSize,
+                    TotalCount = totalCount
+                }
+            };
         }
     }
 }
