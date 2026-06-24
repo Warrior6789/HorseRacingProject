@@ -14,5 +14,6 @@ namespace HorseRacingAPI.Dtos
         public string? RacecourseName { get; set; }
         public string? Location { get; set; }
         public string? ImageUrl { get; set; }
+        public int RegistrationCount { get; set; }
     }
 }

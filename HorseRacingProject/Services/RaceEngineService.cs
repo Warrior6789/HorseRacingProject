@@ -13,10 +13,12 @@ namespace HorseRacingAPI.Services
         private readonly IHubContext<RaceHub> _hubContext;
         private readonly IServiceScopeFactory _factory;
         private readonly Dictionary<Guid, double> _progress = new();
-        private readonly Dictionary<Guid, double> _baseSpeeds = new();
-        private readonly Dictionary<Guid, double> _momentum = new();
-        private readonly Dictionary<Guid, double> _stamina = new();
         private readonly Dictionary<Guid, DateTimeOffset> _finishTimes = new();
+        private readonly HashSet<Guid> _initializedRaces = new();
+        private readonly Dictionary<Guid, int> _raceTick = new();
+        private readonly Dictionary<Guid, int> _targetFinishTick = new();
+        private readonly Dictionary<Guid, double> _raceStyle = new();
+        private readonly Dictionary<Guid, Dictionary<Guid, int>> _pendingOverrides = new();
         private readonly Random _random = new();
 
         public RaceEngineService(IHubContext<RaceHub> hubContext, IServiceScopeFactory factory)
@@ -137,37 +139,33 @@ namespace HorseRacingAPI.Services
                         .Where(r => r.RaceId == race.RaceId && r.Status == RegistrationStatus.Confirmed)
                         .ToListAsync();
 
+                    if (!_initializedRaces.Contains(race.RaceId))
+                        InitializeRace(race.RaceId, registrations);
+
+                    _raceTick[race.RaceId]++;
+
                     var horseStates = new List<object>();
                     int finishedCount = 0;
 
                     foreach (Registration registration in registrations)
                     {
-                        if (!_progress.ContainsKey(registration.HorseId))
-                        {
-                            _progress[registration.HorseId] = 0.0;
-                            double wins = registration.Horse.RecordWins ?? 0;
-                            double winBonus = Math.Min(wins * 0.0004, 0.005);
-                            _baseSpeeds[registration.HorseId] = 0.005 + _random.NextDouble() * 0.012 + winBonus;
-                            _stamina[registration.HorseId] = 0.2 + _random.NextDouble() * 0.8;
-                            _momentum[registration.HorseId] = 0;
-                        }
-
                         double currentProgress = _progress[registration.HorseId];
                         bool isFinished = currentProgress >= 1.0;
 
                         double speed = 0;
                         if (!isFinished)
                         {
-                            double fatigue = currentProgress * (1.0 - _stamina[registration.HorseId]) * 0.004;
+                            int currentTick = _raceTick[race.RaceId];
+                            int targetTick = _targetFinishTick[registration.HorseId];
+                            double style = _raceStyle[registration.HorseId];
 
-                            if (_random.NextDouble() < 0.08)
-                                _momentum[registration.HorseId] = (_random.NextDouble() - 0.6) * 0.008;
+                            double targetProgressNow = Math.Min(1.0, (double)currentTick / targetTick);
+                            double progressError = targetProgressNow - currentProgress;
+                            double styleEffect = style * (0.5 - currentProgress) * 0.008;
+                            double noise = (_random.NextDouble() - 0.5) * 0.0003;
 
-                            _momentum[registration.HorseId] *= 0.80;
-
-                            double noise = (_random.NextDouble() - 0.5) * 0.0008;
-                            speed = _baseSpeeds[registration.HorseId] - fatigue + _momentum[registration.HorseId] + noise;
-                            speed = Math.Max(0.002, Math.Min(0.025, speed));
+                            speed = progressError * 0.5 + 0.003 + styleEffect + noise;
+                            speed = Math.Max(0.001, Math.Min(0.02, speed));
                             _progress[registration.HorseId] += speed;
                             currentProgress = _progress[registration.HorseId];
                             isFinished = currentProgress >= 1.0;
@@ -240,12 +238,13 @@ namespace HorseRacingAPI.Services
                                 horses = horseStates
                             });
 
+                        _initializedRaces.Remove(race.RaceId);
+                        _raceTick.Remove(race.RaceId);
                         foreach (var reg in registrations)
                         {
                             _progress.Remove(reg.HorseId);
-                            _baseSpeeds.Remove(reg.HorseId);
-                            _momentum.Remove(reg.HorseId);
-                            _stamina.Remove(reg.HorseId);
+                            _targetFinishTick.Remove(reg.HorseId);
+                            _raceStyle.Remove(reg.HorseId);
                             _finishTimes.Remove(reg.HorseId);
                         }
 
@@ -258,15 +257,60 @@ namespace HorseRacingAPI.Services
             }
         }
 
-        public void ClearHorseState(IEnumerable<Guid> horseIds)
+        public void ClearRaceState(Guid raceId, IEnumerable<Guid> horseIds)
         {
+            _initializedRaces.Remove(raceId);
+            _raceTick.Remove(raceId);
+            _pendingOverrides.Remove(raceId);
             foreach (Guid id in horseIds)
             {
                 _progress.Remove(id);
-                _baseSpeeds.Remove(id);
-                _momentum.Remove(id);
-                _stamina.Remove(id);
+                _targetFinishTick.Remove(id);
+                _raceStyle.Remove(id);
                 _finishTimes.Remove(id);
+            }
+        }
+
+        public void OverrideResult(Guid raceId, Dictionary<Guid, int> horseRanks)
+        {
+            if (_initializedRaces.Contains(raceId))
+            {
+                int currentTick = _raceTick.TryGetValue(raceId, out int ct) ? ct : 0;
+                var sorted = horseRanks.OrderBy(x => x.Value).ToList();
+                for (int i = 0; i < sorted.Count; i++)
+                    _targetFinishTick[sorted[i].Key] = currentTick + 200 + i * 8;
+            }
+            else
+            {
+                _pendingOverrides[raceId] = horseRanks;
+            }
+        }
+
+        private void InitializeRace(Guid raceId, List<Registration> registrations)
+        {
+            _initializedRaces.Add(raceId);
+            _raceTick[raceId] = 0;
+
+            List<Registration> ordered;
+            if (_pendingOverrides.TryGetValue(raceId, out var pendingRanks))
+            {
+                ordered = registrations
+                    .OrderBy(r => pendingRanks.TryGetValue(r.HorseId, out int rank) ? rank : int.MaxValue)
+                    .ThenBy(_ => _random.NextDouble())
+                    .ToList();
+                _pendingOverrides.Remove(raceId);
+            }
+            else
+            {
+                ordered = registrations.OrderBy(_ => _random.NextDouble()).ToList();
+            }
+
+            for (int i = 0; i < ordered.Count; i++)
+            {
+                Guid horseId = ordered[i].HorseId;
+                _targetFinishTick[horseId] = 350 + i * 8 + _random.Next(-3, 4);
+                _raceStyle[horseId] = _random.NextDouble() * 2 - 1;
+                _progress[horseId] = 0.0;
             }
         }
 

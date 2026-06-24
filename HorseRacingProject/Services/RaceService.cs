@@ -59,7 +59,8 @@ namespace HorseRacingAPI.Services
                     PrizePool = r.PrizePool,
                     RacecourseName = r.Racecourse.RacecourseName,
                     Location = r.Racecourse.Location,
-                    ImageUrl = r.ImageUrl
+                    ImageUrl = r.ImageUrl,
+                    RegistrationCount = r.Registrations.Count(reg => reg.Status == RegistrationStatus.Confirmed)
                 },
                 pageIndex: page - 1,
                 pageSize: pageSize
@@ -78,6 +79,7 @@ namespace HorseRacingAPI.Services
         {
             Race? race = await _uow.GetRepository<Race>().Entities
                 .Include(r => r.Racecourse)
+                .Include(r => r.Registrations)
                 .FirstOrDefaultAsync(r => r.RaceId == raceId && !r.IsDeleted);
 
             if (race == null)
@@ -606,7 +608,7 @@ namespace HorseRacingAPI.Services
 
             await _uow.SaveAsync();
 
-            _engine.ClearHorseState(horseIds);
+            _engine.ClearRaceState(raceId, horseIds);
         }
 
         public async Task<RaceResponse> AdvanceRaceStatusAsync(Guid raceId)
@@ -730,7 +732,8 @@ namespace HorseRacingAPI.Services
             PrizePool = race.PrizePool,
             RacecourseName = race.Racecourse?.RacecourseName,
             Location = race.Racecourse?.Location,
-            ImageUrl = race.ImageUrl
+            ImageUrl = race.ImageUrl,
+            RegistrationCount = race.Registrations?.Count(reg => reg.Status == RegistrationStatus.Confirmed) ?? 0
         };
     }
 }
