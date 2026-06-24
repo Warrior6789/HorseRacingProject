@@ -143,6 +143,16 @@ namespace HorseRacingAPI.Services
             }
         }
 
+        public async Task CancelPaymentAsync(long orderCode)
+        {
+            int updated = await _uow.GetRepository<Payment>().Entities
+                .Where(p => p.OrderCode == orderCode && p.Status == PaymentStatus.Pending)
+                .ExecuteUpdateAsync(s => s.SetProperty(p => p.Status, PaymentStatus.Cancelled));
+
+            if (updated == 0)
+                return;
+        }
+
         public async Task<PagedResponse<PaymentResponse>> GetHistoryPagingAsync(Guid accountId, int page, int pageSize)
         {
             if (page < 1) page = 1;
