@@ -27,6 +27,15 @@ namespace HorseRacingAPI.Controllers
                 ApiResponse<RefereeReportResponse>.SuccessResponse(result, "Referee report created successfully."));
         }
 
+        [HttpGet("my/paged")]
+        [Authorize(Roles = "Referee")]
+        public async Task<IActionResult> GetMyReports([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
+        {
+            Guid refereeId = GetAccountIdFromToken();
+            PagedResponse<RefereeReportResponse> result = await _refereeReportService.GetMyReportsPagedAsync(refereeId, page, pageSize);
+            return Ok(ApiResponse<PagedResponse<RefereeReportResponse>>.SuccessResponse(result, "Get my reports successfully."));
+        }
+
         [HttpGet]
         [Authorize(Roles = "Admin,Referee")]
         public async Task<IActionResult> GetByRace([FromQuery] Guid raceId, [FromQuery] int page = 1, [FromQuery] int pageSize = 10)

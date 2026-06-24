@@ -281,6 +281,53 @@ namespace HorseRacingAPI.Services
             };
         }
 
+        public async Task<PagedResponse<RefereeReportResponse>> GetMyReportsPagedAsync(Guid refereeId, int page, int pageSize)
+        {
+            if (page <= 0) page = 1;
+            if (pageSize <= 0) pageSize = 10;
+            if (pageSize > 100) pageSize = 100;
+
+            IGenericRepository<RefereeReport> reportRepo = _uow.GetRepository<RefereeReport>();
+            int total = await reportRepo.Entities
+                .CountAsync(r => r.RefereeId == refereeId);
+            List<RefereeReportResponse> items = await reportRepo.Entities
+                .Include(r => r.Race)
+                .Include(r => r.Registration)
+                    .ThenInclude(r => r.Horse)
+                .Include(r => r.Referee)
+                    .ThenInclude(r => r.UserProfiles)
+                .Include(r => r.Registration)
+                    .ThenInclude(r => r.RaceResults)
+                .Where(r => r.RefereeId == refereeId)
+                .OrderByDescending(r => r.CreatedAt)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(r => new RefereeReportResponse
+                {
+                    ReportId            = r.ReportId,
+                    RaceId              = r.RaceId,
+                    RaceNumber          = r.Race.RaceNumber,
+                    RefereeId           = r.RefereeId,
+                    RefereeName         = r.Referee.UserProfiles.Select(up => up.FullName).FirstOrDefault() ?? r.Referee.Email ?? "",
+                    RegistrationId      = r.RegistrationId,
+                    HorseName           = r.Registration.Horse.HorseName,
+                    OriginalPosition    = r.Registration.RaceResults.FirstOrDefault() != null ? r.Registration.RaceResults.FirstOrDefault()!.FinishPosition : null,
+                    IncidentDescription = r.IncidentDescription,
+                    PenaltyApplied      = r.PenaltyApplied,
+                    Status              = r.Status.ToString(),
+                    CreatedAt           = r.CreatedAt,
+                })
+                .ToListAsync();
+
+            return new PagedResponse<RefereeReportResponse>
+            {
+                Items      = items,
+                Page       = page,
+                PageSize   = pageSize,
+                TotalCount = total
+            };
+        }
+
         private static RefereeReportResponse MapToResponse(RefereeReport report) => new RefereeReportResponse
         {
             ReportId            = report.ReportId,
