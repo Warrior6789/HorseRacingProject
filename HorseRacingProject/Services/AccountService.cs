@@ -56,7 +56,7 @@ namespace HorseRacingAPI.Services
                 }).ToListAsync();
         }
 
-        public async Task<PagedResponse<AccountResponse>> GetAccountByStatusPagedAsync(string status, int page, int pageSize)
+        public async Task<PagedResponse<AccountResponse>> GetAccountByStatusPagedAsync(string status, int page, int pageSize, string? role = null)
         {
             if (page < 1) page = 1;
             if (pageSize < 1) pageSize = 10;
@@ -64,16 +64,18 @@ namespace HorseRacingAPI.Services
             IGenericRepository<Account> accRepo = _uow.GetRepository<Account>();
 
             if (!Enum.TryParse<AccountStatus>(status, ignoreCase: true, out var accountStatus))
-            {
                 throw new ArgumentException("Invalid account status");
-            }
+
+            AccountRole? parsedRole = role != null && Enum.TryParse<AccountRole>(role, ignoreCase: true, out var r) ? r : (AccountRole?)null;
 
             int totalCount = await accRepo.Entities
-                .Where(a => a.Status == accountStatus && !a.IsDeleted)
+                .Where(a => a.Status == accountStatus && !a.IsDeleted
+                    && (parsedRole == null || a.Role == parsedRole))
                 .CountAsync();
 
             IEnumerable<AccountResponse> items = await accRepo.FindAsync<AccountResponse>(
-                predicate: a => a.Status == accountStatus && !a.IsDeleted,
+                predicate: a => a.Status == accountStatus && !a.IsDeleted
+                    && (parsedRole == null || a.Role == parsedRole),
                 orderBy: null,
                 selector: a => new AccountResponse
                 {
