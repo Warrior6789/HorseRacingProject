@@ -14,12 +14,14 @@ namespace HorseRacingAPI.Controllers
         private readonly IRaceService _raceService;
         private readonly IHubContext<RaceHub> _hubContext;
         private readonly RaceEngineService _engineService;
+        private readonly IRaceRefereeService _raceRefereeService;
 
-        public RacesController(IRaceService raceService, IHubContext<RaceHub> hubContext, RaceEngineService engineService)
+        public RacesController(IRaceService raceService, IHubContext<RaceHub> hubContext, RaceEngineService engineService, IRaceRefereeService raceRefereeService)
         {
             _raceService = raceService;
             _hubContext = hubContext;
             _engineService = engineService;
+            _raceRefereeService = raceRefereeService;
         }
 
       
@@ -140,6 +142,15 @@ namespace HorseRacingAPI.Controllers
             return Ok(ApiResponse<string>.SuccessResponse(imageUrl, "Race image uploaded successfully."));
         }
 
+
+        [Authorize(Roles = "Referee")]
+        [HttpGet("referee/my")]
+        public async Task<IActionResult> GetMyAssignedRaces()
+        {
+            Guid refereeId = GetAccountIdFromToken();
+            List<RaceResponse> result = await _raceRefereeService.GetMyAssignedRacesAsync(refereeId);
+            return Ok(ApiResponse<List<RaceResponse>>.SuccessResponse(result, "Get assigned races successfully."));
+        }
 
         [Authorize(Roles = "HorseOwner")]
         [HttpPost("{raceId}/register")]
