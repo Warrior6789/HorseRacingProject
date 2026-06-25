@@ -30,11 +30,6 @@ namespace HorseRacingAPI.Services
                 .FirstOrDefaultAsync(r => r.RegistrationId == dto.RegistrationId && r.RaceId == dto.RaceId)
                 ?? throw new KeyNotFoundException("Registration not found.");
 
-            bool resultExists = await _uow.GetRepository<RaceResult>().Entities
-                .AnyAsync(r => r.RegistrationId == dto.RegistrationId);
-            if (!resultExists)
-                throw new InvalidOperationException("No race result recorded for this horse. Cannot create a report.");
-
             bool existing = await _uow.GetRepository<RefereeReport>().Entities
                 .AnyAsync(r => r.RegistrationId == dto.RegistrationId
                             && r.RaceId == dto.RaceId
