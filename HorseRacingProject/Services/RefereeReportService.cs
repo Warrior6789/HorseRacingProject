@@ -10,9 +10,12 @@ namespace HorseRacingAPI.Services
     public class RefereeReportService : IRefereeReportService
     {
         private readonly IUnitofWork _uow;
-        public RefereeReportService(IUnitofWork uow)
+        private readonly IRaceSettlementService _settlementService;
+
+        public RefereeReportService(IUnitofWork uow, IRaceSettlementService settlementService)
         {
             _uow = uow;
+            _settlementService = settlementService;
         }
 
         public async Task<RefereeReportResponse> CreateReportAsync(Guid refereeId, CreateRefereeReportDto dto)
@@ -210,6 +213,7 @@ namespace HorseRacingAPI.Services
             }
 
             await _uow.SaveAsync();
+            await _settlementService.TrySettleAsync(report.RaceId);
 
             return MapToResponse(report);
         }
@@ -225,6 +229,7 @@ namespace HorseRacingAPI.Services
             report.Status = RefereeReportStatus.Rejected;
             await _uow.GetRepository<RefereeReport>().UpdateAsync(report);
             await _uow.SaveAsync();
+            await _settlementService.TrySettleAsync(report.RaceId);
 
             return MapToResponse(report);
         }
