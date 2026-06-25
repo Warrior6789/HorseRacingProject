@@ -15,5 +15,6 @@ namespace HorseRacingAPI.Dtos
         public string? Location { get; set; }
         public string? ImageUrl { get; set; }
         public int RegistrationCount { get; set; }
+        public bool HasUnresolvedReports { get; set; }
     }
 }

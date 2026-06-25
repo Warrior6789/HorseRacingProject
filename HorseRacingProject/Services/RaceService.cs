@@ -80,12 +80,16 @@ namespace HorseRacingAPI.Services
             Race? race = await _uow.GetRepository<Race>().Entities
                 .Include(r => r.Racecourse)
                 .Include(r => r.Registrations)
+                .Include(r => r.RefereeReports)
                 .FirstOrDefaultAsync(r => r.RaceId == raceId && !r.IsDeleted);
 
             if (race == null)
                 throw new KeyNotFoundException($"Race with id {raceId} not found.");
 
-            return MapToResponse(race);
+            RaceResponse response = MapToResponse(race);
+            response.HasUnresolvedReports = race.RefereeReports
+                .Any(r => r.Status == RefereeReportStatus.Pending);
+            return response;
         }
 
         public async Task<RaceResponse> CreateRaceAsync(CreateRaceRequest request)
