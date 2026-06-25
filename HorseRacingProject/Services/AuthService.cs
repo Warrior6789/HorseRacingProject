@@ -246,5 +246,21 @@ namespace HorseRacingAPI.Services
                 return false;
             }
         }
+
+        public async Task<MeResponse> GetMeAsync(Guid accountId)
+        {
+            Account? account = await _unitOfWork.GetRepository<Account>().Entities
+                .FirstOrDefaultAsync(a => a.Id == accountId && !a.IsDeleted);
+            if (account == null)
+                throw new KeyNotFoundException("Account not found.");
+
+            return new MeResponse
+            {
+                AccountId     = account.Id,
+                Email         = account.Email,
+                Role          = account.Role.ToString(),
+                RequestedRole = account.RequestedRole?.ToString()
+            };
+        }
     }
 }
