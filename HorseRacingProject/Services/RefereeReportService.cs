@@ -20,8 +20,8 @@ namespace HorseRacingAPI.Services
             var race = await _uow.GetRepository<Race>().Entities
                 .FirstOrDefaultAsync(r => r.RaceId == dto.RaceId)
                 ?? throw new KeyNotFoundException("Race not found.");
-            if (race.Status != RaceStatus.Finished)
-                throw new InvalidOperationException("Race has not finished yet.");
+            if (race.Status != RaceStatus.Live && race.Status != RaceStatus.Finished)
+                throw new InvalidOperationException("Reports can only be submitted while the race is Live or Finished.");
 
             if (race.RefereeId != refereeId)
                 throw new UnauthorizedAccessException("You are not assigned to this race.");
