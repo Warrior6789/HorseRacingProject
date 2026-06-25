@@ -57,6 +57,15 @@ namespace HorseRacingAPI.Controllers
         }
 
         [Authorize]
+        [HttpGet("me")]
+        public async Task<IActionResult> GetMe()
+        {
+            Guid accountId = Guid.Parse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)!.Value);
+            MeResponse result = await _authService.GetMeAsync(accountId);
+            return Ok(ApiResponse<MeResponse>.SuccessResponse(result, "Get current user successfully."));
+        }
+
+        [Authorize]
         [HttpPost("logout")]
         public IActionResult Logout()
         {
