@@ -39,7 +39,7 @@ namespace HorseRacingAPI.Services
 
             List<Registration> sortedRegs = await uow.GetRepository<RaceResult>().Entities
                 .Include(r => r.Registration).ThenInclude(r => r.Horse)
-                .Where(r => r.Registration.RaceId == raceId && !r.IsDisqualified)
+                .Where(r => r.Registration.RaceId == raceId && r.IsDisqualified != true)
                 .OrderBy(r => r.FinishPosition)
                 .Select(r => r.Registration)
                 .ToListAsync();
