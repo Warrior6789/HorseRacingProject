@@ -136,10 +136,10 @@ namespace HorseRacingAPI.Services
                     Status              = r.Status.ToString(),
                     RegistrationFee     = r.RegistrationFee,
                     PrizePool           = r.PrizePool,
-                    RacecourseName      = r.Racecourse.Name,
+                    RacecourseName      = r.Racecourse.RacecourseName,
                     Location            = r.Racecourse.Location,
                     ImageUrl            = r.ImageUrl,
-                    RegistrationCount   = r.Registrations.Count(reg => !reg.IsDeleted)
+                    RegistrationCount   = r.Registrations.Count()
                 })
                 .ToListAsync();
         }
