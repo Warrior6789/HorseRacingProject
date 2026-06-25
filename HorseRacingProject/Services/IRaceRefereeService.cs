@@ -7,5 +7,6 @@ namespace HorseRacingAPI.Services
         Task<RaceRefereeResponse> AssignAsync(Guid raceId, Guid refereeId);
         Task UnassignAsync(Guid raceId);
         Task<RaceRefereeResponse?> GetByRaceAsync(Guid raceId);
+        Task<List<RaceResponse>> GetMyAssignedRacesAsync(Guid refereeId);
     }
 }

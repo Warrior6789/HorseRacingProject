@@ -118,5 +118,30 @@ namespace HorseRacingAPI.Services
                 RefereeEmail = race.Referee.Email
             };
         }
+
+        public async Task<List<RaceResponse>> GetMyAssignedRacesAsync(Guid refereeId)
+        {
+            return await _uow.GetRepository<Race>().Entities
+                .Include(r => r.Racecourse)
+                .Where(r => r.RefereeId == refereeId && !r.IsDeleted)
+                .OrderBy(r => r.StartTime)
+                .Select(r => new RaceResponse
+                {
+                    RaceId              = r.RaceId,
+                    RaceNumber          = r.RaceNumber,
+                    RaceName            = r.RaceName,
+                    StartTime           = r.StartTime,
+                    TrackLength         = r.TrackLength,
+                    MaxParticipants     = r.MaxParticipants,
+                    Status              = r.Status.ToString(),
+                    RegistrationFee     = r.RegistrationFee,
+                    PrizePool           = r.PrizePool,
+                    RacecourseName      = r.Racecourse.Name,
+                    Location            = r.Racecourse.Location,
+                    ImageUrl            = r.ImageUrl,
+                    RegistrationCount   = r.Registrations.Count(reg => !reg.IsDeleted)
+                })
+                .ToListAsync();
+        }
     }
 }
