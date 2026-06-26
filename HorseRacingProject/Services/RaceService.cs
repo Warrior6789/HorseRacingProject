@@ -705,6 +705,9 @@ namespace HorseRacingAPI.Services
                 if (otherRaceLive)
                     throw new InvalidOperationException("Another race at the same racecourse is currently Live.");
 
+                if (!race.RefereeId.HasValue)
+                    throw new InvalidOperationException("Race must have a referee assigned before going Live.");
+
                 if (race.RefereeId.HasValue)
                 {
                     var conflictingRace = await _uow.GetRepository<Race>().Entities
