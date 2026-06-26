@@ -64,7 +64,7 @@ public class PaymentsController : ControllerBase
     }
 
     [Authorize(Roles = "Admin")]
-    [HttpGet("all/paged")]
+    [HttpGet("paged")]
     public async Task<IActionResult> GetAllPayments(
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 10)
