@@ -603,6 +603,41 @@ namespace HorseRacingAPI.Services
 
             await _uow.GetRepository<RaceResult>().DeleteRangeAsync(results);
 
+            List<RefereeReport> reports = await _uow.GetRepository<RefereeReport>().Entities
+                .Where(r => r.RaceId == raceId)
+                .ToListAsync();
+
+            await _uow.GetRepository<RefereeReport>().DeleteRangeAsync(reports);
+
+            List<Prize> prizes = await _uow.GetRepository<Prize>().Entities
+                .Include(p => p.Registration).ThenInclude(r => r.Horse)
+                .Where(p => p.Registration.RaceId == raceId)
+                .ToListAsync();
+
+            foreach (Prize prize in prizes)
+            {
+                if (prize.Amount == null || prize.Amount == 0) continue;
+
+                Guid recipientId = prize.PrizeType == PrizeType.Jockey
+                    ? prize.Registration.JockeyId!.Value
+                    : prize.Registration.Horse.OwnerId;
+
+                UserProfile? profile = await _uow.GetRepository<UserProfile>().Entities
+                    .FirstOrDefaultAsync(p => p.AccountId == recipientId && !p.IsDeleted);
+
+                if (profile != null)
+                {
+                    long delta = (long)Math.Round(Math.Abs(prize.Amount.Value));
+                    profile.Balance = prize.Amount > 0
+                        ? Math.Max(0, (profile.Balance ?? 0) - delta)
+                        : (profile.Balance ?? 0) + delta;
+                    profile.UpdatedAt = DateTimeOffset.UtcNow;
+                    await _uow.GetRepository<UserProfile>().UpdateAsync(profile);
+                }
+            }
+
+            await _uow.GetRepository<Prize>().DeleteRangeAsync(prizes);
+
             List<RacePool> racePools = await _uow.GetRepository<RacePool>().Entities
                 .Where(p => p.RaceId == raceId)
                 .ToListAsync();
