@@ -619,7 +619,7 @@ namespace HorseRacingAPI.Services
                 if (prize.Amount == null || prize.Amount == 0) continue;
 
                 Guid recipientId = prize.PrizeType == PrizeType.Jockey
-                    ? prize.Registration.JockeyId!.Value
+                    ? prize.Registration.JockeyId
                     : prize.Registration.Horse.OwnerId;
 
                 UserProfile? profile = await _uow.GetRepository<UserProfile>().Entities

@@ -63,7 +63,7 @@ namespace HorseRacingAPI.Controllers
             bool isReferee = User.IsInRole("Referee") && !isAdmin;
 
             if (isReferee && raceId == null)
-                return BadRequest(ApiResponse<object>.ErrorResponse("Referee must provide raceId."));
+                return BadRequest(ApiResponse<object>.FailResponse("Referee must provide raceId."));
 
             Guid? refereeId = isReferee ? GetAccountIdFromToken() : null;
             RefereeReportPagedResponse result = await _refereeReportService.GetReportsByRaceAsync(raceId, page, pageSize, refereeId);
