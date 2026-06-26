@@ -57,12 +57,17 @@ namespace HorseRacingAPI.Controllers
 
         [HttpGet]
         [Authorize(Roles = "Admin,Referee")]
-        public async Task<IActionResult> GetByRace([FromQuery] Guid raceId, [FromQuery] int page = 1, [FromQuery] int pageSize = 10)
+        public async Task<IActionResult> GetReports([FromQuery] Guid? raceId, [FromQuery] int page = 1, [FromQuery] int pageSize = 10)
         {
-            bool isReferee = User.IsInRole("Referee") && !User.IsInRole("Admin");
+            bool isAdmin = User.IsInRole("Admin");
+            bool isReferee = User.IsInRole("Referee") && !isAdmin;
+
+            if (isReferee && raceId == null)
+                return BadRequest(ApiResponse<object>.ErrorResponse("Referee must provide raceId."));
+
             Guid? refereeId = isReferee ? GetAccountIdFromToken() : null;
-            PagedResponse<RefereeReportResponse> result = await _refereeReportService.GetReportsByRaceAsync(raceId, page, pageSize, refereeId);
-            return Ok(ApiResponse<PagedResponse<RefereeReportResponse>>.SuccessResponse(result, "Get referee reports successfully."));
+            RefereeReportPagedResponse result = await _refereeReportService.GetReportsByRaceAsync(raceId, page, pageSize, refereeId);
+            return Ok(ApiResponse<RefereeReportPagedResponse>.SuccessResponse(result, "Get referee reports successfully."));
         }
 
         [HttpPut("{id}/approve")]

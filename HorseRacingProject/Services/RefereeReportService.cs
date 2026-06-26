@@ -234,16 +234,22 @@ namespace HorseRacingAPI.Services
             return MapToResponse(report);
         }
 
-        public async Task<PagedResponse<RefereeReportResponse>> GetReportsByRaceAsync(Guid raceId, int page, int pageSize, Guid? refereeId = null)
+        public async Task<RefereeReportPagedResponse> GetReportsByRaceAsync(Guid? raceId, int page, int pageSize, Guid? refereeId = null)
         {
             if (page <= 0) page = 1;
             if (pageSize <= 0) pageSize = 10;
             if (pageSize > 100) pageSize = 100;
 
             IGenericRepository<RefereeReport> reportRepo = _uow.GetRepository<RefereeReport>();
-            int total = await reportRepo.Entities
-                .CountAsync(r => r.RaceId == raceId && (refereeId == null || r.RefereeId == refereeId));
-            List<RefereeReportResponse> items = await reportRepo.Entities
+            IQueryable<RefereeReport> baseQuery = reportRepo.Entities
+                .Where(r => (raceId == null || r.RaceId == raceId) && (refereeId == null || r.RefereeId == refereeId));
+
+            int total         = await baseQuery.CountAsync();
+            int pendingCount  = await baseQuery.CountAsync(r => r.Status == RefereeReportStatus.Pending);
+            int approvedCount = await baseQuery.CountAsync(r => r.Status == RefereeReportStatus.Approved);
+            int rejectedCount = await baseQuery.CountAsync(r => r.Status == RefereeReportStatus.Rejected);
+
+            List<RefereeReportResponse> items = await baseQuery
                 .Include(r => r.Race)
                 .Include(r => r.Registration)
                     .ThenInclude(r => r.Horse)
@@ -251,7 +257,6 @@ namespace HorseRacingAPI.Services
                     .ThenInclude(r => r.UserProfiles)
                 .Include(r => r.Registration)
                     .ThenInclude(r => r.RaceResults)
-                .Where(r => r.RaceId == raceId && (refereeId == null || r.RefereeId == refereeId))
                 .OrderByDescending(r => r.CreatedAt)
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
@@ -272,12 +277,15 @@ namespace HorseRacingAPI.Services
                 })
                 .ToListAsync();
 
-            return new PagedResponse<RefereeReportResponse>
+            return new RefereeReportPagedResponse
             {
-                Items      = items,
-                Page       = page,
-                PageSize   = pageSize,
-                TotalCount = total
+                Items         = items,
+                Page          = page,
+                PageSize      = pageSize,
+                TotalCount    = total,
+                PendingCount  = pendingCount,
+                ApprovedCount = approvedCount,
+                RejectedCount = rejectedCount
             };
         }
 
