@@ -133,7 +133,7 @@ namespace HorseRacingAPI.Services
                     LicenseNumber = dto.LicenseNumber,
                     Weight = dto.Weight,
                     Height = dto.Height,
-                    ImageUrl = imageUrl,
+                    CertificateImageUrl = imageUrl,
                     TotalRaces = 0,
                     TotalWins = 0,
                     CreateAt = DateTimeOffset.UtcNow,
