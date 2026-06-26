@@ -12,7 +12,9 @@
         public int? OriginalPosition { get; set; }
         public string IncidentDescription { get; set; } = null!;
         public string? PenaltyApplied { get; set; }
-        public string Status { get; set; } = null!; 
+        public string PenaltyType { get; set; } = null!;
+        public decimal? FineAmount { get; set; }
+        public string Status { get; set; } = null!;
         public DateTimeOffset? CreatedAt { get; set; }
     }
 }

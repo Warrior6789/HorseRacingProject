@@ -277,6 +277,8 @@ public partial class HorseRacingDataContext : DbContext
                 .HasColumnName("ReportID");
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
             entity.Property(e => e.PenaltyApplied).HasMaxLength(255);
+            entity.Property(e => e.PenaltyType).HasMaxLength(20).HasConversion<string>();
+            entity.Property(e => e.FineAmount).HasColumnType("numeric(18,2)");
             entity.Property(e => e.RaceId).HasColumnName("RaceID");
             entity.Property(e => e.RefereeId).HasColumnName("RefereeID");
             entity.Property(e => e.Status).HasMaxLength(20).HasConversion<string>();

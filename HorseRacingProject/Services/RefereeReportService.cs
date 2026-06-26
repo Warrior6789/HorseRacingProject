@@ -49,6 +49,8 @@ namespace HorseRacingAPI.Services
                 RegistrationId      = dto.RegistrationId,
                 IncidentDescription = dto.IncidentDescription,
                 PenaltyApplied      = dto.PenaltyApplied,
+                PenaltyType         = dto.PenaltyType,
+                FineAmount          = dto.PenaltyType == PenaltyType.Fine ? dto.FineAmount : null,
                 Status              = RefereeReportStatus.Pending,
                 CreatedAt           = DateTimeOffset.UtcNow
             };
@@ -62,11 +64,62 @@ namespace HorseRacingAPI.Services
         public async Task<RefereeReportResponse> ApproveReportAsync(Guid reportId)
         {
             var report = await _uow.GetRepository<RefereeReport>().Entities
+                .Include(r => r.Registration).ThenInclude(r => r.Horse)
                 .FirstOrDefaultAsync(r => r.ReportId == reportId)
                 ?? throw new KeyNotFoundException("Report not found.");
             if (report.Status != RefereeReportStatus.Pending)
                 throw new InvalidOperationException("Only pending reports can be approved.");
 
+            report.Status = RefereeReportStatus.Approved;
+            await _uow.GetRepository<RefereeReport>().UpdateAsync(report);
+
+            switch (report.PenaltyType)
+            {
+                case PenaltyType.Warning:
+                    break;
+
+                case PenaltyType.Fine:
+                    await ApplyFineAsync(report);
+                    break;
+
+                case PenaltyType.Disqualification:
+                    await ApplyDisqualificationAsync(report);
+                    break;
+            }
+
+            await _uow.SaveAsync();
+            await _settlementService.TrySettleAsync(report.RaceId);
+
+            return MapToResponse(report);
+        }
+
+        private async Task ApplyFineAsync(RefereeReport report)
+        {
+            if (report.FineAmount == null || report.FineAmount <= 0) return;
+
+            long fine = (long)Math.Round(report.FineAmount.Value);
+
+            var ownerProfile = await _uow.GetRepository<UserProfile>().Entities
+                .FirstOrDefaultAsync(p => p.AccountId == report.Registration.Horse.OwnerId && !p.IsDeleted);
+            if (ownerProfile != null)
+            {
+                ownerProfile.Balance = Math.Max(0, (ownerProfile.Balance ?? 0) - fine);
+                ownerProfile.UpdatedAt = DateTimeOffset.UtcNow;
+                await _uow.GetRepository<UserProfile>().UpdateAsync(ownerProfile);
+            }
+
+            await _uow.GetRepository<Prize>().AddAsync(new Prize
+            {
+                PrizeId        = Guid.NewGuid(),
+                RegistrationId = report.RegistrationId,
+                PrizeType      = PrizeType.Owner,
+                Amount         = -report.FineAmount.Value,
+                DistributedAt  = DateTimeOffset.UtcNow
+            });
+        }
+
+        private async Task ApplyDisqualificationAsync(RefereeReport report)
+        {
             var disqualifiedResult = await _uow.GetRepository<RaceResult>().Entities
                 .Include(r => r.Registration).ThenInclude(r => r.Horse)
                 .FirstOrDefaultAsync(r => r.RegistrationId == report.RegistrationId
@@ -85,7 +138,6 @@ namespace HorseRacingAPI.Services
                 throw new InvalidOperationException("Race prize configs are not set.");
 
             decimal racePurse = race.PrizePool;
-
             double[] positionRatios =
             [
                 race.PositionPrizeConfig.Pos1Ratio, race.PositionPrizeConfig.Pos2Ratio,
@@ -93,9 +145,7 @@ namespace HorseRacingAPI.Services
                 race.PositionPrizeConfig.Pos5Ratio, race.PositionPrizeConfig.Pos6Ratio
             ];
 
-            report.Status = RefereeReportStatus.Approved;
             disqualifiedResult.IsDisqualified = true;
-            await _uow.GetRepository<RefereeReport>().UpdateAsync(report);
             await _uow.GetRepository<RaceResult>().UpdateAsync(disqualifiedResult);
 
             var disqualifiedPrizes = await _uow.GetRepository<Prize>().Entities
@@ -211,11 +261,6 @@ namespace HorseRacingAPI.Services
                         DistributedAt  = DateTimeOffset.UtcNow
                     });
             }
-
-            await _uow.SaveAsync();
-            await _settlementService.TrySettleAsync(report.RaceId);
-
-            return MapToResponse(report);
         }
 
         public async Task<RefereeReportResponse> RejectReportAsync(Guid reportId)
@@ -380,6 +425,8 @@ namespace HorseRacingAPI.Services
 
             report.IncidentDescription = dto.IncidentDescription ?? report.IncidentDescription;
             report.PenaltyApplied      = dto.PenaltyApplied ?? report.PenaltyApplied;
+            if (dto.PenaltyType.HasValue) report.PenaltyType = dto.PenaltyType.Value;
+            report.FineAmount = report.PenaltyType == PenaltyType.Fine ? (dto.FineAmount ?? report.FineAmount) : null;
 
             await _uow.GetRepository<RefereeReport>().UpdateAsync(report);
             await _uow.SaveAsync();
@@ -395,6 +442,8 @@ namespace HorseRacingAPI.Services
             RegistrationId      = report.RegistrationId,
             IncidentDescription = report.IncidentDescription,
             PenaltyApplied      = report.PenaltyApplied,
+            PenaltyType         = report.PenaltyType.ToString(),
+            FineAmount          = report.FineAmount,
             Status              = report.Status.ToString(),
             CreatedAt           = (DateTimeOffset)report.CreatedAt!
         };
