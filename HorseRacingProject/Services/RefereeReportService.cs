@@ -1,8 +1,10 @@
 using HorseRacingAPI.Dtos;
 using HorseRacingAPI.Enums;
+using HorseRacingAPI.Hubs;
 using HorseRacingAPI.Models;
 using HorseRacingAPI.Repositories;
 using HorseRacingAPI.Repository;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 
 namespace HorseRacingAPI.Services
@@ -11,11 +13,13 @@ namespace HorseRacingAPI.Services
     {
         private readonly IUnitofWork _uow;
         private readonly IRaceSettlementService _settlementService;
+        private readonly IHubContext<RaceHub> _hubContext;
 
-        public RefereeReportService(IUnitofWork uow, IRaceSettlementService settlementService)
+        public RefereeReportService(IUnitofWork uow, IRaceSettlementService settlementService, IHubContext<RaceHub> hubContext)
         {
             _uow = uow;
             _settlementService = settlementService;
+            _hubContext = hubContext;
         }
 
         public async Task<RefereeReportResponse> CreateReportAsync(Guid refereeId, CreateRefereeReportDto dto)
@@ -89,6 +93,12 @@ namespace HorseRacingAPI.Services
 
             await _uow.SaveAsync();
             await _settlementService.TrySettleAsync(report.RaceId);
+            await _hubContext.Clients.All.SendAsync("ReportUpdated", new
+            {
+                reportId = report.ReportId,
+                raceId   = report.RaceId,
+                status   = "Approved"
+            });
 
             return MapToResponse(report);
         }
@@ -275,6 +285,12 @@ namespace HorseRacingAPI.Services
             await _uow.GetRepository<RefereeReport>().UpdateAsync(report);
             await _uow.SaveAsync();
             await _settlementService.TrySettleAsync(report.RaceId);
+            await _hubContext.Clients.All.SendAsync("ReportUpdated", new
+            {
+                reportId = report.ReportId,
+                raceId   = report.RaceId,
+                status   = "Rejected"
+            });
 
             return MapToResponse(report);
         }
