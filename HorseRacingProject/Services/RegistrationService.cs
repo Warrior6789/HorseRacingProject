@@ -635,6 +635,8 @@ namespace HorseRacingAPI.Services
                 await _uow.RollbackTransactionAsync();
                 throw;
             }
+
+            await _hubContext.Clients.All.SendAsync("RegistrationsUpdated", await GetRegistrationKpiAsync());
         }
     }
 }

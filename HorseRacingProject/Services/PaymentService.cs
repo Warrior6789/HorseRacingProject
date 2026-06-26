@@ -124,6 +124,13 @@ namespace HorseRacingAPI.Services
                     amount    = payment.Amount,
                     createdAt = DateTimeOffset.UtcNow
                 });
+                await _hubContext.Clients.All.SendAsync("BalanceUpdated", new
+                {
+                    accountId  = payment.AccountId,
+                    amount     = balanceToAdd,
+                    newBalance = currentBalance,
+                    reason     = "Deposit"
+                });
 
                 return new PaymentResponse
                 {

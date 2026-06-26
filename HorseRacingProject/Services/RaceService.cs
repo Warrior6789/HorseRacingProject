@@ -153,6 +153,7 @@ namespace HorseRacingAPI.Services
 
             await _uow.GetRepository<Race>().AddAsync(race);
             await _uow.SaveAsync();
+            await _hubContext.Clients.All.SendAsync("RacesUpdated");
 
             race.Racecourse = racecourse;
 
@@ -230,6 +231,7 @@ namespace HorseRacingAPI.Services
 
             await _uow.GetRepository<Race>().UpdateAsync(race);
             await _uow.SaveAsync();
+            await _hubContext.Clients.All.SendAsync("RacesUpdated");
 
             return MapToResponse(race);
         }
@@ -727,6 +729,7 @@ namespace HorseRacingAPI.Services
             race.Status = nextStatus.Value;
             await _uow.GetRepository<Race>().UpdateAsync(race);
             await _uow.SaveAsync();
+            await _hubContext.Clients.All.SendAsync("RacesUpdated");
 
             return MapToResponse(race);
         }
