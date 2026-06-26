@@ -72,7 +72,7 @@ namespace HorseRacingAPI.Controllers
         }
 
         [Authorize(Roles = "HorseOwner")]
-        [HttpGet("owner/all")]
+        [HttpGet("owner")]
         public async Task<IActionResult> GetAllOwnerRegistrations()
         {
             Guid accountId = GetAccountIdFromToken();
@@ -81,7 +81,7 @@ namespace HorseRacingAPI.Controllers
         }
 
         [Authorize(Roles = "HorseOwner")]
-        [HttpGet("owner/all/paged")]
+        [HttpGet("owner/paged")]
         public async Task<IActionResult> GetAllOwnerRegistrationsPaged([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
         {
             Guid accountId = GetAccountIdFromToken();
@@ -90,10 +90,10 @@ namespace HorseRacingAPI.Controllers
         }
 
         [Authorize(Roles = "Admin")]
-        [HttpGet("paged-all")]
-        public async Task<IActionResult> GetAllRegistrationsPaged([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
+        [HttpGet("paged")]
+        public async Task<IActionResult> GetAllRegistrationsPaged([FromQuery] int page = 1, [FromQuery] int pageSize = 10, [FromQuery] Guid? raceId = null)
         {
-            PagedResponse<RegistrationResponse> result = await _registrationService.GetAllRegistrationsPagedAsync(page, pageSize);
+            PagedResponse<RegistrationResponse> result = await _registrationService.GetAllRegistrationsPagedAsync(page, pageSize, raceId);
             return Ok(ApiResponse<PagedResponse<RegistrationResponse>>.SuccessResponse(result, "Get all registrations successfully."));
         }
 

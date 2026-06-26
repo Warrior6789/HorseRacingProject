@@ -497,7 +497,7 @@ namespace HorseRacingAPI.Services
             await _hubContext.Clients.All.SendAsync("RegistrationsUpdated", await GetRegistrationKpiAsync());
         }
 
-        public async Task<PagedResponse<RegistrationResponse>> GetAllRegistrationsPagedAsync(int page, int pageSize)
+        public async Task<PagedResponse<RegistrationResponse>> GetAllRegistrationsPagedAsync(int page, int pageSize, Guid? raceId = null)
         {
             if (page < 1) page = 1;
             if (pageSize < 1) pageSize = 10;
@@ -505,9 +505,12 @@ namespace HorseRacingAPI.Services
 
             IGenericRepository<Registration> registrationRepo = _uow.GetRepository<Registration>();
 
-            int totalCount = await registrationRepo.Entities.CountAsync();
+            IQueryable<Registration> baseQuery = registrationRepo.Entities
+                .Where(r => raceId == null || r.RaceId == raceId);
 
-            List<RegistrationResponse> items = await registrationRepo.Entities
+            int totalCount = await baseQuery.CountAsync();
+
+            List<RegistrationResponse> items = await baseQuery
                 .Include(r => r.Horse).ThenInclude(r => r.Owner)
                 .Include(r => r.Race).ThenInclude(r => r.Racecourse)
                 .OrderByDescending(r => r.CreateAt)

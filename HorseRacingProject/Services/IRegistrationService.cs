@@ -15,6 +15,6 @@ namespace HorseRacingAPI.Services
         Task ScratchHorseAsync(Guid registrationId);
         Task AdminAcceptRegistrationAsync(Guid registrationId);
         Task AdminRejectRegistrationAsync(Guid registrationId);
-        Task<PagedResponse<RegistrationResponse>> GetAllRegistrationsPagedAsync(int page, int pageSize);
+        Task<PagedResponse<RegistrationResponse>> GetAllRegistrationsPagedAsync(int page, int pageSize, Guid? raceId = null);
     }
 }
