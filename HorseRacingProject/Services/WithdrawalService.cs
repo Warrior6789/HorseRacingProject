@@ -151,6 +151,21 @@ public class WithdrawalService : IWithdrawalService
             await _uow.SaveAsync();
             await _uow.CommitTransactionAsync();
 
+            if (withdrawal.Status == WithdrawalStatus.Completed)
+            {
+                long newBalance = await _uow.GetRepository<UserProfile>().Entities
+                    .Where(u => u.AccountId == withdrawal.AccountId)
+                    .Select(u => u.Balance ?? 0)
+                    .FirstOrDefaultAsync();
+                await _hubContext.Clients.All.SendAsync("BalanceUpdated", new
+                {
+                    accountId  = withdrawal.AccountId,
+                    amount     = -withdrawal.Amount,
+                    newBalance,
+                    reason     = "Withdrawal"
+                });
+            }
+
             await _hubContext.Clients.All.SendAsync("WithdrawalsUpdated", await GetWithdrawalKpiAsync());
 
             return MapToResponse(withdrawal);
