@@ -61,6 +61,12 @@ namespace HorseRacingAPI.Services
 
             await _uow.GetRepository<RefereeReport>().AddAsync(report);
             await _uow.SaveAsync();
+            await _hubContext.Clients.All.SendAsync("ReportUpdated", new
+            {
+                reportId = report.ReportId,
+                raceId   = report.RaceId,
+                status   = "Pending"
+            });
 
             return MapToResponse(report);
         }
