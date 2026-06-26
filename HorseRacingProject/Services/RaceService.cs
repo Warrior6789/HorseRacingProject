@@ -109,19 +109,21 @@ namespace HorseRacingAPI.Services
             if (duplicate)
                 throw new InvalidOperationException($"Race number {request.RaceNumber} already exists at this racecourse.");
 
-            Race? lastRace = await _uow.GetRepository<Race>().Entities
+            DateTimeOffset newRaceBlockEnd = request.StartTime.AddMinutes(10);
+
+            Race? conflictingRace = await _uow.GetRepository<Race>().Entities
                 .Where(r => r.RacecourseId == request.RacecourseId
                     && r.Status != RaceStatus.Cancelled
                     && !r.IsDeleted
-                    && r.StartTime.HasValue)
-                .OrderByDescending(r => r.EndTime ?? r.StartTime!.Value.AddMinutes(5))
+                    && r.StartTime.HasValue
+                    && r.StartTime < newRaceBlockEnd
+                    && (r.EndTime ?? r.StartTime!.Value.AddMinutes(5)).AddMinutes(5) > request.StartTime)
                 .FirstOrDefaultAsync();
 
-            if (lastRace != null)
+            if (conflictingRace != null)
             {
-                DateTimeOffset lastEnd = (lastRace.EndTime ?? lastRace.StartTime!.Value.AddMinutes(5)).AddMinutes(5);
-                if (request.StartTime < lastEnd)
-                    throw new InvalidOperationException($"This racecourse already has a race scheduled. Next race can start after {lastEnd:yyyy-MM-dd HH:mm} UTC.");
+                DateTimeOffset conflictEnd = (conflictingRace.EndTime ?? conflictingRace.StartTime!.Value.AddMinutes(5)).AddMinutes(5);
+                throw new InvalidOperationException($"Time slot conflicts with an existing race at this racecourse. Next available slot after {conflictEnd:yyyy-MM-dd HH:mm} UTC.");
             }
 
             string? imageUrl = null;
@@ -199,20 +201,22 @@ namespace HorseRacingAPI.Services
                 if (request.StartTime.Value <= DateTimeOffset.UtcNow.AddMinutes(90))
                     throw new InvalidOperationException("Start time must be at least 90 minutes from now.");
 
-                Race? lastRace = await _uow.GetRepository<Race>().Entities
+                DateTimeOffset updatedRaceBlockEnd = request.StartTime.Value.AddMinutes(10);
+
+                Race? conflictingRace = await _uow.GetRepository<Race>().Entities
                     .Where(r => r.RacecourseId == race.RacecourseId
                         && r.RaceId != raceId
                         && r.Status != RaceStatus.Cancelled
                         && !r.IsDeleted
-                        && r.StartTime.HasValue)
-                    .OrderByDescending(r => r.EndTime ?? r.StartTime!.Value.AddMinutes(5))
+                        && r.StartTime.HasValue
+                        && r.StartTime < updatedRaceBlockEnd
+                        && (r.EndTime ?? r.StartTime!.Value.AddMinutes(5)).AddMinutes(5) > request.StartTime.Value)
                     .FirstOrDefaultAsync();
 
-                if (lastRace != null)
+                if (conflictingRace != null)
                 {
-                    DateTimeOffset lastEnd = (lastRace.EndTime ?? lastRace.StartTime!.Value.AddMinutes(5)).AddMinutes(5);
-                    if (request.StartTime.Value < lastEnd)
-                        throw new InvalidOperationException($"This racecourse already has a race scheduled. Next race can start after {lastEnd:yyyy-MM-dd HH:mm} UTC.");
+                    DateTimeOffset conflictEnd = (conflictingRace.EndTime ?? conflictingRace.StartTime!.Value.AddMinutes(5)).AddMinutes(5);
+                    throw new InvalidOperationException($"Time slot conflicts with an existing race at this racecourse. Next available slot after {conflictEnd:yyyy-MM-dd HH:mm} UTC.");
                 }
 
                 race.StartTime = request.StartTime;
