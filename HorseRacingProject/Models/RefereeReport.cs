@@ -18,6 +18,10 @@ public partial class RefereeReport
 
     public string? PenaltyApplied { get; set; }
 
+    public PenaltyType PenaltyType { get; set; }
+
+    public decimal? FineAmount { get; set; }
+
     public RefereeReportStatus Status { get; set; }
 
     public DateTimeOffset? CreatedAt { get; set; }
