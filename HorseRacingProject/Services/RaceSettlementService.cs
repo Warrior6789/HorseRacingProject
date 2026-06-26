@@ -101,7 +101,7 @@ namespace HorseRacingAPI.Services
                     continue;
                 }
 
-                float ratio = (float)(netPool / winningPool);
+                float ratio = Math.Max((float)(netPool / winningPool), 1.0f);
 
                 foreach (Bet bet in typeBets)
                 {
