@@ -135,14 +135,14 @@ namespace HorseRacingAPI.Services
                 .Where(j => j.JockeyId == jockeyAccountId
                     && j.Status == RegistrationStatus.Pending
                     && j.OwnerConfirmation == true
-                    && j.JockeyConfirmation == false)
+                    && j.JockeyConfirmation == null)
                 .CountAsync();
 
             IEnumerable<RegistrationResponse> items = await registrationRepo.FindAsync<RegistrationResponse>(
                 predicate: j => j.JockeyId == jockeyAccountId
                     && j.Status == RegistrationStatus.Pending
                     && j.OwnerConfirmation == true
-                    && j.JockeyConfirmation == false,
+                    && j.JockeyConfirmation == null,
                 orderBy: null,
                 selector: r => new RegistrationResponse
                 {
