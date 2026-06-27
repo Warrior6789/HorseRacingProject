@@ -298,6 +298,25 @@ namespace HorseRacingAPI.Services
             if (account.RequestedRole == null)
                 throw new InvalidOperationException("This account has no pending role upgrade request.");
 
+            if (account.RequestedRole == AccountRole.Jockey)
+            {
+                UserProfile? userProfile = await _uow.GetRepository<UserProfile>().Entities
+                    .FirstOrDefaultAsync(p => p.AccountId == accountId && !p.IsDeleted);
+
+                if (userProfile?.ImageUrl != null)
+                {
+                    JockeyProfile? jockeyProfile = await _uow.GetRepository<JockeyProfile>().Entities
+                        .FirstOrDefaultAsync(p => p.AccountId == accountId && !p.IsDeleted);
+
+                    if (jockeyProfile != null)
+                    {
+                        jockeyProfile.ImageUrl = userProfile.ImageUrl;
+                        jockeyProfile.UpdatedAt = DateTimeOffset.UtcNow;
+                        await _uow.GetRepository<JockeyProfile>().UpdateAsync(jockeyProfile);
+                    }
+                }
+            }
+
             account.Role = account.RequestedRole.Value;
             account.RequestedRole = null;
             account.UpdatedAt = DateTimeOffset.UtcNow;

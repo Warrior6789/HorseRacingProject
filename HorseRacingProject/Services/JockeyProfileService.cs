@@ -183,6 +183,12 @@ namespace HorseRacingAPI.Services
             if (!string.IsNullOrEmpty(req.LicenseNumber))
                 jockeyProfile.LicenseNumber = req.LicenseNumber;
 
+            if (req.Weight.HasValue)
+                jockeyProfile.Weight = req.Weight;
+
+            if (req.Height.HasValue)
+                jockeyProfile.Height = req.Height;
+
             jockeyProfile.UpdatedAt = DateTimeOffset.UtcNow;
             await _uow.SaveAsync();
         }
