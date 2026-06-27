@@ -55,6 +55,14 @@ namespace HorseRacingAPI.Services
                     throw new InvalidOperationException($"Race has reached the maximum number of participants ({registration.Race.MaxParticipants}).");
             }
 
+            bool jockeyAlreadyInSameRace = await _uow.GetRepository<Registration>().Entities
+                .AnyAsync(r => r.JockeyId == jockeyAccountId
+                    && r.RegistrationId != registrationId
+                    && r.RaceId == registration.RaceId
+                    && r.Status == RegistrationStatus.Confirmed);
+            if (jockeyAlreadyInSameRace)
+                throw new InvalidOperationException("You are already confirmed in this race with another horse.");
+
             var confirmedElsewhere = await _uow.GetRepository<Registration>().Entities
                 .Where(r => r.JockeyId == jockeyAccountId
                     && r.RegistrationId != registrationId
@@ -525,6 +533,14 @@ namespace HorseRacingAPI.Services
                 if (confirmedCount >= registration.Race.MaxParticipants.Value)
                     throw new InvalidOperationException($"Race has reached the maximum number of participants ({registration.Race.MaxParticipants}).");
             }
+
+            bool jockeyAlreadyInSameRace = await _uow.GetRepository<Registration>().Entities
+                .AnyAsync(r => r.JockeyId == registration.JockeyId
+                    && r.RegistrationId != registrationId
+                    && r.RaceId == registration.RaceId
+                    && r.Status == RegistrationStatus.Confirmed);
+            if (jockeyAlreadyInSameRace)
+                throw new InvalidOperationException("This jockey is already confirmed in this race with another horse.");
 
             var confirmedElsewhere = await _uow.GetRepository<Registration>().Entities
                 .Where(r => r.JockeyId == registration.JockeyId
