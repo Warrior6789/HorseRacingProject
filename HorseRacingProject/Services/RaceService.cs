@@ -26,25 +26,28 @@ namespace HorseRacingAPI.Services
             _hubContext = hubContext;
         }
 
-        public async Task<PagedResponse<RaceResponse>> GetRacesAsync(int page, int pageSize, Guid? racecourseId, string? status)
+        public async Task<PagedResponse<RaceResponse>> GetRacesAsync(int page, int pageSize, Guid? racecourseId, string? status, string? search = null)
         {
             if (page < 1) page = 1;
             if (pageSize < 1) pageSize = 10;
             if (pageSize > 100) pageSize = 100;
 
             RaceStatus? parsedStatus = status != null && Enum.TryParse<RaceStatus>(status, ignoreCase: true, out var s) ? s : (RaceStatus?)null;
+            string? searchTrim = string.IsNullOrWhiteSpace(search) ? null : search.Trim().ToLower();
 
             IGenericRepository<Race> repo = _uow.GetRepository<Race>();
 
             int totalCount = await repo.Entities
                 .CountAsync(r => !r.IsDeleted
                     && (racecourseId == null || r.RacecourseId == racecourseId)
-                    && (parsedStatus == null || r.Status == parsedStatus));
+                    && (parsedStatus == null || r.Status == parsedStatus)
+                    && (searchTrim == null || r.RaceName!.ToLower().Contains(searchTrim)));
 
             IEnumerable<RaceResponse> items = await repo.FindAsync<RaceResponse>(
                 predicate: r => !r.IsDeleted
                     && (racecourseId == null || r.RacecourseId == racecourseId)
-                    && (parsedStatus == null || r.Status == parsedStatus),
+                    && (parsedStatus == null || r.Status == parsedStatus)
+                    && (searchTrim == null || r.RaceName!.ToLower().Contains(searchTrim)),
                 orderBy: q => q.OrderBy(r => r.StartTime),
                 selector: r => new RaceResponse
                 {
