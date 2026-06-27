@@ -318,6 +318,13 @@ namespace HorseRacingAPI.Services
             if (horseConfirmed)
                 throw new InvalidOperationException("This horse is already confirmed in a race.");
 
+            bool horsePendingElsewhere = await _uow.GetRepository<Registration>().Entities
+                .AnyAsync(r => r.HorseId == request.HorseId
+                    && r.Status == RegistrationStatus.Pending
+                    && r.Race.RacecourseId != race.RacecourseId);
+            if (horsePendingElsewhere)
+                throw new InvalidOperationException("This horse already has a pending registration at another racecourse.");
+
             DateTimeOffset? lastRaceEnd = await _uow.GetRepository<Registration>().Entities
                 .Where(r => r.HorseId == request.HorseId
                     && r.Status == RegistrationStatus.Confirmed
