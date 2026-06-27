@@ -34,6 +34,6 @@ namespace HorseRacingAPI.Helpers
         }
 
         public static bool CanRegisterForRace(HorseStatus status) =>
-            status == HorseStatus.Healthy || status == HorseStatus.Resting;
+            status == HorseStatus.Healthy;
     }
 }
