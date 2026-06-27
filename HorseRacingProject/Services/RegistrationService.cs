@@ -57,6 +57,7 @@ namespace HorseRacingAPI.Services
             bool timeConflict = await _uow.GetRepository<Registration>().Entities
                 .AnyAsync(r => r.JockeyId == jockeyAccountId
                     && r.RegistrationId != registrationId
+                    && r.RaceId != registration.RaceId
                     && r.Status == RegistrationStatus.Confirmed
                     && r.Race.StartTime < registration.Race.EndTime
                     && r.Race.EndTime > registration.Race.StartTime);
