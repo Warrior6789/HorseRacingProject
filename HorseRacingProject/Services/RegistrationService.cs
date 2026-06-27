@@ -36,6 +36,7 @@ namespace HorseRacingAPI.Services
 
             Registration? registration = await registrationRepo.Entities
                 .Include(r => r.Race)
+                .Include(r => r.Horse)
                 .FirstOrDefaultAsync(r => r.RegistrationId == registrationId);
             if (registration == null)
                 throw new ArgumentException("Registration not found.");
@@ -80,16 +81,15 @@ namespace HorseRacingAPI.Services
                 registration.UpdatedAt = DateTimeOffset.UtcNow;
                 await _uow.SaveAsync();
 
-                List<Registration> sameRacePending = await _uow.GetRepository<Registration>().Entities
+                List<Registration> otherHorsePending = await _uow.GetRepository<Registration>().Entities
                     .Include(r => r.Race)
                     .Include(r => r.Horse)
-                    .Where(r => r.JockeyId == jockeyAccountId
-                        && r.RaceId == registration.RaceId
+                    .Where(r => r.HorseId == registration.HorseId
                         && r.RegistrationId != registrationId
                         && r.Status == RegistrationStatus.Pending)
                     .ToListAsync();
 
-                foreach (Registration other in sameRacePending)
+                foreach (Registration other in otherHorsePending)
                 {
                     other.JockeyConfirmation = false;
                     other.Status = RegistrationStatus.Rejected;

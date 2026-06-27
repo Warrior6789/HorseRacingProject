@@ -312,11 +312,20 @@ namespace HorseRacingAPI.Services
                     throw new InvalidOperationException($"Gate number {request.GateNumber} is already taken.");
             }
 
-            bool alreadyRegistered = await _uow.GetRepository<Registration>().Entities
+            bool horseConfirmed = await _uow.GetRepository<Registration>().Entities
                 .AnyAsync(r => r.HorseId == request.HorseId
-                    && (r.Status == RegistrationStatus.Pending || r.Status == RegistrationStatus.Confirmed));
-            if (alreadyRegistered)
-                throw new InvalidOperationException("This horse is already registered in a race. Wait until the registration is rejected before registering again.");
+                    && r.Status == RegistrationStatus.Confirmed);
+            if (horseConfirmed)
+                throw new InvalidOperationException("This horse is already confirmed in a race.");
+
+            DateTimeOffset? lastRaceEnd = await _uow.GetRepository<Registration>().Entities
+                .Where(r => r.HorseId == request.HorseId
+                    && r.Status == RegistrationStatus.Confirmed
+                    && r.Race.Status == RaceStatus.Finished)
+                .MaxAsync(r => (DateTimeOffset?)r.Race.EndTime);
+
+            if (lastRaceEnd != null && race.StartTime < lastRaceEnd.Value.AddDays(7))
+                throw new InvalidOperationException($"Horse needs 7 days rest after last race. Earliest registration date: {lastRaceEnd.Value.AddDays(7):yyyy-MM-dd}.");
 
             bool ownerAlreadyRegistered = await _uow.GetRepository<Registration>().Entities
                 .AnyAsync(r => r.RaceId == raceId
