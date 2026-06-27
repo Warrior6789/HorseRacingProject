@@ -313,11 +313,10 @@ namespace HorseRacingAPI.Services
             }
 
             bool alreadyRegistered = await _uow.GetRepository<Registration>().Entities
-                .AnyAsync(r => r.RaceId == raceId
-                    && r.HorseId == request.HorseId
+                .AnyAsync(r => r.HorseId == request.HorseId
                     && (r.Status == RegistrationStatus.Pending || r.Status == RegistrationStatus.Confirmed));
             if (alreadyRegistered)
-                throw new InvalidOperationException("This horse is already registered in this race.");
+                throw new InvalidOperationException("This horse is already registered in a race. Wait until the registration is rejected before registering again.");
 
             bool ownerAlreadyRegistered = await _uow.GetRepository<Registration>().Entities
                 .AnyAsync(r => r.RaceId == raceId
