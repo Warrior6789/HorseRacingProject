@@ -303,22 +303,17 @@ namespace HorseRacingAPI.Services
                 UserProfile? userProfile = await _uow.GetRepository<UserProfile>().Entities
                     .FirstOrDefaultAsync(p => p.AccountId == accountId && !p.IsDeleted);
 
-                if (userProfile != null)
+                if (userProfile?.ImageUrl != null)
                 {
-                    if (userProfile.ImageUrl != null)
+                    JockeyProfile? jockeyProfile = await _uow.GetRepository<JockeyProfile>().Entities
+                        .FirstOrDefaultAsync(p => p.AccountId == accountId && !p.IsDeleted);
+
+                    if (jockeyProfile != null)
                     {
-                        JockeyProfile? jockeyProfile = await _uow.GetRepository<JockeyProfile>().Entities
-                            .FirstOrDefaultAsync(p => p.AccountId == accountId && !p.IsDeleted);
-
-                        if (jockeyProfile != null)
-                        {
-                            jockeyProfile.ImageUrl = userProfile.ImageUrl;
-                            jockeyProfile.UpdatedAt = DateTimeOffset.UtcNow;
-                            await _uow.GetRepository<JockeyProfile>().UpdateAsync(jockeyProfile);
-                        }
+                        jockeyProfile.ImageUrl = userProfile.ImageUrl;
+                        jockeyProfile.UpdatedAt = DateTimeOffset.UtcNow;
+                        await _uow.GetRepository<JockeyProfile>().UpdateAsync(jockeyProfile);
                     }
-
-                    await _uow.GetRepository<UserProfile>().DeleteAsync(userProfile);
                 }
             }
 
