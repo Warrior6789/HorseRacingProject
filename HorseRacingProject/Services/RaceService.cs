@@ -325,12 +325,12 @@ namespace HorseRacingAPI.Services
             if (ownerAlreadyRegistered)
                 throw new InvalidOperationException("You have already registered a horse in this race.");
 
-            bool jockeyInSameRace = await _uow.GetRepository<Registration>().Entities
+            bool jockeyConfirmedInSameRace = await _uow.GetRepository<Registration>().Entities
                 .AnyAsync(r => r.JockeyId == request.JockeyId
                     && r.RaceId == raceId
-                    && (r.Status == RegistrationStatus.Pending || r.Status == RegistrationStatus.Confirmed));
-            if (jockeyInSameRace)
-                throw new InvalidOperationException("This jockey is already assigned to a horse in this race.");
+                    && r.Status == RegistrationStatus.Confirmed);
+            if (jockeyConfirmedInSameRace)
+                throw new InvalidOperationException("This jockey is already confirmed in this race.");
 
             bool jockeyTimeConflict = await _uow.GetRepository<Registration>().Entities
                 .AnyAsync(r => r.JockeyId == request.JockeyId

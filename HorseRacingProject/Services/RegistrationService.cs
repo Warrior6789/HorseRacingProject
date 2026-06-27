@@ -71,6 +71,39 @@ namespace HorseRacingAPI.Services
                 registration.Status = RegistrationStatus.Confirmed;
                 registration.UpdatedAt = DateTimeOffset.UtcNow;
                 await _uow.SaveAsync();
+
+                List<Registration> sameRacePending = await _uow.GetRepository<Registration>().Entities
+                    .Include(r => r.Race)
+                    .Include(r => r.Horse)
+                    .Where(r => r.JockeyId == jockeyAccountId
+                        && r.RaceId == registration.RaceId
+                        && r.RegistrationId != registrationId
+                        && r.Status == RegistrationStatus.Pending)
+                    .ToListAsync();
+
+                foreach (Registration other in sameRacePending)
+                {
+                    other.JockeyConfirmation = false;
+                    other.Status = RegistrationStatus.Rejected;
+                    other.UpdatedAt = DateTimeOffset.UtcNow;
+                    await _uow.GetRepository<Registration>().UpdateAsync(other);
+
+                    if (other.Race.RegistrationFee > 0)
+                    {
+                        UserProfile? ownerProfile = await _uow.GetRepository<UserProfile>().Entities
+                            .FirstOrDefaultAsync(p => p.AccountId == other.Horse.OwnerId && !p.IsDeleted);
+                        if (ownerProfile != null)
+                        {
+                            ownerProfile.Balance = (ownerProfile.Balance ?? 0) + (long)other.Race.RegistrationFee;
+                            ownerProfile.UpdatedAt = DateTimeOffset.UtcNow;
+                            await _uow.GetRepository<UserProfile>().UpdateAsync(ownerProfile);
+                        }
+                        other.Race.PrizePool = Math.Max(0, other.Race.PrizePool - other.Race.RegistrationFee);
+                        await _uow.GetRepository<Race>().UpdateAsync(other.Race);
+                    }
+                }
+
+                await _uow.SaveAsync();
                 await _uow.CommitTransactionAsync();
             }
             catch (DbUpdateException ex) when (ex.InnerException is PostgresException pg && pg.SqlState == "P0001")
