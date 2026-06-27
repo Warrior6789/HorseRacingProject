@@ -33,6 +33,8 @@ public partial class JockeyProfile
 
     public int? TotalWins { get; set; }
 
+    public long? Balance { get; set; }
+
     public string? ImageUrl { get; set; }
 
     public string? CertificateImageUrl { get; set; }

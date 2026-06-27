@@ -41,12 +41,28 @@ public class WithdrawalService : IWithdrawalService
         if (request.Amount <= 0)
             throw new ArgumentException("Withdrawal amount must be greater than 0.");
 
-        UserProfile? profile = await _uow.GetRepository<UserProfile>().Entities
-            .FirstOrDefaultAsync(u => u.AccountId == accountId);
-        if (profile == null)
-            throw new KeyNotFoundException("User profile not found.");
+        Account? account = await _uow.GetRepository<Account>().Entities
+            .FirstOrDefaultAsync(a => a.Id == accountId && !a.IsDeleted);
 
-        if ((profile.Balance ?? 0) < request.Amount)
+        long currentBalance;
+        if (account?.Role == AccountRole.Jockey)
+        {
+            JockeyProfile? jp = await _uow.GetRepository<JockeyProfile>().Entities
+                .FirstOrDefaultAsync(j => j.AccountId == accountId && !j.IsDeleted);
+            if (jp == null)
+                throw new KeyNotFoundException("Jockey profile not found.");
+            currentBalance = jp.Balance ?? 0;
+        }
+        else
+        {
+            UserProfile? profile = await _uow.GetRepository<UserProfile>().Entities
+                .FirstOrDefaultAsync(u => u.AccountId == accountId);
+            if (profile == null)
+                throw new KeyNotFoundException("User profile not found.");
+            currentBalance = profile.Balance ?? 0;
+        }
+
+        if (currentBalance < request.Amount)
             throw new InvalidOperationException("Insufficient balance.");
 
         Withdrawal withdrawal = new Withdrawal
@@ -127,12 +143,20 @@ public class WithdrawalService : IWithdrawalService
         if (withdrawal.Status != WithdrawalStatus.Pending)
             throw new InvalidOperationException("Withdrawal is not in Pending status.");
 
+        Account? withdrawalAccount = await _uow.GetRepository<Account>().Entities
+            .FirstOrDefaultAsync(a => a.Id == withdrawal.AccountId && !a.IsDeleted);
+        bool isJockey = withdrawalAccount?.Role == AccountRole.Jockey;
+
         await _uow.BeginTransactionAsync();
         try
         {
-            int updated = await _uow.GetRepository<UserProfile>().Entities
-                .Where(u => u.AccountId == withdrawal.AccountId && (u.Balance ?? 0) >= withdrawal.Amount)
-                .ExecuteUpdateAsync(s => s.SetProperty(u => u.Balance, u => (u.Balance ?? 0) - withdrawal.Amount));
+            int updated = isJockey
+                ? await _uow.GetRepository<JockeyProfile>().Entities
+                    .Where(j => j.AccountId == withdrawal.AccountId && (j.Balance ?? 0) >= withdrawal.Amount)
+                    .ExecuteUpdateAsync(s => s.SetProperty(j => j.Balance, j => (j.Balance ?? 0) - withdrawal.Amount))
+                : await _uow.GetRepository<UserProfile>().Entities
+                    .Where(u => u.AccountId == withdrawal.AccountId && (u.Balance ?? 0) >= withdrawal.Amount)
+                    .ExecuteUpdateAsync(s => s.SetProperty(u => u.Balance, u => (u.Balance ?? 0) - withdrawal.Amount));
 
             if (updated == 0)
             {
@@ -153,10 +177,15 @@ public class WithdrawalService : IWithdrawalService
 
             if (withdrawal.Status == WithdrawalStatus.Completed)
             {
-                long newBalance = await _uow.GetRepository<UserProfile>().Entities
-                    .Where(u => u.AccountId == withdrawal.AccountId)
-                    .Select(u => u.Balance ?? 0)
-                    .FirstOrDefaultAsync();
+                long newBalance = isJockey
+                    ? await _uow.GetRepository<JockeyProfile>().Entities
+                        .Where(j => j.AccountId == withdrawal.AccountId)
+                        .Select(j => j.Balance ?? 0)
+                        .FirstOrDefaultAsync()
+                    : await _uow.GetRepository<UserProfile>().Entities
+                        .Where(u => u.AccountId == withdrawal.AccountId)
+                        .Select(u => u.Balance ?? 0)
+                        .FirstOrDefaultAsync();
                 await _hubContext.Clients.All.SendAsync("BalanceUpdated", new
                 {
                     accountId  = withdrawal.AccountId,
