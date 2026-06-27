@@ -135,14 +135,14 @@ namespace HorseRacingAPI.Services
                 .Where(j => j.JockeyId == jockeyAccountId
                     && j.Status == RegistrationStatus.Pending
                     && j.OwnerConfirmation == true
-                    && j.JockeyConfirmation == false)
+                    && j.JockeyConfirmation == null)
                 .CountAsync();
 
             IEnumerable<RegistrationResponse> items = await registrationRepo.FindAsync<RegistrationResponse>(
                 predicate: j => j.JockeyId == jockeyAccountId
                     && j.Status == RegistrationStatus.Pending
                     && j.OwnerConfirmation == true
-                    && j.JockeyConfirmation == false,
+                    && j.JockeyConfirmation == null,
                 orderBy: null,
                 selector: r => new RegistrationResponse
                 {
@@ -251,8 +251,7 @@ namespace HorseRacingAPI.Services
 
             IEnumerable<RegistrationResponse> items = await registrationRepo.FindAsync<RegistrationResponse>(
                 predicate: r => r.Horse.OwnerId == ownerAccountId
-                    && r.Status == RegistrationStatus.Pending
-                    && r.OwnerConfirmation == false,
+                    && r.Status == RegistrationStatus.Pending,
                 orderBy: null,
                 selector: r => new RegistrationResponse
                 {
@@ -416,7 +415,10 @@ namespace HorseRacingAPI.Services
         {
             IGenericRepository<Registration> registrationRepo = _uow.GetRepository<Registration>();
 
-            Registration? registration = await registrationRepo.Entities.FirstOrDefaultAsync(r => r.RegistrationId == registrationId);
+            Registration? registration = await registrationRepo.Entities
+                .Include(r => r.Race)
+                .Include(r => r.Horse)
+                .FirstOrDefaultAsync(r => r.RegistrationId == registrationId);
             if (registration == null)
                 throw new ArgumentException("Registration not found.");
 
@@ -429,6 +431,20 @@ namespace HorseRacingAPI.Services
             registration.JockeyConfirmation = false;
             registration.Status = RegistrationStatus.Rejected;
             registration.UpdatedAt = DateTimeOffset.UtcNow;
+
+            if (registration.Race.RegistrationFee > 0)
+            {
+                UserProfile? ownerProfile = await _uow.GetRepository<UserProfile>().Entities
+                    .FirstOrDefaultAsync(p => p.AccountId == registration.Horse.OwnerId && !p.IsDeleted);
+                if (ownerProfile != null)
+                {
+                    ownerProfile.Balance = (ownerProfile.Balance ?? 0) + (long)registration.Race.RegistrationFee;
+                    ownerProfile.UpdatedAt = DateTimeOffset.UtcNow;
+                    await _uow.GetRepository<UserProfile>().UpdateAsync(ownerProfile);
+                }
+                registration.Race.PrizePool = Math.Max(0, registration.Race.PrizePool - registration.Race.RegistrationFee);
+                await _uow.GetRepository<Race>().UpdateAsync(registration.Race);
+            }
 
             await _uow.SaveAsync();
         }
@@ -481,7 +497,10 @@ namespace HorseRacingAPI.Services
         {
             IGenericRepository<Registration> registrationRepo = _uow.GetRepository<Registration>();
 
-            Registration? registration = await registrationRepo.Entities.FirstOrDefaultAsync(r => r.RegistrationId == registrationId);
+            Registration? registration = await registrationRepo.Entities
+                .Include(r => r.Race)
+                .Include(r => r.Horse)
+                .FirstOrDefaultAsync(r => r.RegistrationId == registrationId);
             if (registration == null)
                 throw new ArgumentException("Registration not found.");
 
@@ -491,6 +510,20 @@ namespace HorseRacingAPI.Services
             registration.JockeyConfirmation = false;
             registration.Status = RegistrationStatus.Rejected;
             registration.UpdatedAt = DateTimeOffset.UtcNow;
+
+            if (registration.Race.RegistrationFee > 0)
+            {
+                UserProfile? ownerProfile = await _uow.GetRepository<UserProfile>().Entities
+                    .FirstOrDefaultAsync(p => p.AccountId == registration.Horse.OwnerId && !p.IsDeleted);
+                if (ownerProfile != null)
+                {
+                    ownerProfile.Balance = (ownerProfile.Balance ?? 0) + (long)registration.Race.RegistrationFee;
+                    ownerProfile.UpdatedAt = DateTimeOffset.UtcNow;
+                    await _uow.GetRepository<UserProfile>().UpdateAsync(ownerProfile);
+                }
+                registration.Race.PrizePool = Math.Max(0, registration.Race.PrizePool - registration.Race.RegistrationFee);
+                await _uow.GetRepository<Race>().UpdateAsync(registration.Race);
+            }
 
             await _uow.SaveAsync();
 
