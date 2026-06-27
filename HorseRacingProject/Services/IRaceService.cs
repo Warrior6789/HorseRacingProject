@@ -4,7 +4,7 @@ namespace HorseRacingAPI.Services
 {
     public interface IRaceService
     {
-        Task<PagedResponse<RaceResponse>> GetRacesAsync(int page, int pageSize, Guid? racecourseId, string? status);
+        Task<PagedResponse<RaceResponse>> GetRacesAsync(int page, int pageSize, Guid? racecourseId, string? status, string? search = null);
         Task<RaceResponse> GetRaceByIdAsync(Guid raceId);
         Task<RaceResponse> CreateRaceAsync(CreateRaceRequest request);
         Task<RaceResponse> UpdateRaceAsync(Guid raceId, UpdateRaceRequest request);

@@ -29,9 +29,10 @@ namespace HorseRacingAPI.Controllers
             [FromQuery] string status = "Active",
             [FromQuery] int page = 1,
             [FromQuery] int pageSize = 10,
-            [FromQuery] string? role = null)
+            [FromQuery] string? role = null,
+            [FromQuery] string? search = null)
         {
-            PagedResponse<AccountResponse> accounts = await _accountService.GetAccountByStatusPagedAsync(status, page, pageSize, role);
+            PagedResponse<AccountResponse> accounts = await _accountService.GetAccountByStatusPagedAsync(status, page, pageSize, role, search);
             return Ok(ApiResponse<PagedResponse<AccountResponse>>.SuccessResponse(accounts, "Get accounts successfully."));
         }
 
