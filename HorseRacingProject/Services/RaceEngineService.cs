@@ -91,7 +91,7 @@ namespace HorseRacingAPI.Services
                     int confirmedCount = await uow.GetRepository<Registration>().Entities
                         .CountAsync(reg => reg.RaceId == r.RaceId && reg.Status == RegistrationStatus.Confirmed);
 
-                    if (confirmedCount < 2)
+                    if (confirmedCount < 3)
                     {
                         DateTimeOffset? previousEndTime = await uow.GetRepository<Race>().Entities
                             .Where(other => other.RacecourseId == r.RacecourseId
