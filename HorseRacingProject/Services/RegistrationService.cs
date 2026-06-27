@@ -54,15 +54,23 @@ namespace HorseRacingAPI.Services
                     throw new InvalidOperationException($"Race has reached the maximum number of participants ({registration.Race.MaxParticipants}).");
             }
 
-            bool timeConflict = await _uow.GetRepository<Registration>().Entities
-                .AnyAsync(r => r.JockeyId == jockeyAccountId
+            var confirmedElsewhere = await _uow.GetRepository<Registration>().Entities
+                .Where(r => r.JockeyId == jockeyAccountId
                     && r.RegistrationId != registrationId
                     && r.RaceId != registration.RaceId
-                    && r.Status == RegistrationStatus.Confirmed
-                    && r.Race.StartTime < registration.Race.EndTime
-                    && r.Race.EndTime > registration.Race.StartTime);
-            if (timeConflict)
-                throw new InvalidOperationException("You are already confirmed in another race that overlaps in time.");
+                    && r.Status == RegistrationStatus.Confirmed)
+                .Select(r => new { r.Race.StartTime, r.Race.EndTime, r.Race.RacecourseId })
+                .ToListAsync();
+
+            foreach (var other in confirmedElsewhere)
+            {
+                bool sameVenue = other.RacecourseId == registration.Race.RacecourseId;
+                DateTimeOffset effectiveStart = sameVenue ? registration.Race.StartTime!.Value : registration.Race.StartTime!.Value.AddHours(-2);
+                DateTimeOffset effectiveEnd   = sameVenue ? registration.Race.EndTime!.Value   : registration.Race.EndTime!.Value.AddHours(2);
+
+                if (other.StartTime < effectiveEnd && other.EndTime > effectiveStart)
+                    throw new InvalidOperationException("You are already confirmed in another race that conflicts in time.");
+            }
 
             await _uow.BeginTransactionAsync();
             try

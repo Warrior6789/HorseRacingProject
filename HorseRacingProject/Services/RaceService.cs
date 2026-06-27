@@ -332,14 +332,22 @@ namespace HorseRacingAPI.Services
             if (jockeyConfirmedInSameRace)
                 throw new InvalidOperationException("This jockey is already confirmed in this race.");
 
-            bool jockeyTimeConflict = await _uow.GetRepository<Registration>().Entities
-                .AnyAsync(r => r.JockeyId == request.JockeyId
+            var confirmedElsewhere = await _uow.GetRepository<Registration>().Entities
+                .Where(r => r.JockeyId == request.JockeyId
                     && r.RaceId != raceId
-                    && r.Status == RegistrationStatus.Confirmed
-                    && r.Race.StartTime < race.EndTime
-                    && r.Race.EndTime > race.StartTime);
-            if (jockeyTimeConflict)
-                throw new InvalidOperationException("This jockey is already confirmed in another race that overlaps in time.");
+                    && r.Status == RegistrationStatus.Confirmed)
+                .Select(r => new { r.Race.StartTime, r.Race.EndTime, r.Race.RacecourseId })
+                .ToListAsync();
+
+            foreach (var other in confirmedElsewhere)
+            {
+                bool sameVenue = other.RacecourseId == race.RacecourseId;
+                DateTimeOffset effectiveStart = sameVenue ? race.StartTime!.Value : race.StartTime!.Value.AddHours(-2);
+                DateTimeOffset effectiveEnd   = sameVenue ? race.EndTime!.Value   : race.EndTime!.Value.AddHours(2);
+
+                if (other.StartTime < effectiveEnd && other.EndTime > effectiveStart)
+                    throw new InvalidOperationException("This jockey is already confirmed in another race that conflicts in time.");
+            }
 
             if (race.RegistrationFee > 0)
             {
