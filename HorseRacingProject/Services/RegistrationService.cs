@@ -251,8 +251,7 @@ namespace HorseRacingAPI.Services
 
             IEnumerable<RegistrationResponse> items = await registrationRepo.FindAsync<RegistrationResponse>(
                 predicate: r => r.Horse.OwnerId == ownerAccountId
-                    && r.Status == RegistrationStatus.Pending
-                    && r.OwnerConfirmation == false,
+                    && r.Status == RegistrationStatus.Pending,
                 orderBy: null,
                 selector: r => new RegistrationResponse
                 {
