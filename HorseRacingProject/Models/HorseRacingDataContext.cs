@@ -156,6 +156,7 @@ public partial class HorseRacingDataContext : DbContext
             entity.Property(e => e.Nationality).HasMaxLength(50);
             entity.Property(e => e.TotalRaces).HasDefaultValue(0);
             entity.Property(e => e.TotalWins).HasDefaultValue(0);
+            entity.Property(e => e.Balance).HasDefaultValue(0L);
             entity.Property(e => e.ImageUrl).HasMaxLength(500);
             entity.Property(e => e.UpdatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
 

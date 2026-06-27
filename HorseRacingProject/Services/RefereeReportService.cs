@@ -184,13 +184,13 @@ namespace HorseRacingAPI.Services
                 }
                 else if (prize.PrizeType == PrizeType.Jockey)
                 {
-                    var jockeyProfile = await _uow.GetRepository<UserProfile>().Entities
+                    var jockeyProfile = await _uow.GetRepository<JockeyProfile>().Entities
                         .FirstOrDefaultAsync(p => p.AccountId == prize.Registration.JockeyId && !p.IsDeleted);
                     if (jockeyProfile != null)
                     {
                         jockeyProfile.Balance = Math.Max(0, (jockeyProfile.Balance ?? 0) - (long)Math.Round(prize.Amount ?? 0));
                         jockeyProfile.UpdatedAt = DateTimeOffset.UtcNow;
-                        await _uow.GetRepository<UserProfile>().UpdateAsync(jockeyProfile);
+                        await _uow.GetRepository<JockeyProfile>().UpdateAsync(jockeyProfile);
                     }
                 }
 
@@ -245,7 +245,7 @@ namespace HorseRacingAPI.Services
                     await _uow.GetRepository<UserProfile>().UpdateAsync(ownerProfile);
                 }
 
-                var jockeyProfile = await _uow.GetRepository<UserProfile>().Entities
+                var jockeyProfile = await _uow.GetRepository<JockeyProfile>().Entities
                     .FirstOrDefaultAsync(p => p.AccountId == result.Registration.JockeyId && !p.IsDeleted);
                 if (jockeyProfile != null && jockeyNew != 0)
                 {
@@ -254,7 +254,7 @@ namespace HorseRacingAPI.Services
                         ? (jockeyProfile.Balance ?? 0) + jockeyDelta
                         : Math.Max(0, (jockeyProfile.Balance ?? 0) - jockeyDelta);
                     jockeyProfile.UpdatedAt = DateTimeOffset.UtcNow;
-                    await _uow.GetRepository<UserProfile>().UpdateAsync(jockeyProfile);
+                    await _uow.GetRepository<JockeyProfile>().UpdateAsync(jockeyProfile);
                 }
 
                 if (ownerNew != 0)

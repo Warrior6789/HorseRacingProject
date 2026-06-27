@@ -33,10 +33,10 @@ namespace HorseRacingAPI.Services
 
         public async Task<string> CreateDepositUrlAsync(Guid accountId, DepositRequest request, string ipAddress)
         {
-            UserProfile? userProfile = await _uow.GetRepository<UserProfile>().Entities
-                .FirstOrDefaultAsync(a => a.AccountId == accountId);
-            if (userProfile == null)
-                throw new KeyNotFoundException("User profile not found.");
+            Account? acctCheck = await _uow.GetRepository<Account>().Entities
+                .FirstOrDefaultAsync(a => a.Id == accountId && !a.IsDeleted);
+            if (acctCheck == null)
+                throw new KeyNotFoundException("Account not found.");
 
             long orderCode = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
@@ -106,16 +106,35 @@ namespace HorseRacingAPI.Services
                 if (claimed == 0)
                     throw new InvalidOperationException("Payment already processed.");
 
-                int profileUpdated = await _uow.GetRepository<UserProfile>().Entities
-                    .Where(u => u.AccountId == payment.AccountId)
-                    .ExecuteUpdateAsync(s => s.SetProperty(u => u.Balance, u => (u.Balance ?? 0) + balanceToAdd));
-                if (profileUpdated == 0)
-                    throw new InvalidOperationException("User profile not found. Cannot credit balance.");
+                Account? acct = await _uow.GetRepository<Account>().Entities
+                    .FirstOrDefaultAsync(a => a.Id == payment.AccountId && !a.IsDeleted);
 
-                long currentBalance = await _uow.GetRepository<UserProfile>().Entities
-                    .Where(u => u.AccountId == payment.AccountId)
-                    .Select(u => u.Balance ?? 0)
-                    .FirstOrDefaultAsync();
+                int profileUpdated;
+                long currentBalance;
+                if (acct?.Role == AccountRole.Jockey)
+                {
+                    profileUpdated = await _uow.GetRepository<JockeyProfile>().Entities
+                        .Where(j => j.AccountId == payment.AccountId)
+                        .ExecuteUpdateAsync(s => s.SetProperty(j => j.Balance, j => (j.Balance ?? 0) + balanceToAdd));
+                    if (profileUpdated == 0)
+                        throw new InvalidOperationException("Jockey profile not found. Cannot credit balance.");
+                    currentBalance = await _uow.GetRepository<JockeyProfile>().Entities
+                        .Where(j => j.AccountId == payment.AccountId)
+                        .Select(j => j.Balance ?? 0)
+                        .FirstOrDefaultAsync();
+                }
+                else
+                {
+                    profileUpdated = await _uow.GetRepository<UserProfile>().Entities
+                        .Where(u => u.AccountId == payment.AccountId)
+                        .ExecuteUpdateAsync(s => s.SetProperty(u => u.Balance, u => (u.Balance ?? 0) + balanceToAdd));
+                    if (profileUpdated == 0)
+                        throw new InvalidOperationException("User profile not found. Cannot credit balance.");
+                    currentBalance = await _uow.GetRepository<UserProfile>().Entities
+                        .Where(u => u.AccountId == payment.AccountId)
+                        .Select(u => u.Balance ?? 0)
+                        .FirstOrDefaultAsync();
+                }
 
                 await _uow.CommitTransactionAsync();
 

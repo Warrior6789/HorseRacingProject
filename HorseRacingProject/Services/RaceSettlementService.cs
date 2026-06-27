@@ -203,13 +203,13 @@ namespace HorseRacingAPI.Services
                     prizePayouts.Add((reg.Horse.OwnerId, (long)ownerAmount, ownerProfile.Balance ?? 0, "PrizePayout"));
                 }
 
-                UserProfile? jockeyProfile = await uow.GetRepository<UserProfile>().Entities
+                JockeyProfile? jockeyProfile = await uow.GetRepository<JockeyProfile>().Entities
                     .FirstOrDefaultAsync(p => p.AccountId == reg.JockeyId && !p.IsDeleted);
                 if (jockeyProfile != null)
                 {
                     jockeyProfile.Balance = (jockeyProfile.Balance ?? 0) + (long)jockeyAmount;
                     jockeyProfile.UpdatedAt = DateTimeOffset.UtcNow;
-                    await uow.GetRepository<UserProfile>().UpdateAsync(jockeyProfile);
+                    await uow.GetRepository<JockeyProfile>().UpdateAsync(jockeyProfile);
                     prizePayouts.Add((reg.JockeyId, (long)jockeyAmount, jockeyProfile.Balance ?? 0, "PrizePayout"));
                 }
             }
