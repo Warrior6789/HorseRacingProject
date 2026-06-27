@@ -304,7 +304,10 @@ namespace HorseRacingAPI.Services
             if (request.GateNumber.HasValue)
             {
                 bool gateTaken = await _uow.GetRepository<Registration>().Entities
-                    .AnyAsync(r => r.RaceId == raceId && r.GateNumber == request.GateNumber);
+                    .AnyAsync(r => r.RaceId == raceId
+                        && r.GateNumber == request.GateNumber
+                        && r.Status != RegistrationStatus.Rejected
+                        && r.Status != RegistrationStatus.Scratched);
                 if (gateTaken)
                     throw new InvalidOperationException($"Gate number {request.GateNumber} is already taken.");
             }
