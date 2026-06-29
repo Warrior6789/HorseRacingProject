@@ -349,13 +349,6 @@ namespace HorseRacingAPI.Services
                 if (jockeyProfile != null)
                     await _uow.GetRepository<JockeyProfile>().DeleteAsync(jockeyProfile);
             }
-            else
-            {
-                UserProfile? userProfile = await _uow.GetRepository<UserProfile>().Entities
-                    .FirstOrDefaultAsync(p => p.AccountId == accountId && !p.IsDeleted);
-                if (userProfile != null)
-                    await _uow.GetRepository<UserProfile>().DeleteAsync(userProfile);
-            }
 
             account.RequestedRole = null;
             account.UpdatedAt = DateTimeOffset.UtcNow;

@@ -654,6 +654,7 @@ namespace HorseRacingAPI.Services
                 throw new InvalidOperationException("Race is already in Scheduled status.");
 
             List<Registration> registrations = await _uow.GetRepository<Registration>().Entities
+                .Include(r => r.Horse)
                 .Where(r => r.RaceId == raceId)
                 .ToListAsync();
 
@@ -746,6 +747,23 @@ namespace HorseRacingAPI.Services
                 .ToListAsync();
 
             await _uow.GetRepository<RacePool>().DeleteRangeAsync(racePools);
+
+            if (race.RegistrationFee > 0)
+            {
+                foreach (Registration reg in registrations)
+                {
+                    UserProfile? ownerProfile = await _uow.GetRepository<UserProfile>().Entities
+                        .FirstOrDefaultAsync(p => p.AccountId == reg.Horse.OwnerId && !p.IsDeleted);
+                    if (ownerProfile != null)
+                    {
+                        ownerProfile.Balance = (ownerProfile.Balance ?? 0) + (long)race.RegistrationFee;
+                        ownerProfile.UpdatedAt = DateTimeOffset.UtcNow;
+                        await _uow.GetRepository<UserProfile>().UpdateAsync(ownerProfile);
+                    }
+                }
+            }
+
+            await _uow.GetRepository<Registration>().DeleteRangeAsync(registrations);
 
             race.Status = RaceStatus.Scheduled;
             race.EndTime = null;
