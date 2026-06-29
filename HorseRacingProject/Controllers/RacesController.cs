@@ -127,6 +127,14 @@ namespace HorseRacingAPI.Controllers
         }
 
         [Authorize(Roles = "Admin")]
+        [HttpPost("{raceId}/pool/collect")]
+        public async Task<IActionResult> CollectFromSpectators(Guid raceId, [FromBody] CollectToRacePoolRequest request)
+        {
+            CollectToRacePoolResponse result = await _raceService.CollectFromSpectatorsAsync(raceId, request);
+            return Ok(ApiResponse<CollectToRacePoolResponse>.SuccessResponse(result, $"Collected from {result.ChargedCount} spectators. Total: {result.TotalCollected} coins."));
+        }
+
+        [Authorize(Roles = "Admin")]
         [HttpDelete("{raceId}")]
         public async Task<IActionResult> DeleteRace(Guid raceId)
         {

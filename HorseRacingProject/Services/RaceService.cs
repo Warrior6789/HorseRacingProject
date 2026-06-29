@@ -867,6 +867,79 @@ namespace HorseRacingAPI.Services
             return newImageUrl;
         }
 
+        public async Task<CollectToRacePoolResponse> CollectFromSpectatorsAsync(Guid raceId, CollectToRacePoolRequest request)
+        {
+            Race? race = await _uow.GetRepository<Race>().Entities
+                .FirstOrDefaultAsync(r => r.RaceId == raceId && !r.IsDeleted);
+
+            if (race == null)
+                throw new KeyNotFoundException($"Race with id {raceId} not found.");
+
+            if (race.Status != RaceStatus.BettingOpen)
+                throw new InvalidOperationException("Can only collect to race pool when race is in BettingOpen status.");
+
+            if (request.AmountPerSpectator <= 0)
+                throw new InvalidOperationException("AmountPerSpectator must be greater than 0.");
+
+            List<UserProfile> spectatorProfiles = await (
+                from profile in _uow.GetRepository<UserProfile>().Entities
+                join account in _uow.GetRepository<Account>().Entities on profile.AccountId equals account.Id
+                where account.Role == AccountRole.Spectator
+                   && !account.IsDeleted
+                   && !profile.IsDeleted
+                select profile
+            ).ToListAsync();
+
+            int chargedCount = 0;
+            int skippedCount = 0;
+
+            foreach (UserProfile profile in spectatorProfiles)
+            {
+                if ((profile.Balance ?? 0) < request.AmountPerSpectator)
+                {
+                    skippedCount++;
+                    continue;
+                }
+
+                profile.Balance = (profile.Balance ?? 0) - request.AmountPerSpectator;
+                profile.UpdatedAt = DateTimeOffset.UtcNow;
+                await _uow.GetRepository<UserProfile>().UpdateAsync(profile);
+                chargedCount++;
+            }
+
+            decimal totalCollected = chargedCount * (decimal)request.AmountPerSpectator;
+
+            RacePool? pool = await _uow.GetRepository<RacePool>().Entities
+                .FirstOrDefaultAsync(p => p.RaceId == raceId && p.BetType == request.BetType);
+
+            if (pool == null)
+            {
+                pool = new RacePool
+                {
+                    RacePoolId = Guid.NewGuid(),
+                    RaceId = raceId,
+                    BetType = request.BetType,
+                    TotalAmount = totalCollected
+                };
+                await _uow.GetRepository<RacePool>().AddAsync(pool);
+            }
+            else
+            {
+                pool.TotalAmount += totalCollected;
+                await _uow.GetRepository<RacePool>().UpdateAsync(pool);
+            }
+
+            await _uow.SaveAsync();
+
+            return new CollectToRacePoolResponse
+            {
+                ChargedCount = chargedCount,
+                SkippedCount = skippedCount,
+                TotalCollected = totalCollected,
+                PoolTotalAmount = pool.TotalAmount
+            };
+        }
+
         private static RaceResponse MapToResponse(Race race) => new RaceResponse
         {
             RaceId = race.RaceId,
