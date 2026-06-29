@@ -63,7 +63,8 @@ namespace HorseRacingAPI.Services
                     RacecourseName = r.Racecourse.RacecourseName,
                     Location = r.Racecourse.Location,
                     ImageUrl = r.ImageUrl,
-                    RegistrationCount = r.Registrations.Count(reg => reg.Status == RegistrationStatus.Confirmed)
+                    RegistrationCount = r.Registrations.Count(reg => reg.Status == RegistrationStatus.Confirmed),
+                    TotalPoolAmount = r.RacePools.Sum(p => p.TotalAmount)
                 },
                 pageIndex: page - 1,
                 pageSize: pageSize
@@ -511,7 +512,8 @@ namespace HorseRacingAPI.Services
                     Status = r.Status.ToString(),
                     RacecourseName = r.Racecourse.RacecourseName,
                     TrackType = r.Racecourse.TrackType,
-                    Location = r.Racecourse.Location
+                    Location = r.Racecourse.Location,
+                    TotalPoolAmount = r.RacePools.Sum(p => p.TotalAmount)
                 },
                 pageIndex: page - 1,
                 pageSize: pageSize
