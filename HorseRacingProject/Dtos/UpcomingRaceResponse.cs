@@ -12,4 +12,5 @@ namespace HorseRacingAPI.Dtos
         public string? TrackType { get; set; }
         public string? Location { get; set; }
         public decimal TotalPoolAmount { get; set; }
+    }
 }
