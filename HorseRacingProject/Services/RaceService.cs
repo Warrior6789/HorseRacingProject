@@ -41,13 +41,13 @@ namespace HorseRacingAPI.Services
                 .CountAsync(r => !r.IsDeleted
                     && (racecourseId == null || r.RacecourseId == racecourseId)
                     && (parsedStatus == null || r.Status == parsedStatus)
-                    && (searchTrim == null || r.RaceName!.ToLower().Contains(searchTrim)));
+                    && (searchTrim == null || r.RaceName!.ToLower().Contains(searchTrim) || r.Racecourse.RacecourseName!.ToLower().Contains(searchTrim)));
 
             IEnumerable<RaceResponse> items = await repo.FindAsync<RaceResponse>(
                 predicate: r => !r.IsDeleted
                     && (racecourseId == null || r.RacecourseId == racecourseId)
                     && (parsedStatus == null || r.Status == parsedStatus)
-                    && (searchTrim == null || r.RaceName!.ToLower().Contains(searchTrim)),
+                    && (searchTrim == null || r.RaceName!.ToLower().Contains(searchTrim) || r.Racecourse.RacecourseName!.ToLower().Contains(searchTrim)),
                 orderBy: q => q.OrderBy(r => r.StartTime),
                 selector: r => new RaceResponse
                 {
