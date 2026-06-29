@@ -41,13 +41,13 @@ namespace HorseRacingAPI.Services
                 .CountAsync(r => !r.IsDeleted
                     && (racecourseId == null || r.RacecourseId == racecourseId)
                     && (parsedStatus == null || r.Status == parsedStatus)
-                    && (searchTrim == null || r.RaceName!.ToLower().Contains(searchTrim)));
+                    && (searchTrim == null || r.RaceName!.ToLower().Contains(searchTrim) || r.Racecourse.RacecourseName!.ToLower().Contains(searchTrim)));
 
             IEnumerable<RaceResponse> items = await repo.FindAsync<RaceResponse>(
                 predicate: r => !r.IsDeleted
                     && (racecourseId == null || r.RacecourseId == racecourseId)
                     && (parsedStatus == null || r.Status == parsedStatus)
-                    && (searchTrim == null || r.RaceName!.ToLower().Contains(searchTrim)),
+                    && (searchTrim == null || r.RaceName!.ToLower().Contains(searchTrim) || r.Racecourse.RacecourseName!.ToLower().Contains(searchTrim)),
                 orderBy: q => q.OrderBy(r => r.StartTime),
                 selector: r => new RaceResponse
                 {
@@ -250,6 +250,31 @@ namespace HorseRacingAPI.Services
             if (race.Status == RaceStatus.Live)
                 throw new InvalidOperationException("Cannot delete a race that is currently Live.");
 
+            List<Registration> registrations = await _uow.GetRepository<Registration>().Entities
+                .Include(r => r.Horse)
+                .Where(r => r.RaceId == raceId
+                    && (r.Status == RegistrationStatus.Pending || r.Status == RegistrationStatus.Confirmed))
+                .ToListAsync();
+
+            foreach (Registration reg in registrations)
+            {
+                reg.Status = RegistrationStatus.Rejected;
+                reg.UpdatedAt = DateTimeOffset.UtcNow;
+                await _uow.GetRepository<Registration>().UpdateAsync(reg);
+
+                if (race.RegistrationFee > 0)
+                {
+                    UserProfile? ownerProfile = await _uow.GetRepository<UserProfile>().Entities
+                        .FirstOrDefaultAsync(p => p.AccountId == reg.Horse.OwnerId && !p.IsDeleted);
+                    if (ownerProfile != null)
+                    {
+                        ownerProfile.Balance = (ownerProfile.Balance ?? 0) + (long)race.RegistrationFee;
+                        ownerProfile.UpdatedAt = DateTimeOffset.UtcNow;
+                        await _uow.GetRepository<UserProfile>().UpdateAsync(ownerProfile);
+                    }
+                }
+            }
+
             race.IsDeleted = true;
             race.DeletedAt = DateTimeOffset.UtcNow;
             await _uow.GetRepository<Race>().UpdateAsync(race);
@@ -277,7 +302,7 @@ namespace HorseRacingAPI.Services
                 throw new ForbiddenAccessException("You do not own this horse.");
 
             if (!HorseStatusPolicy.CanRegisterForRace(horse.Status))
-                throw new InvalidOperationException("Only Healthy or Resting horses can be registered for a race.");
+                throw new InvalidOperationException("Only Healthy horses can be registered for a race.");
 
             Account? jockey = await _uow.GetRepository<Account>().Entities
                 .FirstOrDefaultAsync(a => a.Id == request.JockeyId && !a.IsDeleted);
@@ -312,25 +337,82 @@ namespace HorseRacingAPI.Services
                     throw new InvalidOperationException($"Gate number {request.GateNumber} is already taken.");
             }
 
-            bool alreadyRegistered = await _uow.GetRepository<Registration>().Entities
-                .AnyAsync(r => r.HorseId == request.HorseId
-                    && (r.Status == RegistrationStatus.Pending || r.Status == RegistrationStatus.Confirmed));
-            if (alreadyRegistered)
-                throw new InvalidOperationException("This horse is already registered in a race. Wait until the registration is rejected before registering again.");
+            IQueryable<Guid> activeRaceIds = _uow.GetRepository<Race>().Entities
+                .Where(r => !r.IsDeleted)
+                .Select(r => r.RaceId);
 
-            bool ownerAlreadyRegistered = await _uow.GetRepository<Registration>().Entities
-                .AnyAsync(r => r.RaceId == raceId
-                    && r.Horse.OwnerId == ownerId
-                    && (r.Status == RegistrationStatus.Pending || r.Status == RegistrationStatus.Confirmed));
+            bool horseConfirmed = await _uow.GetRepository<Registration>().Entities
+                .AnyAsync(r => r.HorseId == request.HorseId
+                    && r.Status == RegistrationStatus.Confirmed
+                    && activeRaceIds.Contains(r.RaceId));
+            if (horseConfirmed)
+                throw new InvalidOperationException("This horse is already confirmed in a race.");
+
+            bool horsePendingElsewhere = await (
+                from r in _uow.GetRepository<Registration>().Entities
+                join activeRace in _uow.GetRepository<Race>().Entities on r.RaceId equals activeRace.RaceId
+                where r.HorseId == request.HorseId
+                   && r.Status == RegistrationStatus.Pending
+                   && !activeRace.IsDeleted
+                   && activeRace.RacecourseId != race.RacecourseId
+                select r
+            ).AnyAsync();
+            if (horsePendingElsewhere)
+                throw new InvalidOperationException("This horse already has a pending registration at another racecourse.");
+
+            DateTimeOffset? lastRaceEnd = await (
+                from r in _uow.GetRepository<Registration>().Entities
+                join finishedRace in _uow.GetRepository<Race>().Entities on r.RaceId equals finishedRace.RaceId
+                where r.HorseId == request.HorseId
+                   && r.Status == RegistrationStatus.Confirmed
+                   && finishedRace.Status == RaceStatus.Finished
+                select (DateTimeOffset?)(finishedRace.EndTime ?? finishedRace.StartTime!.Value.AddMinutes(5))
+            ).MaxAsync();
+
+            if (lastRaceEnd != null && race.StartTime < lastRaceEnd.Value.AddDays(7))
+                throw new InvalidOperationException($"Horse needs 7 days rest after last race. Earliest registration date: {lastRaceEnd.Value.AddDays(7):yyyy-MM-dd}.");
+
+            bool ownerAlreadyRegistered = await (
+                from r in _uow.GetRepository<Registration>().Entities
+                join h in _uow.GetRepository<Horse>().Entities on r.HorseId equals h.Id
+                where r.RaceId == raceId
+                   && h.OwnerId == ownerId
+                   && (r.Status == RegistrationStatus.Pending || r.Status == RegistrationStatus.Confirmed)
+                select r
+            ).AnyAsync();
             if (ownerAlreadyRegistered)
                 throw new InvalidOperationException("You have already registered a horse in this race.");
 
-            bool jockeyAlreadyRegistered = await _uow.GetRepository<Registration>().Entities
-                .AnyAsync(r => r.RaceId == raceId
-                    && r.JockeyId == request.JockeyId
-                    && (r.Status == RegistrationStatus.Pending || r.Status == RegistrationStatus.Confirmed));
-            if (jockeyAlreadyRegistered)
-                throw new InvalidOperationException("This jockey is already assigned to another horse in this race.");
+            bool jockeyConfirmedInSameRace = await _uow.GetRepository<Registration>().Entities
+                .AnyAsync(r => r.JockeyId == request.JockeyId
+                    && r.RaceId == raceId
+                    && r.Status == RegistrationStatus.Confirmed);
+            if (jockeyConfirmedInSameRace)
+                throw new InvalidOperationException("This jockey is already confirmed in this race.");
+
+            var confirmedElsewhere = await (
+                from r in _uow.GetRepository<Registration>().Entities
+                join activeRace in _uow.GetRepository<Race>().Entities on r.RaceId equals activeRace.RaceId
+                where r.JockeyId == request.JockeyId
+                   && r.RaceId != raceId
+                   && r.Status == RegistrationStatus.Confirmed
+                   && !activeRace.IsDeleted
+                select new { activeRace.StartTime, activeRace.EndTime, activeRace.RacecourseId }
+            ).ToListAsync();
+
+            foreach (var other in confirmedElsewhere)
+            {
+                bool sameVenue = other.RacecourseId == race.RacecourseId;
+                DateTimeOffset raceStart = race.StartTime!.Value;
+                DateTimeOffset raceEnd   = race.EndTime ?? race.StartTime!.Value.AddMinutes(5);
+                DateTimeOffset otherEnd  = other.EndTime ?? other.StartTime!.Value.AddMinutes(5);
+
+                DateTimeOffset effectiveStart = sameVenue ? raceStart : raceStart.AddHours(-2);
+                DateTimeOffset effectiveEnd   = sameVenue ? raceEnd   : raceEnd.AddHours(2);
+
+                if (other.StartTime < effectiveEnd && otherEnd > effectiveStart)
+                    throw new InvalidOperationException("This jockey is already confirmed in another race that conflicts in time.");
+            }
 
             if (race.RegistrationFee > 0)
             {
@@ -625,21 +707,33 @@ namespace HorseRacingAPI.Services
             {
                 if (prize.Amount == null || prize.Amount == 0) continue;
 
-                Guid recipientId = prize.PrizeType == PrizeType.Jockey
-                    ? prize.Registration.JockeyId
-                    : prize.Registration.Horse.OwnerId;
+                long delta = (long)Math.Round(Math.Abs(prize.Amount.Value));
 
-                UserProfile? profile = await _uow.GetRepository<UserProfile>().Entities
-                    .FirstOrDefaultAsync(p => p.AccountId == recipientId && !p.IsDeleted);
-
-                if (profile != null)
+                if (prize.PrizeType == PrizeType.Jockey)
                 {
-                    long delta = (long)Math.Round(Math.Abs(prize.Amount.Value));
-                    profile.Balance = prize.Amount > 0
-                        ? Math.Max(0, (profile.Balance ?? 0) - delta)
-                        : (profile.Balance ?? 0) + delta;
-                    profile.UpdatedAt = DateTimeOffset.UtcNow;
-                    await _uow.GetRepository<UserProfile>().UpdateAsync(profile);
+                    JockeyProfile? jp = await _uow.GetRepository<JockeyProfile>().Entities
+                        .FirstOrDefaultAsync(p => p.AccountId == prize.Registration.JockeyId && !p.IsDeleted);
+                    if (jp != null)
+                    {
+                        jp.Balance = prize.Amount > 0
+                            ? Math.Max(0, (jp.Balance ?? 0) - delta)
+                            : (jp.Balance ?? 0) + delta;
+                        jp.UpdatedAt = DateTimeOffset.UtcNow;
+                        await _uow.GetRepository<JockeyProfile>().UpdateAsync(jp);
+                    }
+                }
+                else
+                {
+                    UserProfile? ownerProfile = await _uow.GetRepository<UserProfile>().Entities
+                        .FirstOrDefaultAsync(p => p.AccountId == prize.Registration.Horse.OwnerId && !p.IsDeleted);
+                    if (ownerProfile != null)
+                    {
+                        ownerProfile.Balance = prize.Amount > 0
+                            ? Math.Max(0, (ownerProfile.Balance ?? 0) - delta)
+                            : (ownerProfile.Balance ?? 0) + delta;
+                        ownerProfile.UpdatedAt = DateTimeOffset.UtcNow;
+                        await _uow.GetRepository<UserProfile>().UpdateAsync(ownerProfile);
+                    }
                 }
             }
 
