@@ -875,9 +875,6 @@ namespace HorseRacingAPI.Services
             if (race == null)
                 throw new KeyNotFoundException($"Race with id {raceId} not found.");
 
-            if (race.Status != RaceStatus.BettingOpen)
-                throw new InvalidOperationException("Can only collect to race pool when race is in BettingOpen status.");
-
             if (request.AmountPerSpectator <= 0)
                 throw new InvalidOperationException("AmountPerSpectator must be greater than 0.");
 
