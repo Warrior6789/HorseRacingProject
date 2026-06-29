@@ -747,6 +747,8 @@ namespace HorseRacingAPI.Services
 
             await _uow.GetRepository<RacePool>().DeleteRangeAsync(racePools);
 
+            await _uow.GetRepository<Registration>().DeleteRangeAsync(registrations);
+
             race.Status = RaceStatus.Scheduled;
             race.EndTime = null;
             race.StartTime = DateTimeOffset.UtcNow.AddHours(24);
