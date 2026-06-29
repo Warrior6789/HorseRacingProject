@@ -57,4 +57,6 @@ public partial class Race
     public virtual ICollection<RefereeReport> RefereeReports { get; set; } = new List<RefereeReport>();
 
     public virtual ICollection<Registration> Registrations { get; set; } = new List<Registration>();
+
+    public virtual ICollection<RacePool> RacePools { get; set; } = new List<RacePool>();
 }

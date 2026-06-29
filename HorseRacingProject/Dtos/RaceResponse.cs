@@ -16,5 +16,6 @@ namespace HorseRacingAPI.Dtos
         public string? ImageUrl { get; set; }
         public int RegistrationCount { get; set; }
         public bool HasUnresolvedReports { get; set; }
+        public decimal TotalPoolAmount { get; set; }
     }
 }

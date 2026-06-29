@@ -387,7 +387,7 @@ public partial class HorseRacingDataContext : DbContext
             entity.Property(e => e.BetType).HasMaxLength(20).HasConversion<string>();
             entity.Property(e => e.RaceId).HasColumnName("RaceID");
 
-            entity.HasOne(d => d.Race).WithMany()
+            entity.HasOne(d => d.Race).WithMany(r => r.RacePools)
                 .HasForeignKey(d => d.RaceId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_RacePool_Races");
