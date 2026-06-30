@@ -1,0 +1,23 @@
+@startuml ContextDiagram
+skinparam Style strictuml
+skinparam componentStyle rectangle
+
+actor "Client\n(Browser / Mobile)" as Client
+
+component "Horse Racing API\n(ASP.NET Core 8)" as API
+database "PostgreSQL\n(Neon)" as DB
+component "Cloudinary\n(Image Storage)" as Cloudinary
+component "VNPay\n(Payment Gateway)" as VNPay
+component "Railway\n(Hosting)" as Railway
+component "GitHub Actions\n(CI / CD)" as CI
+
+Client --> API : HTTPS / REST JSON
+
+API --> DB : EF Core (DB First)
+API --> Cloudinary : Upload ảnh
+API --> VNPay : Webhook xác nhận thanh toán
+
+CI --> Railway : Auto deploy\n(push to dev)
+Railway --> API : Host container\n(Docker)
+
+@enduml

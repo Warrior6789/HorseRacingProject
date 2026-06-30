@@ -3,7 +3,7 @@ name: Generate PlantUML Diagrams
 on:
   push:
     branches:
-      - dev
+      - Long
 
 jobs:
   render_diagrams:
@@ -15,7 +15,7 @@ jobs:
       - name: Checkout Source Code
         uses: actions/checkout@v4
         with:
-          ref: dev
+          ref: Long
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install PlantUML dependencies
@@ -39,7 +39,7 @@ jobs:
 
           if [ -n "$(git status --porcelain)" ]; then
             git commit -m "Bot: Automatically updated architecture diagrams [skip ci]"
-            git push origin dev
+            git push origin Long
           else
             echo "No changes to commit"
           fi
