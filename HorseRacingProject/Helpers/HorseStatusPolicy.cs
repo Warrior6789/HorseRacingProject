@@ -2,7 +2,7 @@ using HorseRacingAPI.Enums;
 
 namespace HorseRacingAPI.Helpers
 {
-    internal static class HorseStatusPolicy
+    public static class HorseStatusPolicy
     {
         public static readonly HorseStatus[] ActiveStatuses = [HorseStatus.Healthy, HorseStatus.Resting];
 

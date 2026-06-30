@@ -39,7 +39,7 @@ namespace HorseRacingAPI.Services
         public async Task<List<AccountResponse>> GetAccountByStatusAsync(string status)
         {
             IGenericRepository<Account> accRepo = _uow.GetRepository<Account>();
-            if (!Enum.TryParse<AccountStatus>(status, ignoreCase: true, out var accountStatus))
+            if (!Enum.TryParse<AccountStatus>(status, ignoreCase: true, out var accountStatus) || !Enum.IsDefined(accountStatus))
             {
                 throw new ArgumentException("Invalid account status");
             }
@@ -63,7 +63,7 @@ namespace HorseRacingAPI.Services
             if (pageSize > 100) pageSize = 100;
             IGenericRepository<Account> accRepo = _uow.GetRepository<Account>();
 
-            if (!Enum.TryParse<AccountStatus>(status, ignoreCase: true, out var accountStatus))
+            if (!Enum.TryParse<AccountStatus>(status, ignoreCase: true, out var accountStatus) || !Enum.IsDefined(accountStatus))
                 throw new ArgumentException("Invalid account status");
 
             AccountRole? parsedRole = role != null && Enum.TryParse<AccountRole>(role, ignoreCase: true, out var r) ? r : (AccountRole?)null;
