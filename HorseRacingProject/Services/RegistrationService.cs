@@ -158,6 +158,8 @@ namespace HorseRacingAPI.Services
                     Horse = new HorseResponse
                     {
                         Id = r.HorseId,
+                        OwnerId = r.Horse.OwnerId,
+                        OwnerName = r.Horse.Owner.UserProfiles.Select(up => up.FullName).FirstOrDefault(),
                         HorseName = r.Horse.HorseName,
                         Breed = r.Horse.Breed,
                         Color = r.Horse.Color,
@@ -215,6 +217,8 @@ namespace HorseRacingAPI.Services
                     Horse = new HorseResponse
                     {
                         Id = r.HorseId,
+                        OwnerId = r.Horse.OwnerId,
+                        OwnerName = r.Horse.Owner.UserProfiles.Select(up => up.FullName).FirstOrDefault(),
                         HorseName = r.Horse.HorseName,
                         Breed = r.Horse.Breed,
                         Color = r.Horse.Color,
@@ -324,6 +328,8 @@ namespace HorseRacingAPI.Services
                     Horse = new HorseResponse
                     {
                         Id = r.HorseId,
+                        OwnerId = r.Horse.OwnerId,
+                        OwnerName = r.Horse.Owner.UserProfiles.Select(up => up.FullName).FirstOrDefault(),
                         HorseName = r.Horse.HorseName,
                         Breed = r.Horse.Breed,
                         Color = r.Horse.Color,

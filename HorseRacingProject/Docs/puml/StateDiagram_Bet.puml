@@ -1,0 +1,16 @@
+@startuml StateDiagram_Bet
+skinparam Style strictuml
+
+[*] --> Active : Spectator đặt cược\n(trừ Balance)
+
+Active --> Won : Race Finished\n& ngựa về đúng vị trí
+Active --> Lost : Race Finished\n& ngựa không thắng
+Active --> Refunded : Race bị reset / hủy\n(hoàn tiền)
+
+Won --> Paid : Admin settle race\n(cộng payout vào Balance)
+
+Lost --> [*]
+Refunded --> [*]
+Paid --> [*]
+
+@enduml

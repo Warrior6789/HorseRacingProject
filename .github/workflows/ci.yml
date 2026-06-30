@@ -1,0 +1,29 @@
+name: Build & Test
+
+on:
+  push:
+    branches: ["**"]       # chạy trên mọi branch khi push
+  pull_request:
+    branches: [main]       # chạy khi tạo PR vào main
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Restore dependencies
+        run: dotnet restore HorseRacingProject.Tests/HorseRacingProject.Tests.csproj
+
+      - name: Build
+        run: dotnet build HorseRacingProject.Tests/HorseRacingProject.Tests.csproj --no-restore --configuration Release
+
+      - name: Run unit tests
+        run: dotnet test HorseRacingProject.Tests/HorseRacingProject.Tests.csproj --no-build --configuration Release --verbosity normal

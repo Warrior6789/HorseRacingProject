@@ -1,0 +1,41 @@
+@startuml ActivityDiagram_Deposit
+skinparam Style strictuml
+
+actor Client
+participant "PaymentsController" as Controller
+participant "PaymentService" as Service
+participant "VNPay" as VNPay
+database "DB" as DB
+
+Client -> Controller : POST /api/payments/create
+activate Controller
+
+Controller -> Service : CreatePaymentAsync(accountId, amount)
+activate Service
+
+Service -> DB : Tạo Payment (Status = Pending)
+Service --> Controller : Trả về paymentUrl
+deactivate Service
+
+Controller --> Client : paymentUrl
+deactivate Controller
+
+Client -> VNPay : Người dùng thanh toán
+VNPay -> Controller : Webhook callback
+activate Controller
+
+Controller -> Service : HandleCallbackAsync(orderCode, status)
+activate Service
+
+if (Thanh toán thành công?) then (yes)
+  Service -> DB : Cộng Balance vào UserProfile
+  Service -> DB : Cập nhật Payment Status → Completed
+else (no)
+  Service -> DB : Cập nhật Payment Status → Failed
+endif
+
+deactivate Service
+Controller --> VNPay : 200 OK
+deactivate Controller
+
+@enduml
