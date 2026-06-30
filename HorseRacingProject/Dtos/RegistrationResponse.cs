@@ -7,6 +7,7 @@
         public Guid JockeyId { get; set; }
         public string? JockeyName { get; set; }
         public JockeyProfileResponse? Jockey { get; set; }
+        public UserProfileResponse? Owner { get; set; }
 
         public int? GateNumber { get; set; }
         public bool? OwnerConfirmation { get; set; }
