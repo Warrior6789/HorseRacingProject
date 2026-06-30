@@ -650,9 +650,6 @@ namespace HorseRacingAPI.Services
             if (race == null)
                 throw new KeyNotFoundException($"Race with id {raceId} not found.");
 
-            if (race.Status == RaceStatus.Scheduled)
-                throw new InvalidOperationException("Race is already in Scheduled status.");
-
             List<Registration> registrations = await _uow.GetRepository<Registration>().Entities
                 .Include(r => r.Horse)
                 .Where(r => r.RaceId == raceId)
