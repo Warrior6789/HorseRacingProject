@@ -773,6 +773,9 @@ namespace HorseRacingAPI.Services
             await _uow.SaveAsync();
 
             _engine.ClearRaceState(raceId, horseIds);
+
+            await _hubContext.Clients.All.SendAsync("RacesUpdated");
+            await _hubContext.Clients.All.SendAsync("RegistrationsUpdated");
         }
 
         public async Task<RaceResponse> AdvanceRaceStatusAsync(Guid raceId)
