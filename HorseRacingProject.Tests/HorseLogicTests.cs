@@ -7,9 +7,6 @@ namespace HorseRacingProject.Tests;
 
 public class HorseLogicTests
 {
-    // -------------------------------------------------------
-    // HorseStatusPolicy.NormalizeRequired
-    // -------------------------------------------------------
     [Theory]
     [InlineData("Healthy",     HorseStatus.Healthy)]
     [InlineData("healthy",     HorseStatus.Healthy)]
@@ -34,9 +31,6 @@ public class HorseLogicTests
         Assert.Throws<InvalidOperationException>(() => HorseStatusPolicy.NormalizeRequired(input));
     }
 
-    // -------------------------------------------------------
-    // HorseStatusPolicy.NormalizeOrDefault
-    // -------------------------------------------------------
     [Theory]
     [InlineData(null)]
     [InlineData("")]
@@ -52,9 +46,6 @@ public class HorseLogicTests
         Assert.Equal(HorseStatus.Injury, HorseStatusPolicy.NormalizeOrDefault("Injury"));
     }
 
-    // -------------------------------------------------------
-    // HorseStatusPolicy.CanRegisterForRace
-    // -------------------------------------------------------
     [Fact]
     public void CanRegisterForRace_Healthy_ReturnsTrue()
     {
@@ -70,9 +61,6 @@ public class HorseLogicTests
         Assert.False(HorseStatusPolicy.CanRegisterForRace(status));
     }
 
-    // -------------------------------------------------------
-    // HorseStatusPolicy.ActiveStatuses
-    // -------------------------------------------------------
     [Fact]
     public void ActiveStatuses_ContainsHealthyAndResting()
     {
@@ -88,9 +76,6 @@ public class HorseLogicTests
         Assert.DoesNotContain(status, HorseStatusPolicy.ActiveStatuses);
     }
 
-    // -------------------------------------------------------
-    // GetDerivedStatus logic (private static copied from HorseService)
-    // -------------------------------------------------------
     [Fact]
     public void GetDerivedStatus_ConfirmedInLiveRace_ReturnsRacing()
     {
@@ -150,9 +135,6 @@ public class HorseLogicTests
         Assert.Equal("Racing", GetDerivedStatus(horse));
     }
 
-    // -------------------------------------------------------
-    // NormalizePaging logic (private static copied from HorseService)
-    // -------------------------------------------------------
     [Theory]
     [InlineData(0,   10,  1,   10)]
     [InlineData(-5,  10,  1,   10)]
@@ -171,9 +153,6 @@ public class HorseLogicTests
         Assert.Equal(expectedSize, query.PageSize);
     }
 
-    // -------------------------------------------------------
-    // Helpers — copy of private logic from HorseService
-    // -------------------------------------------------------
     private static string? GetDerivedStatus(Horse horse)
     {
         bool hasLive = horse.Registrations.Any(r =>

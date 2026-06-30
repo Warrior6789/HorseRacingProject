@@ -5,16 +5,10 @@ using Moq;
 
 namespace HorseRacingProject.Tests;
 
-// Test validation của các Config service (xảy ra trước khi đụng DB)
-
 public class ConfigValidationTests
 {
     private static IUnitofWork EmptyUow() => new Mock<IUnitofWork>().Object;
 
-    // -------------------------------------------------------
-    // TakeoutConfigService.CreateAsync
-    // TakeoutPercentage phải trong khoảng [0, 1)
-    // -------------------------------------------------------
     [Theory]
     [InlineData(-0.01f)]
     [InlineData(-1.0f)]
@@ -43,15 +37,10 @@ public class ConfigValidationTests
         var service = new TakeoutConfigService(uow.Object);
         var req = new CreateTakeoutConfigRequest { TakeoutPercentage = percentage };
 
-        // Không throw ArgumentException (có thể throw lỗi khác do mock không đầy đủ)
         var ex = await Record.ExceptionAsync(() => service.CreateAsync(req));
         Assert.False(ex is ArgumentException, $"Không được throw ArgumentException với percentage={percentage}");
     }
 
-    // -------------------------------------------------------
-    // JockeyRewardConfigService.CreateAsync
-    // WinCut phải >= PlaceCut
-    // -------------------------------------------------------
     [Theory]
     [InlineData(0.05f, 0.10f)]
     [InlineData(0.0f, 0.01f)]
@@ -83,14 +72,10 @@ public class ConfigValidationTests
         Assert.False(ex is InvalidOperationException, $"Không được throw InvalidOperationException với WinCut={winCut}, PlaceCut={placeCut}");
     }
 
-    // -------------------------------------------------------
-    // PositionPrizeConfigService.CreateAsync
-    // Tổng các ratio không được vượt quá 100% (1.0 + 1e-5)
-    // -------------------------------------------------------
     [Theory]
-    [InlineData(0.50f, 0.30f, 0.10f, 0.05f, 0.04f, 0.03f)] // sum = 1.02
-    [InlineData(1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0002f)]    // sum > 1.0001
-    [InlineData(0.4f, 0.3f, 0.2f, 0.1f, 0.05f, 0.05f)]     // sum = 1.10
+    [InlineData(0.50f, 0.30f, 0.10f, 0.05f, 0.04f, 0.03f)]
+    [InlineData(1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0002f)]
+    [InlineData(0.4f, 0.3f, 0.2f, 0.1f, 0.05f, 0.05f)]
     public async Task PositionPrizeConfig_SumExceeds100_ThrowsInvalidOperationException(
         float p1, float p2, float p3, float p4, float p5, float p6)
     {
@@ -105,9 +90,9 @@ public class ConfigValidationTests
     }
 
     [Theory]
-    [InlineData(0.50f, 0.30f, 0.10f, 0.05f, 0.03f, 0.02f)] // sum = 1.00
-    [InlineData(0.30f, 0.20f, 0.10f, 0.0f, 0.0f, 0.0f)]    // sum = 0.60
-    [InlineData(0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f)]        // sum = 0.0
+    [InlineData(0.50f, 0.30f, 0.10f, 0.05f, 0.03f, 0.02f)]
+    [InlineData(0.30f, 0.20f, 0.10f, 0.0f, 0.0f, 0.0f)]
+    [InlineData(0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f)]
     public async Task PositionPrizeConfig_ValidSum_DoesNotThrowValidationError(
         float p1, float p2, float p3, float p4, float p5, float p6)
     {
