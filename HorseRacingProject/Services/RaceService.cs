@@ -763,7 +763,11 @@ namespace HorseRacingAPI.Services
                 }
             }
 
-            await _uow.GetRepository<Registration>().DeleteRangeAsync(registrations);
+            await _uow.SaveAsync();
+
+            await _uow.GetRepository<Registration>().Entities
+                .Where(r => r.RaceId == raceId)
+                .ExecuteDeleteAsync();
 
             race.Status = RaceStatus.Scheduled;
             race.EndTime = null;
