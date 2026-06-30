@@ -155,6 +155,19 @@ namespace HorseRacingAPI.Services
                     RegistrationId = r.RegistrationId,
                     JockeyId = r.JockeyId,
                     GateNumber = r.GateNumber,
+                    Owner = r.Horse.Owner.UserProfiles
+                        .Where(up => !up.IsDeleted)
+                        .Select(up => new UserProfileResponse
+                        {
+                            ProfileId  = up.ProfileId,
+                            AccountId  = up.AccountId,
+                            FullName   = up.FullName,
+                            Phone      = up.Phone,
+                            ImageUrl   = up.ImageUrl,
+                            CreateAt   = up.CreateAt,
+                            UpdatedAt  = up.UpdatedAt
+                        })
+                        .FirstOrDefault(),
                     Horse = new HorseResponse
                     {
                         Id = r.HorseId,
@@ -214,6 +227,19 @@ namespace HorseRacingAPI.Services
                     RegistrationId = r.RegistrationId,
                     JockeyId = r.JockeyId,
                     GateNumber = r.GateNumber,
+                    Owner = r.Horse.Owner.UserProfiles
+                        .Where(up => !up.IsDeleted)
+                        .Select(up => new UserProfileResponse
+                        {
+                            ProfileId  = up.ProfileId,
+                            AccountId  = up.AccountId,
+                            FullName   = up.FullName,
+                            Phone      = up.Phone,
+                            ImageUrl   = up.ImageUrl,
+                            CreateAt   = up.CreateAt,
+                            UpdatedAt  = up.UpdatedAt
+                        })
+                        .FirstOrDefault(),
                     Horse = new HorseResponse
                     {
                         Id = r.HorseId,
@@ -325,6 +351,19 @@ namespace HorseRacingAPI.Services
                     RegistrationId = r.RegistrationId,
                     JockeyId = r.JockeyId,
                     GateNumber = r.GateNumber,
+                    Owner = r.Horse.Owner.UserProfiles
+                        .Where(up => !up.IsDeleted)
+                        .Select(up => new UserProfileResponse
+                        {
+                            ProfileId  = up.ProfileId,
+                            AccountId  = up.AccountId,
+                            FullName   = up.FullName,
+                            Phone      = up.Phone,
+                            ImageUrl   = up.ImageUrl,
+                            CreateAt   = up.CreateAt,
+                            UpdatedAt  = up.UpdatedAt
+                        })
+                        .FirstOrDefault(),
                     Horse = new HorseResponse
                     {
                         Id = r.HorseId,
