@@ -763,12 +763,8 @@ namespace HorseRacingAPI.Services
                 }
             }
 
-            // Commit balance updates and child deletions (bets, prizes, results, reports, pools)
             await _uow.SaveAsync();
 
-            // Use ExecuteDeleteAsync (direct SQL) to guarantee registration rows are removed —
-            // RemoveRange through EF Core change tracking was silently producing empty deletes
-            // when registrations were loaded via Include, so we bypass the tracker entirely here.
             await _uow.GetRepository<Registration>().Entities
                 .Where(r => r.RaceId == raceId)
                 .ExecuteDeleteAsync();
