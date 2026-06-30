@@ -191,7 +191,8 @@ namespace HorseRacingAPI.Services
                         MaxParticipants = r.Race.MaxParticipants,
                         Status = r.Race.Status.ToString(),
                         RacecourseName = r.Race.Racecourse.RacecourseName,
-                        Location = r.Race.Racecourse.Location
+                        Location = r.Race.Racecourse.Location,
+                        ImageUrl = r.Race.ImageUrl
                     },
                     OwnerConfirmation = r.OwnerConfirmation,
                     JockeyConfirmation = r.JockeyConfirmation,
@@ -263,7 +264,8 @@ namespace HorseRacingAPI.Services
                         MaxParticipants = r.Race.MaxParticipants,
                         Status = r.Race.Status.ToString(),
                         RacecourseName = r.Race.Racecourse.RacecourseName,
-                        Location = r.Race.Racecourse.Location
+                        Location = r.Race.Racecourse.Location,
+                        ImageUrl = r.Race.ImageUrl
                     },
                     OwnerConfirmation = r.OwnerConfirmation,
                     JockeyConfirmation = r.JockeyConfirmation,
@@ -320,7 +322,8 @@ namespace HorseRacingAPI.Services
                         MaxParticipants = r.Race.MaxParticipants,
                         Status = r.Race.Status.ToString(),
                         RacecourseName = r.Race.Racecourse.RacecourseName,
-                        Location = r.Race.Racecourse.Location
+                        Location = r.Race.Racecourse.Location,
+                        ImageUrl = r.Race.ImageUrl
                     },
                     OwnerConfirmation = r.OwnerConfirmation,
                     JockeyConfirmation = r.JockeyConfirmation,
@@ -387,7 +390,8 @@ namespace HorseRacingAPI.Services
                         MaxParticipants = r.Race.MaxParticipants,
                         Status = r.Race.Status.ToString(),
                         RacecourseName = r.Race.Racecourse.RacecourseName,
-                        Location = r.Race.Racecourse.Location
+                        Location = r.Race.Racecourse.Location,
+                        ImageUrl = r.Race.ImageUrl
                     },
                     OwnerConfirmation = r.OwnerConfirmation,
                     JockeyConfirmation = r.JockeyConfirmation,
@@ -444,7 +448,8 @@ namespace HorseRacingAPI.Services
                         MaxParticipants = r.Race.MaxParticipants,
                         Status = r.Race.Status.ToString(),
                         RacecourseName = r.Race.Racecourse.RacecourseName,
-                        Location = r.Race.Racecourse.Location
+                        Location = r.Race.Racecourse.Location,
+                        ImageUrl = r.Race.ImageUrl
                     },
                     OwnerConfirmation = r.OwnerConfirmation,
                     JockeyConfirmation = r.JockeyConfirmation,
@@ -766,7 +771,8 @@ namespace HorseRacingAPI.Services
                         MaxParticipants = r.Race.MaxParticipants,
                         Status = r.Race.Status.ToString(),
                         RacecourseName = r.Race.Racecourse.RacecourseName,
-                        Location = r.Race.Racecourse.Location
+                        Location = r.Race.Racecourse.Location,
+                        ImageUrl = r.Race.ImageUrl
                     },
                     OwnerConfirmation = r.OwnerConfirmation,
                     JockeyConfirmation = r.JockeyConfirmation,
