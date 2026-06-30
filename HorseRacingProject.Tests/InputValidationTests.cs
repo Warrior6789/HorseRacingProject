@@ -8,17 +8,11 @@ using Moq;
 
 namespace HorseRacingProject.Tests;
 
-// Validation tests that fire BEFORE any DB call, so EmptyUow/EmptyHub suffice.
-
 public class InputValidationTests
 {
     private static IUnitofWork EmptyUow() => new Mock<IUnitofWork>().Object;
     private static IHubContext<RaceHub> EmptyHub() => new Mock<IHubContext<RaceHub>>().Object;
 
-    // -------------------------------------------------------
-    // WithdrawalService.CreateWithdrawalAsync
-    // Amount <= 0 → ArgumentException (line 41, before any DB call)
-    // -------------------------------------------------------
     [Theory]
     [InlineData(0L)]
     [InlineData(-1L)]
@@ -43,11 +37,6 @@ public class InputValidationTests
         Assert.False(ex is ArgumentException);
     }
 
-    // -------------------------------------------------------
-    // AuthService.RequestRoleUpgradeAsync
-    // Invalid role → ArgumentException (line 103, before any DB call)
-    // Allowed: HorseOwner, Jockey, Referee
-    // -------------------------------------------------------
     [Theory]
     [InlineData("Admin")]
     [InlineData("Spectator")]
@@ -88,15 +77,11 @@ public class InputValidationTests
             $"Role '{role}' là hợp lệ, không được throw ArgumentException.");
     }
 
-    // -------------------------------------------------------
-    // AccountService.GetAccountByStatusAsync
-    // Invalid status string → ArgumentException (before DB call)
-    // -------------------------------------------------------
     [Theory]
     [InlineData("InvalidStatus")]
     [InlineData("Deleted")]
-    [InlineData("0")]     // numeric không phải named value → Enum.IsDefined chặn
-    [InlineData("99")]    // số ngoài range
+    [InlineData("0")]
+    [InlineData("99")]
     [InlineData("")]
     [InlineData("unknown")]
     public async Task GetAccountByStatus_InvalidStatus_ThrowsArgumentException(string status)

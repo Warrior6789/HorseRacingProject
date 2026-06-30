@@ -2,9 +2,9 @@ name: Build & Test
 
 on:
   push:
-    branches: ["**"]       # chạy trên mọi branch khi push
+    branches: ["**"]
   pull_request:
-    branches: [main]       # chạy khi tạo PR vào main
+    branches: [main]
 
 jobs:
   test:
