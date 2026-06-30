@@ -113,7 +113,6 @@ namespace HorseRacingAPI.Controllers
         public async Task<IActionResult> ResetRace(Guid raceId)
         {
             await _raceService.ResetRaceAsync(raceId);
-            await _hubContext.Clients.All.SendAsync("RacesUpdated");
             return Ok(ApiResponse<object>.SuccessResponse(null!, "Race reset to Scheduled successfully."));
         }
 
@@ -122,7 +121,6 @@ namespace HorseRacingAPI.Controllers
         public async Task<IActionResult> AdvanceRaceStatus(Guid raceId)
         {
             RaceResponse result = await _raceService.AdvanceRaceStatusAsync(raceId);
-            await _hubContext.Clients.All.SendAsync("RacesUpdated");
             return Ok(ApiResponse<RaceResponse>.SuccessResponse(result, $"Race advanced to '{result.Status}' successfully."));
         }
 
