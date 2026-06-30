@@ -444,6 +444,26 @@ namespace HorseRacingAPI.Services
                     Status            = r.Status.ToString(),
                     CreateAt          = r.CreateAt,
                     UpdatedAt         = r.UpdatedAt,
+                    Jockey = r.Jockey.JockeyProfiles
+                        .Where(jp => !jp.IsDeleted)
+                        .Select(jp => new JockeyProfileResponse
+                        {
+                            JockeyProfileId    = jp.JockeyProfileId,
+                            AccountId          = jp.AccountId,
+                            FullName           = jp.FullName,
+                            DateOfBirth        = jp.DateOfBirth,
+                            Nationality        = jp.Nationality,
+                            LicenseNumber      = jp.LicenseNumber,
+                            Weight             = jp.Weight,
+                            Height             = jp.Height,
+                            TotalRaces         = jp.TotalRaces,
+                            TotalWins          = jp.TotalWins,
+                            ImageUrl           = jp.ImageUrl,
+                            CertificateImageUrl = jp.CertificateImageUrl,
+                            CreateAt           = jp.CreateAt,
+                            UpdatedAt          = jp.UpdatedAt
+                        })
+                        .FirstOrDefault(),
                     Horse = new HorseResponse
                     {
                         Id            = r.HorseId,

@@ -3,9 +3,10 @@
     public class RegistrationResponse
     {
         public Guid RegistrationId { get; set; }
-        
+
         public Guid JockeyId { get; set; }
         public string? JockeyName { get; set; }
+        public JockeyProfileResponse? Jockey { get; set; }
 
         public int? GateNumber { get; set; }
         public bool? OwnerConfirmation { get; set; }
