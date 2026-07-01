@@ -790,7 +790,11 @@ namespace HorseRacingAPI.Services
 
             if (race.RegistrationFee > 0)
             {
-                foreach (Registration reg in registrations)
+                List<Registration> feeHeldRegistrations = registrations
+                    .Where(r => r.Status == RegistrationStatus.Confirmed || r.Status == RegistrationStatus.Pending)
+                    .ToList();
+
+                foreach (Registration reg in feeHeldRegistrations)
                 {
                     UserProfile? ownerProfile = await _uow.GetRepository<UserProfile>().Entities
                         .FirstOrDefaultAsync(p => p.AccountId == reg.Horse.OwnerId && !p.IsDeleted);
@@ -803,6 +807,8 @@ namespace HorseRacingAPI.Services
                 }
             }
 
+            race.PrizePool = 0;
+            await _uow.GetRepository<Race>().UpdateAsync(race);
             await _uow.SaveAsync();
 
             await _uow.GetRepository<Registration>().Entities
