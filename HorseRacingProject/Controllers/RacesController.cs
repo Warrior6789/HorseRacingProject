@@ -133,6 +133,22 @@ namespace HorseRacingAPI.Controllers
         }
 
         [Authorize(Roles = "Admin")]
+        [HttpGet("{raceId}/pool")]
+        public async Task<IActionResult> GetRacePoolOverview(Guid raceId)
+        {
+            RacePoolOverviewResponse result = await _raceService.GetRacePoolOverviewAsync(raceId);
+            return Ok(ApiResponse<RacePoolOverviewResponse>.SuccessResponse(result, "Get race pool overview successfully."));
+        }
+
+        [Authorize(Roles = "Admin")]
+        [HttpGet("{raceId}/prize-preview")]
+        public async Task<IActionResult> GetPrizePreview(Guid raceId)
+        {
+            RacePrizePreviewResponse result = await _raceService.GetPrizePreviewAsync(raceId);
+            return Ok(ApiResponse<RacePrizePreviewResponse>.SuccessResponse(result, "Get prize preview successfully."));
+        }
+
+        [Authorize(Roles = "Admin")]
         [HttpDelete("{raceId}")]
         public async Task<IActionResult> DeleteRace(Guid raceId)
         {

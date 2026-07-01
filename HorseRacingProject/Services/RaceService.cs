@@ -64,7 +64,8 @@ namespace HorseRacingAPI.Services
                     Location = r.Racecourse.Location,
                     ImageUrl = r.ImageUrl,
                     RegistrationCount = r.Registrations.Count(reg => reg.Status == RegistrationStatus.Confirmed),
-                    TotalPoolAmount = r.RacePools.Sum(p => p.TotalAmount)
+                    TotalPoolAmount = r.RacePools.Sum(p => p.TotalAmount),
+                    BetCount = r.Registrations.SelectMany(reg => reg.Bets).Count()
                 },
                 pageIndex: page - 1,
                 pageSize: pageSize
@@ -993,6 +994,182 @@ namespace HorseRacingAPI.Services
                 SkippedCount = skippedCount,
                 TotalCollected = totalCollected,
                 PoolTotalAmount = pool.TotalAmount
+            };
+        }
+
+        public async Task<RacePoolOverviewResponse> GetRacePoolOverviewAsync(Guid raceId)
+        {
+            bool exists = await _uow.GetRepository<Race>().Entities
+                .AnyAsync(r => r.RaceId == raceId && !r.IsDeleted);
+            if (!exists)
+                throw new KeyNotFoundException($"Race with id {raceId} not found.");
+
+            List<Bet> bets = await _uow.GetRepository<Bet>().Entities
+                .Include(b => b.Spectator).ThenInclude(a => a.UserProfiles)
+                .Include(b => b.Registration).ThenInclude(r => r.Horse)
+                .Where(b => b.Registration.RaceId == raceId)
+                .OrderByDescending(b => b.CreatedAt)
+                .ToListAsync();
+
+            List<RacePoolBetItemResponse> betItems = bets.Select(b => new RacePoolBetItemResponse
+            {
+                BetId = b.BetId,
+                SpectatorId = b.SpectatorId,
+                SpectatorName = b.Spectator.UserProfiles.Where(p => !p.IsDeleted).Select(p => p.FullName).FirstOrDefault(),
+                RegistrationId = b.RegistrationId,
+                HorseId = b.Registration.HorseId,
+                HorseName = b.Registration.Horse.HorseName,
+                BetType = b.BetType?.ToString(),
+                BetAmount = b.BetAmount,
+                Status = b.Status.ToString(),
+                PayoutRatio = b.PayoutRatio,
+                CreatedAt = b.CreatedAt
+            }).ToList();
+
+            List<RacePoolTypeSummaryResponse> poolSummaries = await _uow.GetRepository<RacePool>().Entities
+                .Where(p => p.RaceId == raceId)
+                .Select(p => new RacePoolTypeSummaryResponse
+                {
+                    BetType = p.BetType.ToString(),
+                    TotalAmount = p.TotalAmount,
+                    BetCount = bets.Count(b => b.BetType == p.BetType)
+                })
+                .ToListAsync();
+
+            return new RacePoolOverviewResponse
+            {
+                RaceId = raceId,
+                TotalPoolAmount = poolSummaries.Sum(p => p.TotalAmount),
+                Pools = poolSummaries,
+                Bets = betItems
+            };
+        }
+
+        public async Task<RacePrizePreviewResponse> GetPrizePreviewAsync(Guid raceId)
+        {
+            Race? race = await _uow.GetRepository<Race>().Entities
+                .FirstOrDefaultAsync(r => r.RaceId == raceId && !r.IsDeleted);
+            if (race == null)
+                throw new KeyNotFoundException($"Race with id {raceId} not found.");
+
+            bool alreadySettled = await _uow.GetRepository<Prize>().Entities
+                .AnyAsync(p => p.Registration.RaceId == raceId);
+
+            if (alreadySettled)
+            {
+                var flatPrizes = await _uow.GetRepository<Prize>().Entities
+                    .Where(p => p.Registration.RaceId == raceId)
+                    .Select(p => new
+                    {
+                        p.RegistrationId,
+                        p.PrizeType,
+                        Amount = p.Amount ?? 0,
+                        HorseId = p.Registration.HorseId,
+                        HorseName = p.Registration.Horse.HorseName,
+                        OwnerId = p.Registration.Horse.OwnerId,
+                        OwnerName = p.Registration.Horse.Owner.UserProfiles.Where(up => !up.IsDeleted).Select(up => up.FullName).FirstOrDefault(),
+                        JockeyId = p.Registration.JockeyId,
+                        JockeyName = p.Registration.Jockey.JockeyProfiles.Where(jp => !jp.IsDeleted).Select(jp => jp.FullName).FirstOrDefault(),
+                        Position = p.Registration.RaceResults.Select(rr => rr.FinishPosition).FirstOrDefault()
+                    })
+                    .ToListAsync();
+
+                List<RacePrizePreviewItemResponse> settledItems = flatPrizes
+                    .GroupBy(x => x.RegistrationId)
+                    .Select(g => new RacePrizePreviewItemResponse
+                    {
+                        RegistrationId = g.Key,
+                        HorseId = g.First().HorseId,
+                        HorseName = g.First().HorseName,
+                        OwnerId = g.First().OwnerId,
+                        OwnerName = g.First().OwnerName,
+                        JockeyId = g.First().JockeyId,
+                        JockeyName = g.First().JockeyName,
+                        Position = g.First().Position,
+                        PositionPrize = g.Sum(x => x.Amount),
+                        OwnerAmount = g.Where(x => x.PrizeType == PrizeType.Owner).Sum(x => x.Amount),
+                        JockeyAmount = g.Where(x => x.PrizeType == PrizeType.Jockey).Sum(x => x.Amount)
+                    })
+                    .OrderBy(i => i.Position)
+                    .ToList();
+
+                return new RacePrizePreviewResponse
+                {
+                    RaceId = raceId,
+                    RacePurse = settledItems.Sum(i => i.PositionPrize),
+                    IsFinal = true,
+                    Items = settledItems
+                };
+            }
+
+            PositionPrizeConfig? posConfig = await _uow.GetRepository<PositionPrizeConfig>().Entities
+                .FirstOrDefaultAsync(c => c.Status == ConfigStatus.Active);
+            JockeyRewardConfig? jockeyConfig = await _uow.GetRepository<JockeyRewardConfig>().Entities
+                .FirstOrDefaultAsync(c => c.Status == ConfigStatus.Active);
+
+            List<Registration> sortedRegs = await _uow.GetRepository<RaceResult>().Entities
+                .Include(r => r.Registration).ThenInclude(reg => reg.Horse).ThenInclude(h => h.Owner).ThenInclude(o => o.UserProfiles)
+                .Include(r => r.Registration).ThenInclude(reg => reg.Jockey).ThenInclude(j => j.JockeyProfiles)
+                .Where(r => r.Registration.RaceId == raceId && r.IsDisqualified != true)
+                .OrderBy(r => r.FinishPosition)
+                .Select(r => r.Registration)
+                .ToListAsync();
+
+            if (posConfig == null || jockeyConfig == null || sortedRegs.Count == 0)
+            {
+                return new RacePrizePreviewResponse
+                {
+                    RaceId = raceId,
+                    RacePurse = race.PrizePool,
+                    IsFinal = false,
+                    Items = new List<RacePrizePreviewItemResponse>()
+                };
+            }
+
+            double[] allRatios =
+            [
+                posConfig.Pos1Ratio, posConfig.Pos2Ratio, posConfig.Pos3Ratio,
+                posConfig.Pos4Ratio, posConfig.Pos5Ratio, posConfig.Pos6Ratio
+            ];
+            int finisherCount = Math.Min(sortedRegs.Count, allRatios.Length);
+            double[] usedRatios = allRatios.Take(finisherCount).ToArray();
+            double ratioSum = usedRatios.Sum();
+
+            List<RacePrizePreviewItemResponse> previewItems = new();
+            if (ratioSum > 0)
+            {
+                double[] normalizedRatios = usedRatios.Select(r => r / ratioSum).ToArray();
+                for (int i = 0; i < finisherCount; i++)
+                {
+                    Registration reg = sortedRegs[i];
+                    int position = i + 1;
+                    decimal positionPrize = race.PrizePool * (decimal)normalizedRatios[i];
+                    decimal jockeyAmount = positionPrize * (decimal)(position == 1 ? jockeyConfig.WinCut : jockeyConfig.PlaceCut);
+                    decimal ownerAmount = positionPrize - jockeyAmount;
+
+                    previewItems.Add(new RacePrizePreviewItemResponse
+                    {
+                        RegistrationId = reg.RegistrationId,
+                        HorseId = reg.HorseId,
+                        HorseName = reg.Horse.HorseName,
+                        OwnerId = reg.Horse.OwnerId,
+                        OwnerName = reg.Horse.Owner.UserProfiles.Where(p => !p.IsDeleted).Select(p => p.FullName).FirstOrDefault(),
+                        JockeyId = reg.JockeyId,
+                        JockeyName = reg.Jockey.JockeyProfiles.Where(p => !p.IsDeleted).Select(p => p.FullName).FirstOrDefault(),
+                        Position = position,
+                        PositionPrize = positionPrize,
+                        OwnerAmount = ownerAmount,
+                        JockeyAmount = jockeyAmount
+                    });
+                }
+            }
+
+            return new RacePrizePreviewResponse
+            {
+                RaceId = raceId,
+                RacePurse = race.PrizePool,
+                IsFinal = false,
+                Items = previewItems
             };
         }
 
