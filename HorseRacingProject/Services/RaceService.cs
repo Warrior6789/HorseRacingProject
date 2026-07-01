@@ -1026,15 +1026,18 @@ namespace HorseRacingAPI.Services
                 CreatedAt = b.CreatedAt
             }).ToList();
 
-            List<RacePoolTypeSummaryResponse> poolSummaries = await _uow.GetRepository<RacePool>().Entities
+            List<RacePool> racePools = await _uow.GetRepository<RacePool>().Entities
                 .Where(p => p.RaceId == raceId)
+                .ToListAsync();
+
+            List<RacePoolTypeSummaryResponse> poolSummaries = racePools
                 .Select(p => new RacePoolTypeSummaryResponse
                 {
                     BetType = p.BetType.ToString(),
                     TotalAmount = p.TotalAmount,
                     BetCount = bets.Count(b => b.BetType == p.BetType)
                 })
-                .ToListAsync();
+                .ToList();
 
             return new RacePoolOverviewResponse
             {
