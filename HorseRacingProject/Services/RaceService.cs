@@ -633,7 +633,6 @@ namespace HorseRacingAPI.Services
                             ProfileId = up.ProfileId,
                             AccountId = up.AccountId,
                             FullName = up.FullName,
-                            Phone = up.Phone,
                             ImageUrl = up.ImageUrl,
                             CreateAt = up.CreateAt,
                             UpdatedAt = up.UpdatedAt
