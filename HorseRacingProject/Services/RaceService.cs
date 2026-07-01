@@ -595,6 +595,7 @@ namespace HorseRacingAPI.Services
 
             return await _uow.GetRepository<Registration>().Entities
                 .Include(r => r.Horse)
+                    .ThenInclude(h => h.Owner)
                 .Include(r => r.Race)
                     .ThenInclude(r => r.Racecourse)
                 .Include(r => r.Jockey)
@@ -606,6 +607,38 @@ namespace HorseRacingAPI.Services
                     RegistrationId = r.RegistrationId,
                     JockeyId = r.JockeyId,
                     JockeyName = r.Jockey.JockeyProfiles.Where(p => !p.IsDeleted).Select(p => p.FullName).FirstOrDefault(),
+                    Jockey = r.Jockey.JockeyProfiles
+                        .Where(p => !p.IsDeleted)
+                        .Select(p => new JockeyProfileResponse
+                        {
+                            JockeyProfileId = p.JockeyProfileId,
+                            AccountId = p.AccountId,
+                            FullName = p.FullName,
+                            DateOfBirth = p.DateOfBirth,
+                            Nationality = p.Nationality,
+                            LicenseNumber = p.LicenseNumber,
+                            Weight = p.Weight,
+                            Height = p.Height,
+                            TotalRaces = p.TotalRaces,
+                            TotalWins = p.TotalWins,
+                            ImageUrl = p.ImageUrl,
+                            CreateAt = p.CreateAt,
+                            UpdatedAt = p.UpdatedAt
+                        })
+                        .FirstOrDefault(),
+                    Owner = r.Horse.Owner.UserProfiles
+                        .Where(up => !up.IsDeleted)
+                        .Select(up => new UserProfileResponse
+                        {
+                            ProfileId = up.ProfileId,
+                            AccountId = up.AccountId,
+                            FullName = up.FullName,
+                            Phone = up.Phone,
+                            ImageUrl = up.ImageUrl,
+                            CreateAt = up.CreateAt,
+                            UpdatedAt = up.UpdatedAt
+                        })
+                        .FirstOrDefault(),
                     GateNumber = r.GateNumber,
                     Horse = new HorseResponse
                     {
