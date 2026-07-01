@@ -32,9 +32,10 @@ namespace HorseRacingAPI.Controllers
             [FromQuery] int pageSize = 10,
             [FromQuery] Guid? racecourseId = null,
             [FromQuery] string? status = null,
-            [FromQuery] string? search = null)
+            [FromQuery] string? search = null,
+            [FromQuery] string? date = null)
         {
-            PagedResponse<RaceResponse> result = await _raceService.GetRacesAsync(page, pageSize, racecourseId, status, search);
+            PagedResponse<RaceResponse> result = await _raceService.GetRacesAsync(page, pageSize, racecourseId, status, search, date);
             return Ok(ApiResponse<PagedResponse<RaceResponse>>.SuccessResponse(result, "Get races successfully."));
         }
 
