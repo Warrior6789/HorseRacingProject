@@ -320,6 +320,7 @@ namespace HorseRacingAPI.Services
                     RaceName = p.Registration.Race.RaceName,
                     RaceNumber = p.Registration.Race.RaceNumber,
                     HorseName = p.Registration.Horse.HorseName,
+                    HorseImageUrl = p.Registration.Horse.ImageUrl,
                     RacecourseName = p.Registration.Race.Racecourse.RacecourseName,
                     TrackType = p.Registration.Race.Racecourse.TrackType,
                     Position = p.Registration.RaceResults.Select(rr => rr.FinishPosition).FirstOrDefault(),

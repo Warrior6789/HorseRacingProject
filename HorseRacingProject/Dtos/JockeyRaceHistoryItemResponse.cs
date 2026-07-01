@@ -8,6 +8,7 @@ namespace HorseRacingAPI.Dtos
         public string? RaceName { get; set; }
         public int? RaceNumber { get; set; }
         public string? HorseName { get; set; }
+        public string? HorseImageUrl { get; set; }
         public string? RacecourseName { get; set; }
         public string? TrackType { get; set; }
         public int? Position { get; set; }
