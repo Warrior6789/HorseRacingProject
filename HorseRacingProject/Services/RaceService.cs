@@ -26,7 +26,7 @@ namespace HorseRacingAPI.Services
             _hubContext = hubContext;
         }
 
-        public async Task<PagedResponse<RaceResponse>> GetRacesAsync(int page, int pageSize, Guid? racecourseId, string? status, string? search = null)
+        public async Task<PagedResponse<RaceResponse>> GetRacesAsync(int page, int pageSize, Guid? racecourseId, string? status, string? search = null, string? date = null)
         {
             if (page < 1) page = 1;
             if (pageSize < 1) pageSize = 10;
@@ -35,19 +35,29 @@ namespace HorseRacingAPI.Services
             RaceStatus? parsedStatus = status != null && Enum.TryParse<RaceStatus>(status, ignoreCase: true, out var s) ? s : (RaceStatus?)null;
             string? searchTrim = string.IsNullOrWhiteSpace(search) ? null : search.Trim().ToLower();
 
+            DateTimeOffset? dateRangeStart = null;
+            DateTimeOffset? dateRangeEnd = null;
+            if (date != null && DateOnly.TryParseExact(date, "yyyy-MM-dd", out var parsedDate))
+            {
+                dateRangeStart = new DateTimeOffset(parsedDate.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
+                dateRangeEnd = dateRangeStart.Value.AddDays(1);
+            }
+
             IGenericRepository<Race> repo = _uow.GetRepository<Race>();
 
             int totalCount = await repo.Entities
                 .CountAsync(r => !r.IsDeleted
                     && (racecourseId == null || r.RacecourseId == racecourseId)
                     && (parsedStatus == null || r.Status == parsedStatus)
-                    && (searchTrim == null || r.RaceName!.ToLower().Contains(searchTrim) || r.Racecourse.RacecourseName!.ToLower().Contains(searchTrim)));
+                    && (searchTrim == null || r.RaceName!.ToLower().Contains(searchTrim) || r.Racecourse.RacecourseName!.ToLower().Contains(searchTrim))
+                    && (dateRangeStart == null || (r.StartTime >= dateRangeStart && r.StartTime < dateRangeEnd)));
 
             IEnumerable<RaceResponse> items = await repo.FindAsync<RaceResponse>(
                 predicate: r => !r.IsDeleted
                     && (racecourseId == null || r.RacecourseId == racecourseId)
                     && (parsedStatus == null || r.Status == parsedStatus)
-                    && (searchTrim == null || r.RaceName!.ToLower().Contains(searchTrim) || r.Racecourse.RacecourseName!.ToLower().Contains(searchTrim)),
+                    && (searchTrim == null || r.RaceName!.ToLower().Contains(searchTrim) || r.Racecourse.RacecourseName!.ToLower().Contains(searchTrim))
+                    && (dateRangeStart == null || (r.StartTime >= dateRangeStart && r.StartTime < dateRangeEnd)),
                 orderBy: q => q.OrderBy(r => r.StartTime),
                 selector: r => new RaceResponse
                 {
