@@ -73,6 +73,15 @@ namespace HorseRacingAPI.Controllers
         }
 
         [Authorize(Roles = "Jockey")]
+        [HttpGet("my/race-history")]
+        public async Task<IActionResult> GetMyRaceHistory([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
+        {
+            Guid accountId = GetAccountIdFromToken();
+            PagedResponse<JockeyRaceHistoryItemResponse> result = await _jockeyProfileService.GetJockeyRaceHistoryAsync(accountId, page, pageSize);
+            return Ok(ApiResponse<PagedResponse<JockeyRaceHistoryItemResponse>>.SuccessResponse(result, "Get jockey race history successfully."));
+        }
+
+        [Authorize(Roles = "Jockey")]
         [HttpPut("image")]
         public async Task<IActionResult> UploadImage(IFormFile file)
         {

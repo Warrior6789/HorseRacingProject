@@ -296,5 +296,44 @@ namespace HorseRacingAPI.Services
                 }
             };
         }
+
+        public async Task<PagedResponse<JockeyRaceHistoryItemResponse>> GetJockeyRaceHistoryAsync(Guid accountId, int page, int pageSize)
+        {
+            if (page < 1) page = 1;
+            if (pageSize < 1) pageSize = 10;
+            if (pageSize > 100) pageSize = 100;
+
+            IQueryable<Prize> query = _uow.GetRepository<Prize>().Entities
+                .Where(p => p.PrizeType == PrizeType.Jockey && p.Registration.JockeyId == accountId);
+
+            int totalCount = await query.CountAsync();
+
+            List<JockeyRaceHistoryItemResponse> items = await query
+                .OrderByDescending(p => p.DistributedAt ?? DateTimeOffset.MinValue)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(p => new JockeyRaceHistoryItemResponse
+                {
+                    RegistrationId = p.RegistrationId,
+                    RaceId = p.Registration.RaceId,
+                    Date = p.Registration.Race.StartTime,
+                    RaceName = p.Registration.Race.RaceName,
+                    RaceNumber = p.Registration.Race.RaceNumber,
+                    HorseName = p.Registration.Horse.HorseName,
+                    RacecourseName = p.Registration.Race.Racecourse.RacecourseName,
+                    TrackType = p.Registration.Race.Racecourse.TrackType,
+                    Position = p.Registration.RaceResults.Select(rr => rr.FinishPosition).FirstOrDefault(),
+                    Earnings = p.Amount
+                })
+                .ToListAsync();
+
+            return new PagedResponse<JockeyRaceHistoryItemResponse>
+            {
+                Items = items,
+                Page = page,
+                PageSize = pageSize,
+                TotalCount = totalCount
+            };
+        }
     }
 }
