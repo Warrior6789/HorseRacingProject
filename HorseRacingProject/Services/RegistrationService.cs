@@ -245,16 +245,16 @@ namespace HorseRacingAPI.Services
 
             int totalCount = await registrationRepo.Entities
                 .Where(j => j.JockeyId == jockeyAccountId
-                    && j.Status == RegistrationStatus.Pending
                     && j.OwnerConfirmation == true
-                    && j.JockeyConfirmation == null)
+                    && ((j.Status == RegistrationStatus.Pending && j.JockeyConfirmation == null)
+                        || (j.Status == RegistrationStatus.Confirmed && j.JockeyConfirmation == true)))
                 .CountAsync();
 
             IEnumerable<RegistrationResponse> items = await registrationRepo.FindAsync<RegistrationResponse>(
                 predicate: j => j.JockeyId == jockeyAccountId
-                    && j.Status == RegistrationStatus.Pending
                     && j.OwnerConfirmation == true
-                    && j.JockeyConfirmation == null,
+                    && ((j.Status == RegistrationStatus.Pending && j.JockeyConfirmation == null)
+                        || (j.Status == RegistrationStatus.Confirmed && j.JockeyConfirmation == true)),
                 orderBy: null,
                 selector: r => new RegistrationResponse
                 {
