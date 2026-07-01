@@ -398,7 +398,7 @@ namespace HorseRacingAPI.Services
                     && rr.IsDisqualified != true);
 
             decimal totalEarned = await prizeRepo.Entities
-                .Where(p => p.Registration.HorseId == horseId)
+                .Where(p => p.Registration.HorseId == horseId && p.PrizeType == PrizeType.Owner)
                 .SumAsync(p => p.Amount ?? 0);
 
             return new HorsePerformanceSummaryResponse
