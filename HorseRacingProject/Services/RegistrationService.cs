@@ -613,6 +613,8 @@ namespace HorseRacingAPI.Services
             }
 
             await _uow.SaveAsync();
+
+            await _hubContext.Clients.All.SendAsync("RegistrationsUpdated", await GetRegistrationKpiAsync());
         }
 
         public async Task AdminAcceptRegistrationAsync(Guid registrationId)
