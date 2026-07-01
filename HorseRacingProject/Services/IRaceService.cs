@@ -18,5 +18,7 @@ Task<List<RaceResultResponse>> GetRaceResultsAsync(Guid raceId);
         Task ResetRaceAsync(Guid raceId);
         Task<string> UploadImageAsync(Guid raceId, IFormFile file);
         Task<CollectToRacePoolResponse> CollectFromSpectatorsAsync(Guid raceId, CollectToRacePoolRequest request);
+        Task<RacePoolOverviewResponse> GetRacePoolOverviewAsync(Guid raceId);
+        Task<RacePrizePreviewResponse> GetPrizePreviewAsync(Guid raceId);
     }
 }

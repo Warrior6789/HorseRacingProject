@@ -17,5 +17,6 @@ namespace HorseRacingAPI.Dtos
         public int RegistrationCount { get; set; }
         public bool HasUnresolvedReports { get; set; }
         public decimal TotalPoolAmount { get; set; }
+        public int BetCount { get; set; }
     }
 }
