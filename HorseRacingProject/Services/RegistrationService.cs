@@ -286,7 +286,8 @@ namespace HorseRacingAPI.Services
                         Weight = r.Horse.Weight,
                         RecordWins = r.Horse.RecordWins,
                         Status = r.Horse.Status.ToString(),
-                        DerivedStatus = r.Horse.Status.ToString()
+                        DerivedStatus = r.Horse.Status.ToString(),
+                        ImageUrl = r.Horse.ImageUrl
                     },
                     Race = new RaceResponse
                     {
