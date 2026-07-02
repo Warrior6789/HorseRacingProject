@@ -59,4 +59,6 @@ public partial class Race
     public virtual ICollection<Registration> Registrations { get; set; } = new List<Registration>();
 
     public virtual ICollection<RacePool> RacePools { get; set; } = new List<RacePool>();
+
+    public virtual ICollection<TakeoutLedger> TakeoutLedgers { get; set; } = new List<TakeoutLedger>();
 }

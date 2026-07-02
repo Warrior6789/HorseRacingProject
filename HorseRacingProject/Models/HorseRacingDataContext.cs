@@ -47,6 +47,8 @@ public partial class HorseRacingDataContext : DbContext
 
     public virtual DbSet<RacePool> RacePools { get; set; }
 
+    public virtual DbSet<TakeoutLedger> TakeoutLedgers { get; set; }
+
     public virtual DbSet<UserProfile> UserProfiles { get; set; }
 
     public virtual DbSet<Withdrawal> Withdrawals { get; set; }
@@ -391,6 +393,25 @@ public partial class HorseRacingDataContext : DbContext
                 .HasForeignKey(d => d.RaceId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_RacePool_Races");
+        });
+
+        modelBuilder.Entity<TakeoutLedger>(entity =>
+        {
+            entity.HasKey(e => e.TakeoutLedgerId).HasName("TakeoutLedger_pkey");
+            entity.ToTable("TakeoutLedger");
+            entity.Property(e => e.TakeoutLedgerId)
+                .ValueGeneratedNever()
+                .HasColumnName("TakeoutLedgerID");
+            entity.Property(e => e.RaceId).HasColumnName("RaceID");
+            entity.Property(e => e.BetType).HasMaxLength(20).HasConversion<string>();
+            entity.Property(e => e.TotalPool).HasPrecision(18, 2);
+            entity.Property(e => e.TakeoutAmount).HasPrecision(18, 2);
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            entity.HasOne(d => d.Race).WithMany(r => r.TakeoutLedgers)
+                .HasForeignKey(d => d.RaceId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_TakeoutLedger_Races");
         });
 
         modelBuilder.Entity<Withdrawal>(entity =>

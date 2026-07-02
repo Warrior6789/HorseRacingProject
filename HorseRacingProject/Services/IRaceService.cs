@@ -20,5 +20,6 @@ Task<List<RaceResultResponse>> GetRaceResultsAsync(Guid raceId);
         Task<CollectToRacePoolResponse> CollectFromSpectatorsAsync(Guid raceId, CollectToRacePoolRequest request);
         Task<RacePoolOverviewResponse> GetRacePoolOverviewAsync(Guid raceId);
         Task<RacePrizePreviewResponse> GetPrizePreviewAsync(Guid raceId);
+        Task<PagedResponse<TakeoutLedgerResponse>> GetTakeoutLedgerPagedAsync(int page, int pageSize, Guid? raceId = null, string? betType = null);
     }
 }

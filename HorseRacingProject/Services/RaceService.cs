@@ -1228,6 +1228,54 @@ namespace HorseRacingAPI.Services
             };
         }
 
+        public async Task<PagedResponse<TakeoutLedgerResponse>> GetTakeoutLedgerPagedAsync(int page, int pageSize, Guid? raceId = null, string? betType = null)
+        {
+            if (page < 1) page = 1;
+            if (pageSize < 1) pageSize = 10;
+            if (pageSize > 100) pageSize = 100;
+
+            BetType? parsedBetType = null;
+            if (!string.IsNullOrWhiteSpace(betType))
+            {
+                if (!Enum.TryParse<BetType>(betType, ignoreCase: true, out BetType parsed))
+                    throw new InvalidOperationException("Invalid bet type. Must be Win, Place, or Show.");
+                parsedBetType = parsed;
+            }
+
+            IQueryable<TakeoutLedger> query = _uow.GetRepository<TakeoutLedger>().Entities
+                .Include(t => t.Race)
+                .Where(t => (raceId == null || t.RaceId == raceId)
+                         && (parsedBetType == null || t.BetType == parsedBetType));
+
+            int totalCount = await query.CountAsync();
+
+            List<TakeoutLedgerResponse> items = await query
+                .OrderByDescending(t => t.CreatedAt)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(t => new TakeoutLedgerResponse
+                {
+                    TakeoutLedgerId = t.TakeoutLedgerId,
+                    RaceId = t.RaceId,
+                    RaceName = t.Race.RaceName,
+                    RaceNumber = t.Race.RaceNumber,
+                    BetType = t.BetType.ToString(),
+                    TotalPool = t.TotalPool,
+                    TakeoutPercentage = t.TakeoutPercentage,
+                    TakeoutAmount = t.TakeoutAmount,
+                    CreatedAt = t.CreatedAt
+                })
+                .ToListAsync();
+
+            return new PagedResponse<TakeoutLedgerResponse>
+            {
+                Items = items,
+                Page = page,
+                PageSize = pageSize,
+                TotalCount = totalCount
+            };
+        }
+
         private async Task BroadcastPrizePoolUpdateAsync(Guid raceId, decimal prizePool)
         {
             await _hubContext.Clients.Group($"race-{raceId}")
