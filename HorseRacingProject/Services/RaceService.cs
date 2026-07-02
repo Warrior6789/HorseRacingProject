@@ -1228,7 +1228,7 @@ namespace HorseRacingAPI.Services
             };
         }
 
-        public async Task<PagedResponse<TakeoutLedgerResponse>> GetTakeoutLedgerPagedAsync(int page, int pageSize, Guid? raceId = null, string? betType = null)
+        public async Task<TakeoutLedgerPagedResponse> GetTakeoutLedgerPagedAsync(int page, int pageSize, Guid? raceId = null, string? betType = null)
         {
             if (page < 1) page = 1;
             if (pageSize < 1) pageSize = 10;
@@ -1248,6 +1248,7 @@ namespace HorseRacingAPI.Services
                          && (parsedBetType == null || t.BetType == parsedBetType));
 
             int totalCount = await query.CountAsync();
+            decimal totalTakeoutAmount = await query.SumAsync(t => t.TakeoutAmount);
 
             List<TakeoutLedgerResponse> items = await query
                 .OrderByDescending(t => t.CreatedAt)
@@ -1267,12 +1268,13 @@ namespace HorseRacingAPI.Services
                 })
                 .ToListAsync();
 
-            return new PagedResponse<TakeoutLedgerResponse>
+            return new TakeoutLedgerPagedResponse
             {
                 Items = items,
                 Page = page,
                 PageSize = pageSize,
-                TotalCount = totalCount
+                TotalCount = totalCount,
+                TotalTakeoutAmount = totalTakeoutAmount
             };
         }
 

@@ -157,8 +157,8 @@ namespace HorseRacingAPI.Controllers
             [FromQuery] Guid? raceId = null,
             [FromQuery] string? betType = null)
         {
-            PagedResponse<TakeoutLedgerResponse> result = await _raceService.GetTakeoutLedgerPagedAsync(page, pageSize, raceId, betType);
-            return Ok(ApiResponse<PagedResponse<TakeoutLedgerResponse>>.SuccessResponse(result, "Get takeout ledger successfully."));
+            TakeoutLedgerPagedResponse result = await _raceService.GetTakeoutLedgerPagedAsync(page, pageSize, raceId, betType);
+            return Ok(ApiResponse<TakeoutLedgerPagedResponse>.SuccessResponse(result, "Get takeout ledger successfully."));
         }
 
         [Authorize(Roles = "Admin")]
