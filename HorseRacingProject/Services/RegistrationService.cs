@@ -30,6 +30,26 @@ namespace HorseRacingAPI.Services
             return new { pendingCount, approvedCount, rejectedCount };
         }
 
+        private async Task BroadcastPrizePoolUpdateAsync(Guid raceId, decimal prizePool)
+        {
+            await _hubContext.Clients.Group($"race-{raceId}")
+                .SendAsync("PrizePoolUpdate", new { raceId, prizePool });
+        }
+
+        private async Task BroadcastPoolUpdateAsync(Guid raceId)
+        {
+            List<RacePool> pools = await _uow.GetRepository<RacePool>().Entities
+                .Where(p => p.RaceId == raceId)
+                .ToListAsync();
+
+            await _hubContext.Clients.Group($"race-{raceId}")
+                .SendAsync("PoolUpdate", new
+                {
+                    raceId,
+                    pools = pools.Select(p => new { betType = p.BetType.ToString(), totalAmount = p.TotalAmount })
+                });
+        }
+
         public async Task AcceptRegistrationAsync(Guid registrationId, Guid jockeyAccountId)
         {
             IGenericRepository<Registration> registrationRepo = _uow.GetRepository<Registration>();
@@ -85,6 +105,8 @@ namespace HorseRacingAPI.Services
                     throw new InvalidOperationException("You are already confirmed in another race that conflicts in time.");
             }
 
+            Dictionary<Guid, decimal> affectedPrizePools = new();
+
             await _uow.BeginTransactionAsync();
             try
             {
@@ -120,6 +142,7 @@ namespace HorseRacingAPI.Services
                         }
                         other.Race.PrizePool = Math.Max(0, other.Race.PrizePool - other.Race.RegistrationFee);
                         await _uow.GetRepository<Race>().UpdateAsync(other.Race);
+                        affectedPrizePools[other.RaceId] = other.Race.PrizePool;
                     }
                 }
 
@@ -151,6 +174,7 @@ namespace HorseRacingAPI.Services
                         }
                         other.Race.PrizePool = Math.Max(0, other.Race.PrizePool - other.Race.RegistrationFee);
                         await _uow.GetRepository<Race>().UpdateAsync(other.Race);
+                        affectedPrizePools[other.RaceId] = other.Race.PrizePool;
                     }
                 }
 
@@ -167,6 +191,9 @@ namespace HorseRacingAPI.Services
                 await _uow.RollbackTransactionAsync();
                 throw;
             }
+
+            foreach ((Guid raceId, decimal prizePool) in affectedPrizePools)
+                await BroadcastPrizePoolUpdateAsync(raceId, prizePool);
 
             await _hubContext.Clients.All.SendAsync("RegistrationsUpdated", await GetRegistrationKpiAsync());
         }
@@ -615,6 +642,9 @@ namespace HorseRacingAPI.Services
 
             await _uow.SaveAsync();
 
+            if (registration.Race.RegistrationFee > 0)
+                await BroadcastPrizePoolUpdateAsync(registration.RaceId, registration.Race.PrizePool);
+
             await _hubContext.Clients.All.SendAsync("RegistrationsUpdated", await GetRegistrationKpiAsync());
         }
 
@@ -670,6 +700,8 @@ namespace HorseRacingAPI.Services
                     throw new InvalidOperationException("This jockey is already confirmed in another race that conflicts in time.");
             }
 
+            Dictionary<Guid, decimal> affectedPrizePools = new();
+
             await _uow.BeginTransactionAsync();
             try
             {
@@ -705,6 +737,7 @@ namespace HorseRacingAPI.Services
                         }
                         other.Race.PrizePool = Math.Max(0, other.Race.PrizePool - other.Race.RegistrationFee);
                         await _uow.GetRepository<Race>().UpdateAsync(other.Race);
+                        affectedPrizePools[other.RaceId] = other.Race.PrizePool;
                     }
                 }
 
@@ -721,6 +754,9 @@ namespace HorseRacingAPI.Services
                 await _uow.RollbackTransactionAsync();
                 throw;
             }
+
+            foreach ((Guid raceId, decimal prizePool) in affectedPrizePools)
+                await BroadcastPrizePoolUpdateAsync(raceId, prizePool);
 
             await _hubContext.Clients.All.SendAsync("RegistrationsUpdated", await GetRegistrationKpiAsync());
         }
@@ -758,6 +794,9 @@ namespace HorseRacingAPI.Services
             }
 
             await _uow.SaveAsync();
+
+            if (registration.Race.RegistrationFee > 0)
+                await BroadcastPrizePoolUpdateAsync(registration.RaceId, registration.Race.PrizePool);
 
             await _hubContext.Clients.All.SendAsync("RegistrationsUpdated", await GetRegistrationKpiAsync());
         }
@@ -843,6 +882,8 @@ namespace HorseRacingAPI.Services
             if (raceStatus == RaceStatus.Live || raceStatus == RaceStatus.Finished || raceStatus == RaceStatus.Cancelled)
                 throw new InvalidOperationException($"Cannot scratch a horse when race is {raceStatus}.");
 
+            List<Bet> bets = new();
+
             await _uow.BeginTransactionAsync();
             try
             {
@@ -864,7 +905,7 @@ namespace HorseRacingAPI.Services
                     await _uow.GetRepository<Race>().UpdateAsync(registration.Race);
                 }
 
-                List<Bet> bets = await _uow.GetRepository<Bet>().Entities
+                bets = await _uow.GetRepository<Bet>().Entities
                     .Where(b => b.RegistrationId == registrationId && b.Status == BetStatus.Active)
                     .ToListAsync();
 
@@ -901,6 +942,12 @@ namespace HorseRacingAPI.Services
                 await _uow.RollbackTransactionAsync();
                 throw;
             }
+
+            if (registration.Race.RegistrationFee > 0)
+                await BroadcastPrizePoolUpdateAsync(registration.RaceId, registration.Race.PrizePool);
+
+            if (bets.Count > 0)
+                await BroadcastPoolUpdateAsync(registration.RaceId);
 
             await _hubContext.Clients.All.SendAsync("RegistrationsUpdated", await GetRegistrationKpiAsync());
         }
