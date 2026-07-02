@@ -95,6 +95,8 @@ namespace HorseRacingAPI.Services
             Race? race = await _uow.GetRepository<Race>().Entities
                 .Include(r => r.Racecourse)
                 .Include(r => r.Registrations)
+                    .ThenInclude(reg => reg.Bets)
+                .Include(r => r.RacePools)
                 .Include(r => r.RefereeReports)
                 .FirstOrDefaultAsync(r => r.RaceId == raceId && !r.IsDeleted);
 
@@ -1206,7 +1208,9 @@ namespace HorseRacingAPI.Services
             RacecourseName = race.Racecourse?.RacecourseName,
             Location = race.Racecourse?.Location,
             ImageUrl = race.ImageUrl,
-            RegistrationCount = race.Registrations?.Count(reg => reg.Status == RegistrationStatus.Confirmed) ?? 0
+            RegistrationCount = race.Registrations?.Count(reg => reg.Status == RegistrationStatus.Confirmed) ?? 0,
+            TotalPoolAmount = race.RacePools?.Sum(p => p.TotalAmount) ?? 0,
+            BetCount = race.Registrations?.SelectMany(reg => reg.Bets).Count() ?? 0
         };
     }
 }
