@@ -352,7 +352,7 @@ namespace HorseRacingAPI.Services
             }
 
             IQueryable<Guid> activeRaceIds = _uow.GetRepository<Race>().Entities
-                .Where(r => !r.IsDeleted)
+                .Where(r => !r.IsDeleted && r.Status != RaceStatus.Finished && r.Status != RaceStatus.Cancelled)
                 .Select(r => r.RaceId);
 
             bool horseConfirmed = await _uow.GetRepository<Registration>().Entities
@@ -384,7 +384,11 @@ namespace HorseRacingAPI.Services
             ).MaxAsync();
 
             if (lastRaceEnd != null && race.StartTime < lastRaceEnd.Value.AddDays(7))
-                throw new InvalidOperationException($"Horse needs 7 days rest after last race. Earliest registration date: {lastRaceEnd.Value.AddDays(7):yyyy-MM-dd}.");
+            {
+                DateTimeOffset earliestDate = lastRaceEnd.Value.AddDays(7);
+                int daysRemaining = Math.Max(0, (int)Math.Ceiling((earliestDate - DateTimeOffset.UtcNow).TotalDays));
+                throw new InvalidOperationException($"Horse needs 7 days rest after last race. {daysRemaining} day(s) remaining. Earliest registration date: {earliestDate:yyyy-MM-dd}.");
+            }
 
             bool ownerAlreadyRegistered = await (
                 from r in _uow.GetRepository<Registration>().Entities

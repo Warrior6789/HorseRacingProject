@@ -38,6 +38,42 @@ namespace HorseRacingAPI.Services
 
                 DateTimeOffset now = DateTimeOffset.UtcNow;
 
+                List<Guid> restingHorseIds = await uow.GetRepository<Horse>().Entities
+                    .Where(h => h.Status == HorseStatus.Resting)
+                    .Select(h => h.Id)
+                    .ToListAsync();
+
+                if (restingHorseIds.Count > 0)
+                {
+                    bool anyWoken = false;
+                    foreach (Guid horseId in restingHorseIds)
+                    {
+                        DateTimeOffset? lastRaceEnd = await (
+                            from r in uow.GetRepository<Registration>().Entities
+                            join finishedRace in uow.GetRepository<Race>().Entities on r.RaceId equals finishedRace.RaceId
+                            where r.HorseId == horseId
+                               && r.Status == RegistrationStatus.Confirmed
+                               && finishedRace.Status == RaceStatus.Finished
+                            select (DateTimeOffset?)(finishedRace.EndTime ?? finishedRace.StartTime!.Value.AddMinutes(5))
+                        ).MaxAsync();
+
+                        if (lastRaceEnd == null || now >= lastRaceEnd.Value.AddDays(7))
+                        {
+                            Horse? horse = await uow.GetRepository<Horse>().Entities
+                                .FirstOrDefaultAsync(h => h.Id == horseId);
+                            if (horse != null)
+                            {
+                                horse.Status = HorseStatus.Healthy;
+                                await uow.GetRepository<Horse>().UpdateAsync(horse);
+                                anyWoken = true;
+                            }
+                        }
+                    }
+
+                    if (anyWoken)
+                        await uow.SaveAsync();
+                }
+
                 List<Race> toOpen = await uow.GetRepository<Race>().Entities
                     .Where(r => r.Status == RaceStatus.Scheduled
                                 && r.StartTime <= now.AddMinutes(30)
@@ -227,6 +263,15 @@ namespace HorseRacingAPI.Services
                                 CreateAt = DateTimeOffset.UtcNow
                             };
                             await uow.GetRepository<RaceResult>().AddAsync(result);
+                        }
+
+                        foreach (Registration reg in registrations)
+                        {
+                            if (reg.Horse.Status == HorseStatus.Healthy)
+                            {
+                                reg.Horse.Status = HorseStatus.Resting;
+                                await uow.GetRepository<Horse>().UpdateAsync(reg.Horse);
+                            }
                         }
 
                         await uow.SaveAsync();
