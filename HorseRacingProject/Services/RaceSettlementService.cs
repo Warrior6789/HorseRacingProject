@@ -44,6 +44,13 @@ namespace HorseRacingAPI.Services
                 .Select(r => r.Registration)
                 .ToListAsync();
 
+            if (sortedRegs.Count > 0)
+            {
+                Horse winnerHorse = sortedRegs[0].Horse;
+                winnerHorse.RecordWins = (winnerHorse.RecordWins ?? 0) + 1;
+                await uow.GetRepository<Horse>().UpdateAsync(winnerHorse);
+            }
+
             decimal carryover = await SettleBetsAsync(uow, raceId, sortedRegs);
             await DistributePrizesAsync(uow, race, sortedRegs, carryover);
         }
