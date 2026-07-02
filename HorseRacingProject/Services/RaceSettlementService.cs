@@ -74,6 +74,17 @@ namespace HorseRacingAPI.Services
                 decimal totalPool = typeBets.Sum(b => b.BetAmount);
                 decimal netPool = totalPool * (1 - takeout);
 
+                await uow.GetRepository<TakeoutLedger>().AddAsync(new TakeoutLedger
+                {
+                    TakeoutLedgerId = Guid.NewGuid(),
+                    RaceId = raceId,
+                    BetType = betType,
+                    TotalPool = totalPool,
+                    TakeoutPercentage = (float)takeout,
+                    TakeoutAmount = totalPool - netPool,
+                    CreatedAt = DateTimeOffset.UtcNow
+                });
+
                 HashSet<Guid> winningRegIds = positions
                     .Where(kvp => betType switch
                     {

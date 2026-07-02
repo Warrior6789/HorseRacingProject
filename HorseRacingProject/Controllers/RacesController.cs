@@ -150,6 +150,18 @@ namespace HorseRacingAPI.Controllers
         }
 
         [Authorize(Roles = "Admin")]
+        [HttpGet("takeout-ledger/paged")]
+        public async Task<IActionResult> GetTakeoutLedgerPaged(
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 10,
+            [FromQuery] Guid? raceId = null,
+            [FromQuery] string? betType = null)
+        {
+            PagedResponse<TakeoutLedgerResponse> result = await _raceService.GetTakeoutLedgerPagedAsync(page, pageSize, raceId, betType);
+            return Ok(ApiResponse<PagedResponse<TakeoutLedgerResponse>>.SuccessResponse(result, "Get takeout ledger successfully."));
+        }
+
+        [Authorize(Roles = "Admin")]
         [HttpDelete("{raceId}")]
         public async Task<IActionResult> DeleteRace(Guid raceId)
         {
