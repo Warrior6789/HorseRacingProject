@@ -12,6 +12,7 @@ namespace HorseRacingAPI.Dtos
         public decimal BetAmount { get; set; }
         public string? Status { get; set; }
         public float? PayoutRatio { get; set; }
+        public decimal? EstimatedPayout { get; set; }
         public DateTimeOffset? CreatedAt { get; set; }
     }
 

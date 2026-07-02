@@ -11,6 +11,8 @@ namespace HorseRacingAPI.Services
 {
     public class BetService : IBetService
     {
+        private const decimal MinBetAmount = 1000;
+
         private readonly IUnitofWork _uow;
         private readonly IHubContext<RaceHub> _hubContext;
         private static readonly HashSet<BetType> ValidBetTypes = [BetType.Win, BetType.Place, BetType.Show];
@@ -96,8 +98,8 @@ namespace HorseRacingAPI.Services
             if (!Enum.TryParse<BetType>(req.BetType, ignoreCase: true, out var betType) || !ValidBetTypes.Contains(betType))
                 throw new InvalidOperationException("Invalid bet type. Must be Win, Place, or Show.");
 
-            if (req.BetAmount <= 0)
-                throw new InvalidOperationException("Bet amount must be greater than 0.");
+            if (req.BetAmount < MinBetAmount)
+                throw new InvalidOperationException($"Bet amount must be at least {MinBetAmount} coins.");
             bool profileExists = await _uow.GetRepository<UserProfile>().Entities
                 .AnyAsync(p => p.AccountId == spectatorId && !p.IsDeleted);
             if (!profileExists)

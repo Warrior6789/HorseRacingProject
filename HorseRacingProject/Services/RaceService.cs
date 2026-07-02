@@ -1037,24 +1037,50 @@ namespace HorseRacingAPI.Services
                 .OrderByDescending(b => b.CreatedAt)
                 .ToListAsync();
 
-            List<RacePoolBetItemResponse> betItems = bets.Select(b => new RacePoolBetItemResponse
-            {
-                BetId = b.BetId,
-                SpectatorId = b.SpectatorId,
-                SpectatorName = b.Spectator.UserProfiles.Where(p => !p.IsDeleted).Select(p => p.FullName).FirstOrDefault(),
-                RegistrationId = b.RegistrationId,
-                HorseId = b.Registration.HorseId,
-                HorseName = b.Registration.Horse.HorseName,
-                BetType = b.BetType?.ToString(),
-                BetAmount = b.BetAmount,
-                Status = b.Status.ToString(),
-                PayoutRatio = b.PayoutRatio,
-                CreatedAt = b.CreatedAt
-            }).ToList();
-
             List<RacePool> racePools = await _uow.GetRepository<RacePool>().Entities
                 .Where(p => p.RaceId == raceId)
                 .ToListAsync();
+
+            TakeoutConfig? takeoutConfig = await _uow.GetRepository<TakeoutConfig>().Entities
+                .FirstOrDefaultAsync(c => c.Status == ConfigStatus.Active);
+            decimal takeout = (decimal)(takeoutConfig?.TakeoutPercentage ?? 0.20f);
+
+            var perHorsePools = bets
+                .Where(b => b.Status == BetStatus.Active)
+                .GroupBy(b => new { b.RegistrationId, b.BetType })
+                .Select(g => new { g.Key.RegistrationId, g.Key.BetType, Total = g.Sum(b => b.BetAmount) })
+                .ToList();
+
+            List<RacePoolBetItemResponse> betItems = bets.Select(b =>
+            {
+                decimal? estimatedPayout = null;
+                if (b.Status == BetStatus.Active)
+                {
+                    RacePool? pool = racePools.FirstOrDefault(p => p.BetType == b.BetType);
+                    var horsePool = perHorsePools.FirstOrDefault(p => p.RegistrationId == b.RegistrationId && p.BetType == b.BetType);
+                    if (pool != null && horsePool != null && horsePool.Total > 0)
+                    {
+                        decimal netPool = pool.TotalAmount * (1 - takeout);
+                        estimatedPayout = Math.Round(b.BetAmount * (netPool / horsePool.Total), 0);
+                    }
+                }
+
+                return new RacePoolBetItemResponse
+                {
+                    BetId = b.BetId,
+                    SpectatorId = b.SpectatorId,
+                    SpectatorName = b.Spectator.UserProfiles.Where(p => !p.IsDeleted).Select(p => p.FullName).FirstOrDefault(),
+                    RegistrationId = b.RegistrationId,
+                    HorseId = b.Registration.HorseId,
+                    HorseName = b.Registration.Horse.HorseName,
+                    BetType = b.BetType?.ToString(),
+                    BetAmount = b.BetAmount,
+                    Status = b.Status.ToString(),
+                    PayoutRatio = b.PayoutRatio,
+                    EstimatedPayout = estimatedPayout,
+                    CreatedAt = b.CreatedAt
+                };
+            }).ToList();
 
             List<RacePoolTypeSummaryResponse> poolSummaries = racePools
                 .Select(p => new RacePoolTypeSummaryResponse
