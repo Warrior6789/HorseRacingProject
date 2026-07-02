@@ -458,6 +458,9 @@ namespace HorseRacingAPI.Services
             await _uow.GetRepository<Registration>().AddAsync(registration);
             await _uow.SaveAsync();
 
+            if (race.RegistrationFee > 0)
+                await BroadcastPrizePoolUpdateAsync(raceId, race.PrizePool);
+
             int pendingCount = await _uow.GetRepository<Registration>().Entities
                 .CountAsync(r => r.Status == RegistrationStatus.Pending);
             await _hubContext.Clients.All.SendAsync("RegistrationsUpdated", new
@@ -826,6 +829,9 @@ namespace HorseRacingAPI.Services
 
             _engine.ClearRaceState(raceId, horseIds);
 
+            await BroadcastPrizePoolUpdateAsync(raceId, 0);
+            await BroadcastPoolUpdateAsync(raceId);
+
             await _hubContext.Clients.All.SendAsync("RacesUpdated");
             await _hubContext.Clients.All.SendAsync("RegistrationsUpdated");
         }
@@ -1005,6 +1011,8 @@ namespace HorseRacingAPI.Services
             }
 
             await _uow.SaveAsync();
+
+            await BroadcastPoolUpdateAsync(raceId);
 
             return new CollectToRacePoolResponse
             {
@@ -1192,6 +1200,26 @@ namespace HorseRacingAPI.Services
                 IsFinal = false,
                 Items = previewItems
             };
+        }
+
+        private async Task BroadcastPrizePoolUpdateAsync(Guid raceId, decimal prizePool)
+        {
+            await _hubContext.Clients.Group($"race-{raceId}")
+                .SendAsync("PrizePoolUpdate", new { raceId, prizePool });
+        }
+
+        private async Task BroadcastPoolUpdateAsync(Guid raceId)
+        {
+            List<RacePool> pools = await _uow.GetRepository<RacePool>().Entities
+                .Where(p => p.RaceId == raceId)
+                .ToListAsync();
+
+            await _hubContext.Clients.Group($"race-{raceId}")
+                .SendAsync("PoolUpdate", new
+                {
+                    raceId,
+                    pools = pools.Select(p => new { betType = p.BetType.ToString(), totalAmount = p.TotalAmount })
+                });
         }
 
         private static RaceResponse MapToResponse(Race race) => new RaceResponse
