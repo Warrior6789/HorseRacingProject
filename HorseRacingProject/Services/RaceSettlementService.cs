@@ -65,6 +65,7 @@ namespace HorseRacingAPI.Services
 
             decimal carryover = 0;
             var betPayouts = new List<(Guid accountId, long amount, long newBalance)>();
+            bool ledgerCreated = false;
 
             foreach (BetType betType in new[] { BetType.Win, BetType.Place, BetType.Show })
             {
@@ -84,6 +85,7 @@ namespace HorseRacingAPI.Services
                     TakeoutAmount = totalPool - netPool,
                     CreatedAt = DateTimeOffset.UtcNow
                 });
+                ledgerCreated = true;
 
                 HashSet<Guid> winningRegIds = positions
                     .Where(kvp => betType switch
@@ -138,6 +140,9 @@ namespace HorseRacingAPI.Services
             }
 
             await uow.SaveAsync();
+
+            if (ledgerCreated)
+                await _hubContext.Clients.All.SendAsync("TakeoutLedgerUpdated", new { raceId });
 
             foreach (var (accountId, amount, newBalance) in betPayouts)
                 await _hubContext.Clients.All.SendAsync("BalanceUpdated", new
