@@ -1203,7 +1203,12 @@ namespace HorseRacingAPI.Services
                     Registration reg = sortedRegs[i];
                     int position = i + 1;
                     decimal positionPrize = race.PrizePool * (decimal)normalizedRatios[i];
-                    decimal jockeyAmount = positionPrize * (decimal)(position == 1 ? jockeyConfig.WinCut : jockeyConfig.PlaceCut);
+                    decimal jockeyAmount = position switch
+                    {
+                        1 => positionPrize * (decimal)jockeyConfig.WinCut,
+                        2 => positionPrize * (decimal)jockeyConfig.PlaceCut,
+                        _ => 0m
+                    };
                     decimal ownerAmount = positionPrize - jockeyAmount;
 
                     previewItems.Add(new RacePrizePreviewItemResponse

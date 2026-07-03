@@ -222,13 +222,23 @@ namespace HorseRacingAPI.Services
                 if (newPos > positionRatios.Length) continue;
 
                 decimal prizeAtNewPos = racePurse * (decimal)positionRatios[newPos - 1];
-                decimal jockeyNew = prizeAtNewPos * (decimal)(newPos == 1 ? race.JockeyRewardConfig.WinCut : race.JockeyRewardConfig.PlaceCut);
+                decimal jockeyNew = newPos switch
+                {
+                    1 => prizeAtNewPos * (decimal)race.JockeyRewardConfig.WinCut,
+                    2 => prizeAtNewPos * (decimal)race.JockeyRewardConfig.PlaceCut,
+                    _ => 0m
+                };
                 decimal ownerNew  = prizeAtNewPos - jockeyNew;
 
                 if (oldPos <= positionRatios.Length)
                 {
                     decimal prizeAtOldPos = racePurse * (decimal)positionRatios[oldPos - 1];
-                    decimal jockeyOld = prizeAtOldPos * (decimal)(oldPos == 1 ? race.JockeyRewardConfig.WinCut : race.JockeyRewardConfig.PlaceCut);
+                    decimal jockeyOld = oldPos switch
+                    {
+                        1 => prizeAtOldPos * (decimal)race.JockeyRewardConfig.WinCut,
+                        2 => prizeAtOldPos * (decimal)race.JockeyRewardConfig.PlaceCut,
+                        _ => 0m
+                    };
                     jockeyNew -= jockeyOld;
                     ownerNew  -= (prizeAtOldPos - jockeyOld);
                 }
