@@ -81,7 +81,10 @@ namespace HorseRacingAPI.Services
             {
                 await _uow.GetRepository<Payment>().Entities
                     .Where(p => p.OrderCode == data.OrderCode && p.Status == PaymentStatus.Pending)
-                    .ExecuteUpdateAsync(s => s.SetProperty(p => p.Status, PaymentStatus.Failed));
+                    .ExecuteUpdateAsync(s => s
+                        .SetProperty(p => p.Status, PaymentStatus.Failed)
+                        .SetProperty(p => p.BalanceChanged, 0)
+                        .SetProperty(p => p.CurrentBalance, (long?)null));
 
                 return new PaymentResponse
                 {
@@ -135,6 +138,12 @@ namespace HorseRacingAPI.Services
                         .Select(u => u.Balance ?? 0)
                         .FirstOrDefaultAsync();
                 }
+
+                await _uow.GetRepository<Payment>().Entities
+                    .Where(p => p.PaymentId == payment.PaymentId)
+                    .ExecuteUpdateAsync(s => s
+                        .SetProperty(p => p.BalanceChanged, balanceToAdd)
+                        .SetProperty(p => p.CurrentBalance, currentBalance));
 
                 await _uow.CommitTransactionAsync();
 
@@ -197,8 +206,8 @@ namespace HorseRacingAPI.Services
                     Amount          = p.Amount,
                     Status          = p.Status.ToString(),
                     TransactionType = PaymentType.Deposit.ToString(),
-                    BalanceChanged  = 0,
-                    CurrentBalance  = 0,
+                    BalanceChanged  = p.BalanceChanged ?? 0,
+                    CurrentBalance  = p.CurrentBalance ?? 0,
                     CreateAt        = p.CreateAt
                 },
                 pageIndex: page - 1,
@@ -237,8 +246,8 @@ namespace HorseRacingAPI.Services
                     Amount          = p.Amount,
                     Status          = p.Status.ToString(),
                     TransactionType = PaymentType.Deposit.ToString(),
-                    BalanceChanged  = 0,
-                    CurrentBalance  = 0,
+                    BalanceChanged  = p.BalanceChanged ?? 0,
+                    CurrentBalance  = p.CurrentBalance ?? 0,
                     CreateAt        = p.CreateAt
                 }).ToList(),
                 Page       = page,
