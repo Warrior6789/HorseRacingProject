@@ -17,4 +17,8 @@ public partial class Payment
     public PaymentStatus Status { get; set; }
 
     public DateTimeOffset? CreateAt { get; set; }
+
+    public long? BalanceChanged { get; set; }
+
+    public long? CurrentBalance { get; set; }
 }
