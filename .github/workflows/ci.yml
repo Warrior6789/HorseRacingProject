@@ -10,6 +10,11 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
+    permissions:
+      checks: write
+      pull-requests: write
+      contents: read
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -26,4 +31,12 @@ jobs:
         run: dotnet build HorseRacingProject.Tests/HorseRacingProject.Tests.csproj --no-restore --configuration Release
 
       - name: Run unit tests
-        run: dotnet test HorseRacingProject.Tests/HorseRacingProject.Tests.csproj --no-build --configuration Release --verbosity normal
+        run: dotnet test HorseRacingProject.Tests/HorseRacingProject.Tests.csproj --no-build --configuration Release --verbosity normal --logger "trx;LogFileName=test-results.trx" --results-directory ./TestResults
+
+      - name: Publish test report
+        uses: dorny/test-reporter@v1
+        if: always()
+        with:
+          name: Test Results
+          path: "TestResults/*.trx"
+          reporter: dotnet-trx
