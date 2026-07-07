@@ -27,6 +27,14 @@ jobs:
         working-directory: HorseRacingProject
         run: echo '{"sdk":{"version":"8.0.422","rollForward":"latestFeature"}}' > global.json
 
+      - name: Debug - resolve TargetFramework
+        working-directory: HorseRacingProject
+        run: |
+          dotnet --version
+          dotnet msbuild HorseRacingAPI.csproj -getProperty:TargetFramework
+          echo "---env---"
+          env | grep -i "dotnet\|msbuild\|target" || true
+
       - name: Start backend against Neon e2e branch
         working-directory: HorseRacingProject
         env:
