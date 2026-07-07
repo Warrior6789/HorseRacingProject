@@ -23,10 +23,9 @@ jobs:
         with:
           dotnet-version: "8.0.x"
 
-      - name: Debug - dotnet info
-        run: |
-          which dotnet
-          dotnet --info
+      - name: Pin SDK to the installed .NET 8
+        working-directory: HorseRacingProject
+        run: echo '{"sdk":{"version":"8.0.422","rollForward":"latestFeature"}}' > global.json
 
       - name: Start backend against Neon e2e branch
         working-directory: HorseRacingProject
@@ -36,7 +35,6 @@ jobs:
           Jwt__Issuer: "HorseRacingAPI"
           Jwt__Audience: "HorseRacingFrontend"
           Jwt__DurationInMinutes: "180"
-          DOTNET_ROLL_FORWARD: LatestPatch
         run: |
           nohup dotnet run --urls http://localhost:5035 > ../backend.log 2>&1 &
           for i in $(seq 1 30); do
@@ -44,15 +42,6 @@ jobs:
             if [ "$code" != "000" ] && [ -n "$code" ]; then echo "Backend is up (HTTP $code)"; break; fi
             sleep 2
           done
-
-      - name: Debug - raw multipart request to backend
-        run: |
-          curl --version
-          curl -v -s -o /dev/null -X POST http://localhost:5035/api/auth/register \
-            -F "fullName=Debug User" \
-            -F "email=debug-curl-$(date +%s)@test.com" \
-            -F "phone=0900000000" \
-            -F "password=Passw0rd!123" 2>&1
 
       - name: Setup Node 20
         uses: actions/setup-node@v4
