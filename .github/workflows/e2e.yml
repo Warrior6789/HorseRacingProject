@@ -34,6 +34,17 @@ jobs:
           dotnet msbuild HorseRacingAPI.csproj -getProperty:TargetFramework
           echo "---env---"
           env | grep -i "dotnet\|msbuild\|target" || true
+          echo "---searching parent dirs for stray build files---"
+          d="$(pwd)"
+          while [ "$d" != "/" ]; do
+            for f in "$d"/Directory.Build.props "$d"/Directory.Build.targets "$d"/Directory.Build.rsp "$d"/global.json "$d"/NuGet.config "$d"/nuget.config; do
+              if [ -f "$f" ]; then
+                echo "=== $f ==="
+                cat "$f"
+              fi
+            done
+            d="$(dirname "$d")"
+          done
 
       - name: Start backend against Neon e2e branch
         working-directory: HorseRacingProject
