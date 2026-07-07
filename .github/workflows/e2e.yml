@@ -40,6 +40,14 @@ jobs:
             sleep 2
           done
 
+      - name: Debug - raw multipart request to backend
+        run: |
+          curl -s -i -X POST http://localhost:5035/api/auth/register \
+            -F "fullName=Debug User" \
+            -F "email=debug-curl-$(date +%s)@test.com" \
+            -F "phone=0900000000" \
+            -F "password=Passw0rd!123"
+
       - name: Setup Node 20
         uses: actions/setup-node@v4
         with:
