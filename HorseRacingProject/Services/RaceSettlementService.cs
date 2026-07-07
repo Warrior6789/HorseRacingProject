@@ -33,8 +33,8 @@ namespace HorseRacingAPI.Services
                 .AnyAsync(r => r.RaceId == raceId && r.Status == RefereeReportStatus.Pending);
             if (hasPending) return;
 
-            bool alreadySettled = !await uow.GetRepository<Bet>().Entities
-                .AnyAsync(b => b.Registration.RaceId == raceId && b.Status == BetStatus.Active);
+            bool alreadySettled = await uow.GetRepository<Prize>().Entities
+                .AnyAsync(p => p.Registration.RaceId == raceId);
             if (alreadySettled) return;
 
             List<Registration> sortedRegs = await uow.GetRepository<RaceResult>().Entities
