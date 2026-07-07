@@ -27,6 +27,10 @@ jobs:
         working-directory: HorseRacingProject
         env:
           ConnectionStrings__DefaultConnection: ${{ secrets.NEON_E2E_CONNECTION_STRING }}
+          Jwt__Key: "e2e-ci-signing-key-never-used-in-production-0000"
+          Jwt__Issuer: "HorseRacingAPI"
+          Jwt__Audience: "HorseRacingFrontend"
+          Jwt__DurationInMinutes: "180"
         run: |
           nohup dotnet run --urls http://localhost:5035 > ../backend.log 2>&1 &
           for i in $(seq 1 30); do
