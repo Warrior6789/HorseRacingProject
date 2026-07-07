@@ -18,10 +18,13 @@ jobs:
           repository: Warrior6789/horse_racing_react
           path: frontend
 
-      - name: Setup .NET 8
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: "8.0.x"
+      - name: Install isolated .NET 8 SDK
+        run: |
+          curl -sSL https://dot.net/v1/dotnet-install.sh -o dotnet-install.sh
+          chmod +x dotnet-install.sh
+          ./dotnet-install.sh --channel 8.0 --install-dir "$HOME/dotnet8"
+          echo "$HOME/dotnet8" >> "$GITHUB_PATH"
+          echo "DOTNET_ROOT=$HOME/dotnet8" >> "$GITHUB_ENV"
 
       - name: Start backend against Neon e2e branch
         working-directory: HorseRacingProject
@@ -32,6 +35,13 @@ jobs:
           Jwt__Audience: "HorseRacingFrontend"
           Jwt__DurationInMinutes: "180"
         run: |
+          {
+            echo "=== DEBUG dotnet resolution ==="
+            which dotnet
+            dotnet --version
+            dotnet msbuild HorseRacingAPI.csproj -getProperty:TargetFramework
+            echo "=== END DEBUG dotnet resolution ==="
+          } > ../debug-curl.log 2>&1
           nohup dotnet run --urls http://localhost:5035 > ../backend.log 2>&1 &
           for i in $(seq 1 30); do
             code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:5035/ || true)
@@ -47,7 +57,7 @@ jobs:
               -F "phone=0900000000" \
               -F "password=Passw0rd!123" 2>&1
             echo "=== END DEBUG ==="
-          } > ../debug-curl.log 2>&1
+          } >> ../debug-curl.log 2>&1
 
       - name: Setup Node 20
         uses: actions/setup-node@v4
