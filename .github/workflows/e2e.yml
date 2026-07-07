@@ -47,7 +47,7 @@ jobs:
               -F "phone=0900000000" \
               -F "password=Passw0rd!123" 2>&1
             echo "=== END DEBUG ==="
-          } >> ../backend.log 2>&1
+          } > ../debug-curl.log 2>&1
 
       - name: Setup Node 20
         uses: actions/setup-node@v4
@@ -78,7 +78,7 @@ jobs:
 
       - name: Show backend log on failure
         if: failure()
-        run: cat backend.log
+        run: cat backend.log debug-curl.log
 
       - name: Upload Playwright report
         if: failure()
