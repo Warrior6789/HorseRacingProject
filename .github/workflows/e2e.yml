@@ -30,8 +30,8 @@ jobs:
         run: |
           nohup dotnet run --urls http://localhost:5035 > ../backend.log 2>&1 &
           for i in $(seq 1 30); do
-            code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:5035/)
-            if [ "$code" != "000" ]; then echo "Backend is up (HTTP $code)"; break; fi
+            code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:5035/ || true)
+            if [ "$code" != "000" ] && [ -n "$code" ]; then echo "Backend is up (HTTP $code)"; break; fi
             sleep 2
           done
 
