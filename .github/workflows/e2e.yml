@@ -6,41 +6,14 @@ on:
 
 jobs:
   e2e:
-    runs-on: windows-latest
-    defaults:
-      run:
-        shell: bash
+    runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout backend
-        uses: actions/checkout@v4
-
-      - name: Checkout frontend
+      - name: Checkout frontend (e2e specs live there)
         uses: actions/checkout@v4
         with:
           repository: Warrior6789/horse_racing_react
           path: frontend
-
-      - name: Setup .NET 8
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: "8.0.x"
-
-      - name: Start backend against Neon e2e branch
-        working-directory: HorseRacingProject
-        env:
-          ConnectionStrings__DefaultConnection: ${{ secrets.NEON_E2E_CONNECTION_STRING }}
-          Jwt__Key: "e2e-ci-signing-key-never-used-in-production-0000"
-          Jwt__Issuer: "HorseRacingAPI"
-          Jwt__Audience: "HorseRacingFrontend"
-          Jwt__DurationInMinutes: "180"
-        run: |
-          nohup dotnet run --urls http://localhost:5035 > ../backend.log 2>&1 &
-          for i in $(seq 1 30); do
-            code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:5035/ || true)
-            if [ "$code" != "000" ] && [ -n "$code" ]; then echo "Backend is up (HTTP $code)"; break; fi
-            sleep 2
-          done
 
       - name: Setup Node 20
         uses: actions/setup-node@v4
@@ -66,12 +39,8 @@ jobs:
       - name: Run Playwright e2e tests
         working-directory: frontend
         env:
-          VITE_API_URL: ""
+          VITE_API_URL: "https://horseracingproject-production.up.railway.app"
         run: npx playwright test
-
-      - name: Show backend log on failure
-        if: failure()
-        run: cat backend.log
 
       - name: Upload Playwright report
         if: failure()
