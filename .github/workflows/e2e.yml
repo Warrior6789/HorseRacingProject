@@ -18,8 +18,7 @@ jobs:
           repository: Warrior6789/horse_racing_react
           path: frontend
 
-      - name: Start backend against Neon e2e branch (via Docker, same image as production)
-        working-directory: HorseRacingProject
+      - name: Start backend against Neon e2e branch (via Docker, same image AND build command as production)
         run: |
           docker run -d --name backend --network host \
             -v "$PWD:/src" -w /src \
@@ -29,8 +28,8 @@ jobs:
             -e Jwt__Audience="HorseRacingFrontend" \
             -e Jwt__DurationInMinutes="180" \
             mcr.microsoft.com/dotnet/sdk:8.0 \
-            dotnet run --urls http://localhost:5035
-          for i in $(seq 1 60); do
+            sh -c "dotnet publish HorseRacingProject/HorseRacingAPI.csproj -c Release -o /app && dotnet /app/HorseRacingAPI.dll --urls http://localhost:5035"
+          for i in $(seq 1 90); do
             code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:5035/ || true)
             if [ "$code" != "000" ] && [ -n "$code" ]; then echo "Backend is up (HTTP $code)"; break; fi
             sleep 2
@@ -44,7 +43,7 @@ jobs:
               -F "phone=0900000000" \
               -F "password=Passw0rd!123" 2>&1
             echo "=== END DEBUG ==="
-          } > ../debug-curl.log 2>&1
+          } > debug-curl.log 2>&1
 
       - name: Setup Node 20
         uses: actions/setup-node@v4
