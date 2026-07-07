@@ -23,6 +23,11 @@ jobs:
         with:
           dotnet-version: "8.0.x"
 
+      - name: Debug - dotnet info
+        run: |
+          which dotnet
+          dotnet --info
+
       - name: Start backend against Neon e2e branch
         working-directory: HorseRacingProject
         env:
