@@ -1,0 +1,73 @@
+name: E2E (Neon staging)
+
+on:
+  pull_request:
+    branches: [dev]
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout backend
+        uses: actions/checkout@v4
+
+      - name: Checkout frontend
+        uses: actions/checkout@v4
+        with:
+          repository: Warrior6789/horse_racing_react
+          path: frontend
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Start backend against Neon e2e branch
+        working-directory: HorseRacingProject
+        env:
+          ConnectionStrings__DefaultConnection: ${{ secrets.NEON_E2E_CONNECTION_STRING }}
+        run: |
+          nohup dotnet run --urls http://localhost:5035 > ../backend.log 2>&1 &
+          for i in $(seq 1 30); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:5035/)
+            if [ "$code" != "000" ]; then echo "Backend is up (HTTP $code)"; break; fi
+            sleep 2
+          done
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20.x"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Install Playwright browsers
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+
+      - name: Reset e2e fixture data
+        working-directory: frontend
+        env:
+          E2E_DATABASE_URL: ${{ secrets.NEON_E2E_DATABASE_URL }}
+        run: node e2e/reset-e2e-data.js
+
+      - name: Run Playwright e2e tests
+        working-directory: frontend
+        run: npx playwright test
+
+      - name: Show backend log on failure
+        if: failure()
+        run: cat backend.log
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: frontend/playwright-report/
+          retention-days: 7
