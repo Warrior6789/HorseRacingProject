@@ -36,7 +36,7 @@ jobs:
           Jwt__Audience: "HorseRacingFrontend"
           Jwt__DurationInMinutes: "180"
         run: |
-          nohup dotnet run --urls http://localhost:5035 > ../backend.log 2>&1 &
+          nohup dotnet run --framework net8.0 --urls http://localhost:5035 > ../backend.log 2>&1 &
           for i in $(seq 1 30); do
             code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:5035/ || true)
             if [ "$code" != "000" ] && [ -n "$code" ]; then echo "Backend is up (HTTP $code)"; break; fi
