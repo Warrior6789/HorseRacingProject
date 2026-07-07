@@ -27,25 +27,6 @@ jobs:
         working-directory: HorseRacingProject
         run: echo '{"sdk":{"version":"8.0.422","rollForward":"latestFeature"}}' > global.json
 
-      - name: Debug - resolve TargetFramework
-        working-directory: HorseRacingProject
-        run: |
-          dotnet --version
-          dotnet msbuild HorseRacingAPI.csproj -getProperty:TargetFramework
-          echo "---env---"
-          env | grep -i "dotnet\|msbuild\|target" || true
-          echo "---searching parent dirs for stray build files---"
-          d="$(pwd)"
-          while [ "$d" != "/" ]; do
-            for f in "$d"/Directory.Build.props "$d"/Directory.Build.targets "$d"/Directory.Build.rsp "$d"/global.json "$d"/NuGet.config "$d"/nuget.config; do
-              if [ -f "$f" ]; then
-                echo "=== $f ==="
-                cat "$f"
-              fi
-            done
-            d="$(dirname "$d")"
-          done
-
       - name: Start backend against Neon e2e branch
         working-directory: HorseRacingProject
         env:
@@ -55,7 +36,7 @@ jobs:
           Jwt__Audience: "HorseRacingFrontend"
           Jwt__DurationInMinutes: "180"
         run: |
-          nohup dotnet run --framework net8.0 --urls http://localhost:5035 > ../backend.log 2>&1 &
+          nohup dotnet run -p:TargetFramework=net8.0 --urls http://localhost:5035 > ../backend.log 2>&1 &
           for i in $(seq 1 30); do
             code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:5035/ || true)
             if [ "$code" != "000" ] && [ -n "$code" ]; then echo "Backend is up (HTTP $code)"; break; fi
