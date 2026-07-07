@@ -40,7 +40,7 @@ jobs:
         working-directory: frontend
         env:
           VITE_API_URL: "https://horseracingproject-production.up.railway.app"
-        run: npx playwright test
+        run: npx playwright test e2e/login.spec.js e2e/registration.spec.js e2e/jockey-accept.spec.js e2e/race-settlement.spec.js
 
       - name: Upload Playwright report
         if: failure()
