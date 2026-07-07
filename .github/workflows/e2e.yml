@@ -18,36 +18,33 @@ jobs:
           repository: Warrior6789/horse_racing_react
           path: frontend
 
-      - name: Install isolated .NET 8 SDK
-        run: |
-          curl -sSL https://dot.net/v1/dotnet-install.sh -o dotnet-install.sh
-          chmod +x dotnet-install.sh
-          ./dotnet-install.sh --channel 8.0 --install-dir "$HOME/dotnet8"
-          echo "$HOME/dotnet8" >> "$GITHUB_PATH"
-          echo "DOTNET_ROOT=$HOME/dotnet8" >> "$GITHUB_ENV"
-
-      - name: Start backend against Neon e2e branch
+      - name: Start backend against Neon e2e branch (via Docker, same image as production)
         working-directory: HorseRacingProject
-        env:
-          ConnectionStrings__DefaultConnection: ${{ secrets.NEON_E2E_CONNECTION_STRING }}
-          Jwt__Key: "e2e-ci-signing-key-never-used-in-production-0000"
-          Jwt__Issuer: "HorseRacingAPI"
-          Jwt__Audience: "HorseRacingFrontend"
-          Jwt__DurationInMinutes: "180"
         run: |
+          docker run -d --name backend --network host \
+            -v "$PWD:/src" -w /src \
+            -e ConnectionStrings__DefaultConnection="${{ secrets.NEON_E2E_CONNECTION_STRING }}" \
+            -e Jwt__Key="e2e-ci-signing-key-never-used-in-production-0000" \
+            -e Jwt__Issuer="HorseRacingAPI" \
+            -e Jwt__Audience="HorseRacingFrontend" \
+            -e Jwt__DurationInMinutes="180" \
+            mcr.microsoft.com/dotnet/sdk:8.0 \
+            dotnet run --urls http://localhost:5035
+          for i in $(seq 1 60); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:5035/ || true)
+            if [ "$code" != "000" ] && [ -n "$code" ]; then echo "Backend is up (HTTP $code)"; break; fi
+            sleep 2
+          done
           {
-            echo "=== DEBUG dotnet resolution ==="
-            which dotnet
-            dotnet --version
-            dotnet msbuild HorseRacingAPI.csproj -getProperty:TargetFramework
-            echo "=== END DEBUG dotnet resolution ==="
+            echo "=== DEBUG curl -v multipart ==="
+            curl --version
+            curl -v -s -o /dev/null -X POST http://localhost:5035/api/auth/register \
+              -F "fullName=Debug User" \
+              -F "email=debug-curl-$(date +%s)@test.com" \
+              -F "phone=0900000000" \
+              -F "password=Passw0rd!123" 2>&1
+            echo "=== END DEBUG ==="
           } > ../debug-curl.log 2>&1
-          dotnet build HorseRacingAPI.csproj -v:diag > /tmp/msbuild-diag.log 2>&1 || true
-          {
-            echo "=== DEBUG msbuild diag (TargetFramework reassignments) ==="
-            grep -n "TargetFramework" /tmp/msbuild-diag.log | grep -i "reassign\|=.*net10\|Overriding" | head -60
-            echo "=== END DEBUG msbuild diag ==="
-          } >> ../debug-curl.log 2>&1
 
       - name: Setup Node 20
         uses: actions/setup-node@v4
@@ -78,7 +75,9 @@ jobs:
 
       - name: Show backend log on failure
         if: failure()
-        run: cat backend.log debug-curl.log
+        run: |
+          docker logs backend > backend.log 2>&1 || true
+          cat backend.log debug-curl.log
 
       - name: Upload Playwright report
         if: failure()
