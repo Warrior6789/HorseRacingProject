@@ -42,21 +42,11 @@ jobs:
             dotnet msbuild HorseRacingAPI.csproj -getProperty:TargetFramework
             echo "=== END DEBUG dotnet resolution ==="
           } > ../debug-curl.log 2>&1
-          nohup dotnet run --urls http://localhost:5035 > ../backend.log 2>&1 &
-          for i in $(seq 1 30); do
-            code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:5035/ || true)
-            if [ "$code" != "000" ] && [ -n "$code" ]; then echo "Backend is up (HTTP $code)"; break; fi
-            sleep 2
-          done
+          dotnet build HorseRacingAPI.csproj -v:diag > /tmp/msbuild-diag.log 2>&1 || true
           {
-            echo "=== DEBUG curl -v multipart ==="
-            curl --version
-            curl -v -s -o /dev/null -X POST http://localhost:5035/api/auth/register \
-              -F "fullName=Debug User" \
-              -F "email=debug-curl-$(date +%s)@test.com" \
-              -F "phone=0900000000" \
-              -F "password=Passw0rd!123" 2>&1
-            echo "=== END DEBUG ==="
+            echo "=== DEBUG msbuild diag (TargetFramework reassignments) ==="
+            grep -n "TargetFramework" /tmp/msbuild-diag.log | grep -i "reassign\|=.*net10\|Overriding" | head -60
+            echo "=== END DEBUG msbuild diag ==="
           } >> ../debug-curl.log 2>&1
 
       - name: Setup Node 20
