@@ -31,6 +31,7 @@ jobs:
           Jwt__Issuer: "HorseRacingAPI"
           Jwt__Audience: "HorseRacingFrontend"
           Jwt__DurationInMinutes: "180"
+          DOTNET_ROLL_FORWARD: LatestPatch
         run: |
           nohup dotnet run --urls http://localhost:5035 > ../backend.log 2>&1 &
           for i in $(seq 1 30); do
