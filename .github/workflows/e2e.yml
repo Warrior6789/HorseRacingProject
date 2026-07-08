@@ -15,7 +15,7 @@ jobs:
       - name: Checkout frontend (e2e specs live there)
         uses: actions/checkout@v4
         with:
-          repository: Warrior6789/horse_racing_react
+          repository: Warrior6789/horse-racing-react
           path: frontend
 
       - name: Setup Node 20
