@@ -16,6 +16,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: Warrior6789/horse_racing_react
+          ref: dev
           path: frontend
 
       - name: Setup Node 20
