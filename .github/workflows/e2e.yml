@@ -1,7 +1,7 @@
-name: E2E (Neon staging)
+name: E2E (Neon staging, post-deploy smoke test)
 
 on:
-  pull_request:
+  push:
     branches: [dev]
 
 jobs:
@@ -9,6 +9,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Wait for Railway to finish deploying
+        run: sleep 90
+
       - name: Checkout frontend (e2e specs live there)
         uses: actions/checkout@v4
         with:
