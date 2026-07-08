@@ -19,6 +19,8 @@ public partial class HorseRacingDataContext : DbContext
 
     public virtual DbSet<Bet> Bets { get; set; }
 
+    public virtual DbSet<BetCarryover> BetCarryovers { get; set; }
+
     public virtual DbSet<JockeyRewardConfig> JockeyRewardConfigs { get; set; }
 
     public virtual DbSet<RegistrationFeeConfig> RegistrationFeeConfigs { get; set; }
@@ -97,6 +99,27 @@ public partial class HorseRacingDataContext : DbContext
                 .HasForeignKey(d => d.SpectatorId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_Bets_Account");
+        });
+
+        modelBuilder.Entity<BetCarryover>(entity =>
+        {
+            entity.HasKey(e => e.BetCarryoverId).HasName("BetCarryover_pkey");
+            entity.ToTable("BetCarryover");
+
+            entity.HasIndex(e => new { e.RacecourseId, e.BetType }, "BetCarryover_Racecourse_BetType_key").IsUnique();
+
+            entity.Property(e => e.BetCarryoverId)
+                .ValueGeneratedNever()
+                .HasColumnName("BetCarryoverID");
+            entity.Property(e => e.RacecourseId).HasColumnName("RacecourseID");
+            entity.Property(e => e.BetType).HasMaxLength(20).HasConversion<string>();
+            entity.Property(e => e.Amount).HasPrecision(18, 2).HasDefaultValue(0m);
+            entity.Property(e => e.UpdatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            entity.HasOne(d => d.Racecourse).WithMany()
+                .HasForeignKey(d => d.RacecourseId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_BetCarryover_Racecourse");
         });
 
         modelBuilder.Entity<JockeyRewardConfig>(entity =>

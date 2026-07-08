@@ -51,12 +51,14 @@ namespace HorseRacingAPI.Services
                 await uow.GetRepository<Horse>().UpdateAsync(winnerHorse);
             }
 
-            decimal carryover = await SettleBetsAsync(uow, raceId, sortedRegs);
-            await DistributePrizesAsync(uow, race, sortedRegs, carryover);
+            await SettleBetsAsync(uow, race, sortedRegs);
+            await DistributePrizesAsync(uow, race, sortedRegs);
         }
 
-        private async Task<decimal> SettleBetsAsync(IUnitofWork uow, Guid raceId, List<Registration> sortedRegs)
+        private async Task SettleBetsAsync(IUnitofWork uow, Race race, List<Registration> sortedRegs)
         {
+            Guid raceId = race.RaceId;
+
             TakeoutConfig? takeoutConfig = await uow.GetRepository<TakeoutConfig>().Entities
                 .FirstOrDefaultAsync(c => c.Status == ConfigStatus.Active);
             decimal takeout = (decimal)(takeoutConfig?.TakeoutPercentage ?? 0.20f);
@@ -70,7 +72,6 @@ namespace HorseRacingAPI.Services
                 .Where(b => b.Registration.RaceId == raceId && b.Status == BetStatus.Active)
                 .ToListAsync();
 
-            decimal carryover = 0;
             var betPayouts = new List<(Guid accountId, long amount, long newBalance)>();
             bool ledgerCreated = false;
 
@@ -93,6 +94,9 @@ namespace HorseRacingAPI.Services
                     CreatedAt = DateTimeOffset.UtcNow
                 });
                 ledgerCreated = true;
+
+                BetCarryover? carryoverRow = await uow.GetRepository<BetCarryover>().Entities
+                    .FirstOrDefaultAsync(c => c.RacecourseId == race.RacecourseId && c.BetType == betType);
 
                 HashSet<Guid> winningRegIds = positions
                     .Where(kvp => betType switch
@@ -117,8 +121,33 @@ namespace HorseRacingAPI.Services
                         bet.PayoutRatio = 0;
                         await uow.GetRepository<Bet>().UpdateAsync(bet);
                     }
-                    carryover += netPool;
+
+                    if (carryoverRow != null)
+                    {
+                        carryoverRow.Amount += netPool;
+                        carryoverRow.UpdatedAt = DateTimeOffset.UtcNow;
+                        await uow.GetRepository<BetCarryover>().UpdateAsync(carryoverRow);
+                    }
+                    else
+                    {
+                        await uow.GetRepository<BetCarryover>().AddAsync(new BetCarryover
+                        {
+                            BetCarryoverId = Guid.NewGuid(),
+                            RacecourseId = race.RacecourseId,
+                            BetType = betType,
+                            Amount = netPool,
+                            UpdatedAt = DateTimeOffset.UtcNow
+                        });
+                    }
                     continue;
+                }
+
+                if (carryoverRow != null && carryoverRow.Amount > 0)
+                {
+                    netPool += carryoverRow.Amount;
+                    carryoverRow.Amount = 0;
+                    carryoverRow.UpdatedAt = DateTimeOffset.UtcNow;
+                    await uow.GetRepository<BetCarryover>().UpdateAsync(carryoverRow);
                 }
 
                 float ratio = Math.Max((float)(netPool / winningPool), 1.0f);
@@ -159,11 +188,9 @@ namespace HorseRacingAPI.Services
                     newBalance,
                     reason = "BetPayout"
                 });
-
-            return carryover;
         }
 
-        private async Task DistributePrizesAsync(IUnitofWork uow, Race race, List<Registration> sortedRegs, decimal carryover = 0)
+        private async Task DistributePrizesAsync(IUnitofWork uow, Race race, List<Registration> sortedRegs)
         {
             PositionPrizeConfig? posConfig = await uow.GetRepository<PositionPrizeConfig>().Entities
                 .FirstOrDefaultAsync(c => c.Status == ConfigStatus.Active);
@@ -171,7 +198,7 @@ namespace HorseRacingAPI.Services
                 .FirstOrDefaultAsync(c => c.Status == ConfigStatus.Active);
             if (posConfig == null || jockeyConfig == null) return;
 
-            decimal racePurse = race.PrizePool + carryover;
+            decimal racePurse = race.PrizePool;
             if (racePurse <= 0) return;
 
             race.PositionPrizeConfigId = posConfig.PositionPrizeConfigId;
