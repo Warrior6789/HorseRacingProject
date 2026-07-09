@@ -85,8 +85,8 @@ public class BetSettlementIntegrationTests
 
         for (int i = 0; i < 3; i++)
         {
-            owners[i] = new Account { Id = Guid.NewGuid(), Email = $"owner{i}@test.com", PasswordHash = "x", Role = AccountRole.HorseOwner, Status = AccountStatus.Active };
-            jockeys[i] = new Account { Id = Guid.NewGuid(), Email = $"jockey{i}@test.com", PasswordHash = "x", Role = AccountRole.Jockey, Status = AccountStatus.Active };
+            owners[i] = new Account { Id = Guid.NewGuid(), Email = $"owner{i}-{race.RaceId:N}@test.com", PasswordHash = "x", Role = AccountRole.HorseOwner, Status = AccountStatus.Active };
+            jockeys[i] = new Account { Id = Guid.NewGuid(), Email = $"jockey{i}-{race.RaceId:N}@test.com", PasswordHash = "x", Role = AccountRole.Jockey, Status = AccountStatus.Active };
             horses[i] = new Horse { Id = Guid.NewGuid(), OwnerId = owners[i].Id, HorseName = $"Horse{i}", Status = HorseStatus.Healthy, RecordWins = 0 };
             registrations[i] = new Registration
             {
@@ -103,7 +103,7 @@ public class BetSettlementIntegrationTests
         var spectators = new Account[spectatorCount];
         for (int i = 0; i < spectatorCount; i++)
         {
-            spectators[i] = new Account { Id = Guid.NewGuid(), Email = $"spectator{i}@test.com", PasswordHash = "x", Role = AccountRole.Spectator, Status = AccountStatus.Active };
+            spectators[i] = new Account { Id = Guid.NewGuid(), Email = $"spectator{i}-{race.RaceId:N}@test.com", PasswordHash = "x", Role = AccountRole.Spectator, Status = AccountStatus.Active };
             db.Add(new UserProfile { ProfileId = Guid.NewGuid(), AccountId = spectators[i].Id, Balance = 0 });
         }
 

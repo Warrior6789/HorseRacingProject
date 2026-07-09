@@ -156,7 +156,7 @@ namespace HorseRacingAPI.Services
                 {
                     bool won = winningRegIds.Contains(bet.RegistrationId);
                     bet.Status = won ? BetStatus.Won : BetStatus.Lost;
-                    bet.PayoutRatio = ratio;
+                    bet.PayoutRatio = won ? ratio : 0f;
                     await uow.GetRepository<Bet>().UpdateAsync(bet);
 
                     if (won)
@@ -205,23 +205,23 @@ namespace HorseRacingAPI.Services
             race.JockeyRewardConfigId  = jockeyConfig.JockeyRewardConfigId;
             await uow.GetRepository<Race>().UpdateAsync(race);
 
-            double[] allRatios =
+            decimal[] allRatios =
             [
-                posConfig.Pos1Ratio, posConfig.Pos2Ratio, posConfig.Pos3Ratio,
-                posConfig.Pos4Ratio, posConfig.Pos5Ratio, posConfig.Pos6Ratio
+                (decimal)posConfig.Pos1Ratio, (decimal)posConfig.Pos2Ratio, (decimal)posConfig.Pos3Ratio,
+                (decimal)posConfig.Pos4Ratio, (decimal)posConfig.Pos5Ratio, (decimal)posConfig.Pos6Ratio
             ];
             int finisherCount = Math.Min(sortedRegs.Count, allRatios.Length);
-            double[] usedRatios = allRatios.Take(finisherCount).ToArray();
-            double ratioSum = usedRatios.Sum();
+            decimal[] usedRatios = allRatios.Take(finisherCount).ToArray();
+            decimal ratioSum = usedRatios.Sum();
             if (ratioSum <= 0) return;
-            double[] normalizedRatios = usedRatios.Select(r => r / ratioSum).ToArray();
+            decimal[] normalizedRatios = usedRatios.Select(r => r / ratioSum).ToArray();
             var prizePayouts = new List<(Guid accountId, long amount, long newBalance, string reason)>();
 
             for (int i = 0; i < finisherCount; i++)
             {
                 Registration reg = sortedRegs[i];
                 int position = i + 1;
-                decimal positionPrize = racePurse * (decimal)normalizedRatios[i];
+                decimal positionPrize = racePurse * normalizedRatios[i];
                 decimal jockeyAmount = position switch
                 {
                     1 => positionPrize * (decimal)jockeyConfig.WinCut,
