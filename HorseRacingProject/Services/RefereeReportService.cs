@@ -413,36 +413,6 @@ namespace HorseRacingAPI.Services
             };
         }
 
-        public async Task<RefereeReportResponse> GetReportByIdAsync(Guid reportId, Guid requesterId, bool isAdmin)
-        {
-            RefereeReport? report = await _uow.GetRepository<RefereeReport>().Entities
-                .Include(r => r.Race)
-                .Include(r => r.Registration).ThenInclude(r => r.Horse)
-                .Include(r => r.Referee).ThenInclude(r => r.UserProfiles)
-                .Include(r => r.Registration).ThenInclude(r => r.RaceResults)
-                .FirstOrDefaultAsync(r => r.ReportId == reportId)
-                ?? throw new KeyNotFoundException("Report not found.");
-
-            if (!isAdmin && report.RefereeId != requesterId)
-                throw new UnauthorizedAccessException("Access denied.");
-
-            return new RefereeReportResponse
-            {
-                ReportId            = report.ReportId,
-                RaceId              = report.RaceId,
-                RaceNumber          = report.Race.RaceNumber,
-                RefereeId           = report.RefereeId,
-                RefereeName         = report.Referee.UserProfiles.Select(p => p.FullName).FirstOrDefault() ?? report.Referee.Email ?? "",
-                RegistrationId      = report.RegistrationId,
-                HorseName           = report.Registration.Horse.HorseName,
-                OriginalPosition    = report.Registration.RaceResults.FirstOrDefault()?.FinishPosition,
-                IncidentDescription = report.IncidentDescription,
-                PenaltyApplied      = report.PenaltyApplied,
-                Status              = report.Status.ToString(),
-                CreatedAt           = report.CreatedAt,
-            };
-        }
-
         public async Task<RefereeReportResponse> UpdateReportAsync(Guid reportId, Guid refereeId, UpdateRefereeReportDto dto)
         {
             RefereeReport? report = await _uow.GetRepository<RefereeReport>().Entities

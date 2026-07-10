@@ -358,37 +358,6 @@ public class RaceServiceTests
     }
 
     [Fact]
-    public async Task GetRaceHorsesAsync_NotFound_ThrowsKeyNotFound()
-    {
-        using HorseRacingDataContext db = CreateContext();
-        RaceService service = CreateService(db);
-
-        await Assert.ThrowsAsync<KeyNotFoundException>(() => service.GetRaceHorsesAsync(Guid.NewGuid()));
-    }
-
-    [Fact]
-    public async Task GetRaceHorsesAsync_OnlyReturnsConfirmedRegistrations()
-    {
-        using HorseRacingDataContext db = CreateContext();
-        Racecourse racecourse = NewRacecourse();
-        Account owner = NewAccount(AccountRole.HorseOwner);
-        Account jockey = NewAccount(AccountRole.Jockey);
-        Horse confirmedHorse = NewHorse(owner.Id);
-        Horse pendingHorse = NewHorse(owner.Id);
-        var race = new Race { RaceId = Guid.NewGuid(), RacecourseId = racecourse.Id, Status = RaceStatus.Scheduled, StartTime = DateTimeOffset.UtcNow.AddHours(2) };
-        var confirmedReg = new Registration { RegistrationId = Guid.NewGuid(), RaceId = race.RaceId, HorseId = confirmedHorse.Id, JockeyId = jockey.Id, Status = RegistrationStatus.Confirmed };
-        var pendingReg = new Registration { RegistrationId = Guid.NewGuid(), RaceId = race.RaceId, HorseId = pendingHorse.Id, JockeyId = jockey.Id, Status = RegistrationStatus.Pending };
-        db.AddRange(racecourse, owner, jockey, confirmedHorse, pendingHorse, race, confirmedReg, pendingReg);
-        await db.SaveChangesAsync();
-        RaceService service = CreateService(db);
-
-        List<RaceResultHorseDto> horses = await service.GetRaceHorsesAsync(race.RaceId);
-
-        Assert.Single(horses);
-        Assert.Equal(confirmedHorse.Id, horses[0].Id);
-    }
-
-    [Fact]
     public async Task GetRaceRegistrationsAsync_NotFound_ThrowsKeyNotFound()
     {
         using HorseRacingDataContext db = CreateContext();

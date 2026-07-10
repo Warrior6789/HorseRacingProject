@@ -41,28 +41,6 @@ public class RacecourseServiceTests
     }
 
     [Fact]
-    public async Task GetRacecourseByIdAsync_NotFound_ThrowsKeyNotFound()
-    {
-        using HorseRacingDataContext db = CreateContext();
-        RacecourseService service = CreateService(db);
-
-        await Assert.ThrowsAsync<KeyNotFoundException>(() => service.GetRacecourseByIdAsync(Guid.NewGuid()));
-    }
-
-    [Fact]
-    public async Task GetRacecourseByIdAsync_Deleted_ThrowsKeyNotFound()
-    {
-        using HorseRacingDataContext db = CreateContext();
-        var racecourse = new Racecourse { Id = Guid.NewGuid(), RacecourseName = "Gone", IsDeleted = true };
-        db.Racecourses.Add(racecourse);
-        await db.SaveChangesAsync();
-
-        RacecourseService service = CreateService(db);
-
-        await Assert.ThrowsAsync<KeyNotFoundException>(() => service.GetRacecourseByIdAsync(racecourse.Id));
-    }
-
-    [Fact]
     public async Task CreateRacecourseAsync_NoImage_CreatesWithNullImageUrl()
     {
         using HorseRacingDataContext db = CreateContext();

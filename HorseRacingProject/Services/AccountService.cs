@@ -36,26 +36,6 @@ namespace HorseRacingAPI.Services
             await _uow.SaveAsync();
         }
 
-        public async Task<List<AccountResponse>> GetAccountByStatusAsync(string status)
-        {
-            IGenericRepository<Account> accRepo = _uow.GetRepository<Account>();
-            if (!Enum.TryParse<AccountStatus>(status, ignoreCase: true, out var accountStatus) || !Enum.IsDefined(accountStatus))
-            {
-                throw new ArgumentException("Invalid account status");
-            }
-
-            return await accRepo.Entities
-                .Where(a => a.Status == accountStatus && !a.IsDeleted)
-                .Select(a => new AccountResponse
-                {
-                    Id = a.Id,
-                    Email = a.Email,
-                    Role = a.Role.ToString(),
-                    Status = a.Status.ToString(),
-                    CreateAt = a.CreateAt
-                }).ToListAsync();
-        }
-
         public async Task<PagedResponse<AccountResponse>> GetAccountByStatusPagedAsync(string status, int page, int pageSize, string? role = null, string? search = null)
         {
             if (page < 1) page = 1;
@@ -115,61 +95,6 @@ namespace HorseRacingAPI.Services
             account.Status    = AccountStatus.Active;
             account.UpdatedAt = DateTimeOffset.UtcNow;
             await _uow.SaveAsync();
-        }
-
-        public async Task<List<UpgradeRequestResponse>> GetRoleUpgradeRequestsAsync()
-        {
-            List<Account> accounts = await _uow.GetRepository<Account>().Entities
-                .Where(a => a.RequestedRole != null && !a.IsDeleted)
-                .ToListAsync();
-
-            List<UpgradeRequestResponse> result = new();
-
-            foreach (Account account in accounts)
-            {
-                UpgradeRequestResponse item = new()
-                {
-                    AccountId    = account.Id,
-                    Email        = account.Email,
-                    CurrentRole  = account.Role.ToString(),
-                    RequestedRole = account.RequestedRole!.ToString()!,
-                    RequestedAt  = account.UpdatedAt
-                };
-
-                if (account.RequestedRole == AccountRole.Jockey)
-                {
-                    JockeyProfile? jp = await _uow.GetRepository<JockeyProfile>().Entities
-                        .FirstOrDefaultAsync(p => p.AccountId == account.Id && !p.IsDeleted);
-
-                    if (jp != null)
-                    {
-                        item.FullName             = jp.FullName;
-                        item.CertificateImageUrl  = jp.CertificateImageUrl;
-                        item.DateOfBirth          = jp.DateOfBirth;
-                        item.Nationality          = jp.Nationality;
-                        item.LicenseNumber        = jp.LicenseNumber;
-                        item.Weight               = jp.Weight;
-                        item.Height               = jp.Height;
-                    }
-                }
-                else
-                {
-                    UserProfile? up = await _uow.GetRepository<UserProfile>().Entities
-                        .FirstOrDefaultAsync(p => p.AccountId == account.Id && !p.IsDeleted);
-
-                    if (up != null)
-                    {
-                        item.FullName            = up.FullName;
-                        item.Phone               = up.Phone;
-                        item.AvatarUrl           = up.ImageUrl;
-                        item.CertificateImageUrl = up.CertificateImageUrl;
-                    }
-                }
-
-                result.Add(item);
-            }
-
-            return result;
         }
 
         public async Task<PagedResponse<UpgradeRequestResponse>> GetRoleUpgradeRequestsPagedAsync(int page, int pageSize)

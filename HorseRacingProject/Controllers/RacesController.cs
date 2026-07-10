@@ -67,13 +67,6 @@ namespace HorseRacingAPI.Controllers
             return Ok(ApiResponse<List<RegistrationResponse>>.SuccessResponse(result, "Get race registrations successfully."));
         }
 
-        [HttpGet("{raceId}/horses")]
-        public async Task<IActionResult> GetRaceHorses(Guid raceId)
-        {
-            List<RaceResultHorseDto> result = await _raceService.GetRaceHorsesAsync(raceId);
-            return Ok(ApiResponse<List<RaceResultHorseDto>>.SuccessResponse(result, "Get race horses successfully."));
-        }
-
         [HttpGet("{raceId}/results")]
         public async Task<IActionResult> GetRaceResults(Guid raceId)
         {

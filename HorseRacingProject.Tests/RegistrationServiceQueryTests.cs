@@ -102,54 +102,6 @@ public class RegistrationServiceQueryTests
     }
 
     [Fact]
-    public async Task GetOwnerRequestAsync_ReturnsOnlyPendingForOwner()
-    {
-        using HorseRacingDataContext db = CreateContext();
-        Racecourse racecourse = NewRacecourse();
-        Account owner = NewAccount(AccountRole.HorseOwner);
-        Account otherOwner = NewAccount(AccountRole.HorseOwner);
-        Account jockey = NewAccount(AccountRole.Jockey);
-        Horse ownHorse = NewHorse(owner.Id);
-        Horse otherHorse = NewHorse(otherOwner.Id);
-        var race = new Race { RaceId = Guid.NewGuid(), RacecourseId = racecourse.Id, Status = RaceStatus.Scheduled, StartTime = DateTimeOffset.UtcNow.AddHours(2) };
-        var ownPendingReg = new Registration { RegistrationId = Guid.NewGuid(), RaceId = race.RaceId, HorseId = ownHorse.Id, JockeyId = jockey.Id, Status = RegistrationStatus.Pending };
-        var otherPendingReg = new Registration { RegistrationId = Guid.NewGuid(), RaceId = race.RaceId, HorseId = otherHorse.Id, JockeyId = jockey.Id, Status = RegistrationStatus.Pending };
-        db.AddRange(racecourse, owner, otherOwner, jockey, ownHorse, otherHorse, race, ownPendingReg, otherPendingReg);
-        await db.SaveChangesAsync();
-        RegistrationService service = CreateService(db);
-
-        List<RegistrationResponse> result = await service.GetOwnerRequestAsync(owner.Id);
-
-        Assert.Single(result);
-        Assert.Equal(ownPendingReg.RegistrationId, result[0].RegistrationId);
-    }
-
-    [Fact]
-    public async Task GetOwnerRequestPagedAsync_ClampsInvalidPageAndPageSize()
-    {
-        using HorseRacingDataContext db = CreateContext();
-        Racecourse racecourse = NewRacecourse();
-        Account owner = NewAccount(AccountRole.HorseOwner);
-        Account jockey = NewAccount(AccountRole.Jockey);
-        var race = new Race { RaceId = Guid.NewGuid(), RacecourseId = racecourse.Id, Status = RaceStatus.Scheduled, StartTime = DateTimeOffset.UtcNow.AddHours(2) };
-        db.AddRange(racecourse, owner, jockey, race);
-        for (int i = 0; i < 3; i++)
-        {
-            Horse horse = NewHorse(owner.Id);
-            db.Horses.Add(horse);
-            db.Registrations.Add(new Registration { RegistrationId = Guid.NewGuid(), RaceId = race.RaceId, HorseId = horse.Id, JockeyId = jockey.Id, Status = RegistrationStatus.Pending });
-        }
-        await db.SaveChangesAsync();
-        RegistrationService service = CreateService(db);
-
-        PagedResponse<RegistrationResponse> result = await service.GetOwnerRequestPagedAsync(owner.Id, page: 0, pageSize: -5);
-
-        Assert.Equal(1, result.Page);
-        Assert.Equal(10, result.PageSize);
-        Assert.Equal(3, result.TotalCount);
-    }
-
-    [Fact]
     public async Task GetAllOwnerRegistrationsAsync_ReturnsAllStatusesOrderedByCreateAtDescending()
     {
         using HorseRacingDataContext db = CreateContext();

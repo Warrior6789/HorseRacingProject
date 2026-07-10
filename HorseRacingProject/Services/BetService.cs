@@ -21,34 +21,6 @@ namespace HorseRacingAPI.Services
             _uow = uow;
             _hubContext = hubContext;
         }
-        public async Task<List<BetResponse>> GetMyBetsAsync(Guid spectatorId)
-        {
-            List<BetResponse> bets = await _uow.GetRepository<Bet>().Entities
-                  .Include(b => b.Registration).ThenInclude(r => r.Horse)
-                  .Include(b => b.Registration).ThenInclude(r => r.Race)
-                  .Where(b => b.SpectatorId == spectatorId)
-                  .OrderByDescending(b => b.CreatedAt)
-                  .Select(b => new BetResponse
-                  {
-                      BetId = b.BetId,
-                      SpectatorId = b.SpectatorId,
-                      RegistrationId = b.RegistrationId,
-                      RaceId = b.Registration.RaceId,
-                      HorseName = b.Registration.Horse.HorseName,
-                      RaceNumber = b.Registration.Race.RaceNumber,
-                      RaceName = b.Registration.Race.RaceName,
-                      BetAmount = b.BetAmount,
-                      BetType = b.BetType.ToString(),
-                      PayoutRatio = b.PayoutRatio,
-                      Status = b.Status.ToString(),
-                      CreatedAt = b.CreatedAt
-                  })
-                  .ToListAsync();
-
-            await EnrichEstimatedPayoutAsync(bets);
-            return bets;
-        }
-
         public async Task<PagedResponse<BetResponse>> GetMyBetsPagedAsync(Guid spectatorId, int page, int pageSize)
         {
             if (page < 1) page = 1;

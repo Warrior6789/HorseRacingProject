@@ -581,30 +581,6 @@ namespace HorseRacingAPI.Services
                 .ToListAsync();
         }
 
-        public async Task<List<RaceResultHorseDto>> GetRaceHorsesAsync(Guid raceId)
-        {
-            bool exists = await _uow.GetRepository<Race>().Entities
-                .AnyAsync(r => r.RaceId == raceId && !r.IsDeleted);
-
-            if (!exists)
-                throw new KeyNotFoundException($"Race with id {raceId} not found.");
-
-            return await _uow.GetRepository<Registration>().Entities
-                .Include(r => r.Horse)
-                .Where(r => r.RaceId == raceId && r.Status == RegistrationStatus.Confirmed)
-                .Select(r => new RaceResultHorseDto
-                {
-                    Id = r.Horse.Id,
-                    RegistrationId = r.RegistrationId,
-                    HorseName = r.Horse.HorseName,
-                    Breed = r.Horse.Breed,
-                    Color = r.Horse.Color,
-                    Age = r.Horse.Age,
-                    Status = r.Horse.Status.ToString()
-                })
-                .ToListAsync();
-        }
-
         public async Task<List<RegistrationResponse>> GetRaceRegistrationsAsync(Guid raceId)
         {
             bool exists = await _uow.GetRepository<Race>().Entities
@@ -1185,24 +1161,24 @@ namespace HorseRacingAPI.Services
                 };
             }
 
-            double[] allRatios =
+            decimal[] allRatios =
             [
-                posConfig.Pos1Ratio, posConfig.Pos2Ratio, posConfig.Pos3Ratio,
-                posConfig.Pos4Ratio, posConfig.Pos5Ratio, posConfig.Pos6Ratio
+                (decimal)posConfig.Pos1Ratio, (decimal)posConfig.Pos2Ratio, (decimal)posConfig.Pos3Ratio,
+                (decimal)posConfig.Pos4Ratio, (decimal)posConfig.Pos5Ratio, (decimal)posConfig.Pos6Ratio
             ];
             int finisherCount = Math.Min(sortedRegs.Count, allRatios.Length);
-            double[] usedRatios = allRatios.Take(finisherCount).ToArray();
-            double ratioSum = usedRatios.Sum();
+            decimal[] usedRatios = allRatios.Take(finisherCount).ToArray();
+            decimal ratioSum = usedRatios.Sum();
 
             List<RacePrizePreviewItemResponse> previewItems = new();
             if (ratioSum > 0)
             {
-                double[] normalizedRatios = usedRatios.Select(r => r / ratioSum).ToArray();
+                decimal[] normalizedRatios = usedRatios.Select(r => r / ratioSum).ToArray();
                 for (int i = 0; i < finisherCount; i++)
                 {
                     Registration reg = sortedRegs[i];
                     int position = i + 1;
-                    decimal positionPrize = race.PrizePool * (decimal)normalizedRatios[i];
+                    decimal positionPrize = race.PrizePool * normalizedRatios[i];
                     decimal jockeyAmount = position switch
                     {
                         1 => positionPrize * (decimal)jockeyConfig.WinCut,

@@ -190,27 +190,6 @@ public class HorseServiceTests
     }
 
     [Fact]
-    public async Task GetActiveHorsesAsync_ExcludesInjuryAndRetired()
-    {
-        using HorseRacingDataContext db = CreateContext();
-        Account owner = NewAccount(AccountRole.HorseOwner);
-        db.Accounts.Add(owner);
-        db.Horses.Add(new Horse { Id = Guid.NewGuid(), OwnerId = owner.Id, HorseName = "Healthy1", Status = HorseStatus.Healthy });
-        db.Horses.Add(new Horse { Id = Guid.NewGuid(), OwnerId = owner.Id, HorseName = "Resting1", Status = HorseStatus.Resting });
-        db.Horses.Add(new Horse { Id = Guid.NewGuid(), OwnerId = owner.Id, HorseName = "Injured1", Status = HorseStatus.Injury });
-        db.Horses.Add(new Horse { Id = Guid.NewGuid(), OwnerId = owner.Id, HorseName = "Retired1", Status = HorseStatus.Retired });
-        await db.SaveChangesAsync();
-
-        HorseService service = CreateService(db);
-
-        List<HorseResponse> result = await service.GetActiveHorsesAsync(owner.Id, isAdmin: false);
-
-        Assert.Equal(2, result.Count);
-        Assert.Contains(result, h => h.HorseName == "Healthy1");
-        Assert.Contains(result, h => h.HorseName == "Resting1");
-    }
-
-    [Fact]
     public async Task GetPerformanceSummaryAsync_AggregatesRacesWinsAndEarnings()
     {
         using HorseRacingDataContext db = CreateContext();
@@ -325,88 +304,4 @@ public class HorseServiceTests
         Assert.Equal("Healthy1", result.Items[0].HorseName);
     }
 
-    [Fact]
-    public async Task GetMyScheduleAsync_ReturnsRegistrationsForOwnerHorses()
-    {
-        using HorseRacingDataContext db = CreateContext();
-        Account owner = NewAccount(AccountRole.HorseOwner);
-        Account jockey = NewAccount(AccountRole.Jockey);
-        var racecourse = new Racecourse { Id = Guid.NewGuid(), RacecourseName = "Track" };
-        var horse = new Horse { Id = Guid.NewGuid(), OwnerId = owner.Id, HorseName = "Thunder", Status = HorseStatus.Healthy };
-        var race = new Race { RaceId = Guid.NewGuid(), RacecourseId = racecourse.Id, Status = RaceStatus.Scheduled, StartTime = DateTimeOffset.UtcNow.AddHours(2) };
-        var registration = new Registration { RegistrationId = Guid.NewGuid(), RaceId = race.RaceId, HorseId = horse.Id, JockeyId = jockey.Id, Status = RegistrationStatus.Confirmed };
-        db.AddRange(owner, jockey, racecourse, horse, race, registration);
-        await db.SaveChangesAsync();
-
-        HorseService service = CreateService(db);
-
-        List<HorseScheduleResponse> result = await service.GetMyScheduleAsync(owner.Id);
-
-        Assert.Single(result);
-        Assert.Equal(horse.Id, result[0].HorseId);
-    }
-
-    [Fact]
-    public async Task GetHorseScheduleAsync_NotFound_ThrowsKeyNotFound()
-    {
-        using HorseRacingDataContext db = CreateContext();
-        HorseService service = CreateService(db);
-
-        await Assert.ThrowsAsync<KeyNotFoundException>(
-            () => service.GetHorseScheduleAsync(Guid.NewGuid(), Guid.NewGuid(), isAdmin: false));
-    }
-
-    [Fact]
-    public async Task GetHorseScheduleAsync_ReturnsScheduleForHorse()
-    {
-        using HorseRacingDataContext db = CreateContext();
-        Account owner = NewAccount(AccountRole.HorseOwner);
-        Account jockey = NewAccount(AccountRole.Jockey);
-        var racecourse = new Racecourse { Id = Guid.NewGuid(), RacecourseName = "Track" };
-        var horse = new Horse { Id = Guid.NewGuid(), OwnerId = owner.Id, HorseName = "Thunder", Status = HorseStatus.Healthy };
-        var race = new Race { RaceId = Guid.NewGuid(), RacecourseId = racecourse.Id, Status = RaceStatus.Scheduled, StartTime = DateTimeOffset.UtcNow.AddHours(2) };
-        var registration = new Registration { RegistrationId = Guid.NewGuid(), RaceId = race.RaceId, HorseId = horse.Id, JockeyId = jockey.Id, Status = RegistrationStatus.Confirmed };
-        db.AddRange(owner, jockey, racecourse, horse, race, registration);
-        await db.SaveChangesAsync();
-
-        HorseService service = CreateService(db);
-
-        List<HorseScheduleResponse> result = await service.GetHorseScheduleAsync(horse.Id, owner.Id, isAdmin: false);
-
-        Assert.Single(result);
-        Assert.Equal(race.RaceId, result[0].RaceId);
-    }
-
-    [Fact]
-    public async Task GetHorseRewardsAsync_NotFound_ThrowsKeyNotFound()
-    {
-        using HorseRacingDataContext db = CreateContext();
-        HorseService service = CreateService(db);
-
-        await Assert.ThrowsAsync<KeyNotFoundException>(
-            () => service.GetHorseRewardsAsync(Guid.NewGuid(), Guid.NewGuid(), isAdmin: false, new HorseRewardsQueryRequest()));
-    }
-
-    [Fact]
-    public async Task GetHorseRewardsAsync_AggregatesRewardAmounts()
-    {
-        using HorseRacingDataContext db = CreateContext();
-        Account owner = NewAccount(AccountRole.HorseOwner);
-        Account jockey = NewAccount(AccountRole.Jockey);
-        var racecourse = new Racecourse { Id = Guid.NewGuid(), RacecourseName = "Track" };
-        var horse = new Horse { Id = Guid.NewGuid(), OwnerId = owner.Id, HorseName = "Thunder", Status = HorseStatus.Healthy };
-        var race = new Race { RaceId = Guid.NewGuid(), RacecourseId = racecourse.Id, Status = RaceStatus.Finished, StartTime = DateTimeOffset.UtcNow.AddHours(-2) };
-        var registration = new Registration { RegistrationId = Guid.NewGuid(), RaceId = race.RaceId, HorseId = horse.Id, JockeyId = jockey.Id, Status = RegistrationStatus.Confirmed };
-        var prize = new Prize { PrizeId = Guid.NewGuid(), RegistrationId = registration.RegistrationId, PrizeType = PrizeType.Owner, Amount = 200_000m, DistributedAt = DateTimeOffset.UtcNow };
-        db.AddRange(owner, jockey, racecourse, horse, race, registration, prize);
-        await db.SaveChangesAsync();
-
-        HorseService service = CreateService(db);
-
-        HorseRewardsResponse result = await service.GetHorseRewardsAsync(horse.Id, owner.Id, isAdmin: false, new HorseRewardsQueryRequest());
-
-        Assert.Equal(200_000m, result.TotalRewardAmount);
-        Assert.Equal(1, result.RewardCount);
-        Assert.Single(result.Rewards.Items);
-    }
 }

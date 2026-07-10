@@ -26,15 +26,6 @@ public class WithdrawalsController : ControllerBase
         return Ok(ApiResponse<WithdrawalResponse>.SuccessResponse(result, "Withdrawal request created successfully."));
     }
 
-    [Authorize]
-    [HttpGet("my-history")]
-    public async Task<IActionResult> GetMyHistory([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
-    {
-        Guid accountId = GetAccountId();
-        PagedResponse<WithdrawalResponse> result = await _withdrawalService.GetMyHistoryAsync(accountId, page, pageSize);
-        return Ok(ApiResponse<PagedResponse<WithdrawalResponse>>.SuccessResponse(result));
-    }
-
     [Authorize(Roles = "Admin")]
     [HttpGet("pending")]
     public async Task<IActionResult> GetPending([FromQuery] int page = 1, [FromQuery] int pageSize = 10)

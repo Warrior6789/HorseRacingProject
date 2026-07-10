@@ -19,84 +19,6 @@ namespace HorseRacingAPI.Services
             _cloudinaryService = cloudinaryService;
         }
 
-        public async Task<JockeyProfileResponse> CreateJockeyProfileAsync(Guid accountId, JockeyProfileCreateRequest req)
-        {
-            IGenericRepository<Account> accRepo = _uow.GetRepository<Account>();
-            Account? account = await accRepo.Entities
-                .FirstOrDefaultAsync(a => a.Id == accountId && !a.IsDeleted);
-            if (account == null)
-                throw new InvalidOperationException("Account does not exist.");
-
-            if (account.Role != AccountRole.Jockey)
-                throw new InvalidOperationException("Only accounts with role Jockey can have a JockeyProfile.");
-
-            IGenericRepository<JockeyProfile> repo = _uow.GetRepository<JockeyProfile>();
-            int existingCount = await repo.Entities.CountAsync(p => p.AccountId == accountId);
-            if (existingCount > 0)
-                throw new InvalidOperationException("A jockey profile already exists for this account.");
-
-            string? imageUrl = req.Image != null
-                ? await _cloudinaryService.UploadImageAsync(req.Image, "jockey-profiles")
-                : null;
-            
-            JockeyProfile jockeyProfile = new JockeyProfile
-            {
-                JockeyProfileId = Guid.NewGuid(),
-                AccountId = accountId,
-                FullName = req.FullName,
-                DateOfBirth = req.DateOfBirth,
-                Nationality = req.Nationality,
-                LicenseNumber = req.LicenseNumber,
-                ImageUrl = imageUrl,
-                TotalRaces = 0,
-                TotalWins = 0,
-                CreateAt = DateTimeOffset.UtcNow,
-                UpdatedAt = DateTimeOffset.UtcNow,
-                IsDeleted = false
-            };
-            try
-            {
-                await repo.AddAsync(jockeyProfile);
-                await _uow.SaveAsync();
-            }
-            catch
-            {
-                if(imageUrl != null)
-                {
-                    string publicId = string.Join("/", new Uri(imageUrl).AbsolutePath
-                   .TrimStart('/').Split('/').TakeLast(2)).Split('.')[0];
-                    await _cloudinaryService.DeleteImageAsync(publicId);
-                }
-                throw;
-            }
-            return MapToResponse(jockeyProfile);
-        }
-
-        public async Task<List<JockeyProfileResponse>> GetAllJockeyProfilesAsync()
-        {
-            IGenericRepository<JockeyProfile> repo = _uow.GetRepository<JockeyProfile>();
-            return await repo.Entities
-                .Where(p => !p.IsDeleted)
-                .Select(p => new JockeyProfileResponse
-                {
-                    JockeyProfileId = p.JockeyProfileId,
-                    AccountId = p.AccountId,
-                    FullName = p.FullName,
-                    DateOfBirth = p.DateOfBirth,
-                    Nationality = p.Nationality,
-                    LicenseNumber = p.LicenseNumber,
-                    Weight = p.Weight,
-                    Height = p.Height,
-                    TotalRaces = p.TotalRaces,
-                    TotalWins = p.TotalWins,
-                    Balance = p.Balance,
-                    ImageUrl = p.ImageUrl,
-                    CertificateImageUrl = p.CertificateImageUrl,
-                    CreateAt = p.CreateAt,
-                    UpdatedAt = p.UpdatedAt
-                }).ToListAsync();
-        }
-
         public async Task<PagedResponse<JockeyProfileResponse>> GetAllJockeyProfilesPagedAsync(int page, int pageSize)
         {
             if (page < 1) page = 1;
@@ -195,21 +117,6 @@ namespace HorseRacingAPI.Services
             jockeyProfile.UpdatedAt = DateTimeOffset.UtcNow;
             await _uow.SaveAsync();
         }
-
-        private static JockeyProfileResponse MapToResponse(JockeyProfile p) => new JockeyProfileResponse
-        {
-            JockeyProfileId = p.JockeyProfileId,
-            AccountId = p.AccountId,
-            FullName = p.FullName,
-            DateOfBirth = p.DateOfBirth,
-            Nationality = p.Nationality,
-            LicenseNumber = p.LicenseNumber,
-            TotalRaces = p.TotalRaces,
-            TotalWins = p.TotalWins,
-            ImageUrl = p.ImageUrl,
-            CreateAt = p.CreateAt,
-            UpdatedAt = p.UpdatedAt
-        };
 
         public async Task<string> UploadImageAsync(Guid accountId, IFormFile file)
         {

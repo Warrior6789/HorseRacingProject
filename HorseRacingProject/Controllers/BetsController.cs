@@ -30,15 +30,6 @@ namespace HorseRacingAPI.Controllers
 
 
         [Authorize]
-        [HttpGet("my")]
-        public async Task<IActionResult> GetMyBets()
-        {
-            Guid spectatorId = GetAccountIdFromToken();
-            List<BetResponse> result = await _betService.GetMyBetsAsync(spectatorId);
-            return Ok(ApiResponse<List<BetResponse>>.SuccessResponse(result, "Get bets successfully."));
-        }
-
-        [Authorize]
         [HttpGet("my/paged")]
         public async Task<IActionResult> GetMyBetsPaged([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
         {

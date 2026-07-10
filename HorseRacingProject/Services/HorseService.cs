@@ -192,38 +192,6 @@ namespace HorseRacingAPI.Services
             await _uow.SaveAsync();
         }
 
-        public async Task<List<HorseResponse>> GetActiveHorsesAsync(Guid accountId, bool isAdmin)
-        {
-            RaceStatus[] upcomingRaceStatuses =
-            [
-                RaceStatus.Scheduled,
-                RaceStatus.BettingOpen,
-                RaceStatus.BettingClosed
-            ];
-
-            return await BuildHorseScope(accountId, isAdmin)
-                .Where(h => HorseStatusPolicy.ActiveStatuses.Contains(h.Status))
-                .OrderBy(h => h.HorseName)
-                .Select(h => new HorseResponse
-                {
-                    Id = h.Id,
-                    HorseName = h.HorseName,
-                    Age = h.Age,
-                    Breed = h.Breed,
-                    Weight = h.Weight,
-                    Status = h.Status.ToString(),
-                    DerivedStatus = h.Registrations.Any(r => r.Status == RegistrationStatus.Confirmed && !r.Race.IsDeleted && r.Race.Status == RaceStatus.Live)
-                        ? "Racing"
-                        : h.Registrations.Any(r => r.Status == RegistrationStatus.Confirmed && !r.Race.IsDeleted && upcomingRaceStatuses.Contains(r.Race.Status))
-                            ? "Registered"
-                            : h.Status.ToString(),
-                    RecordWins = h.RecordWins,
-                    Color = h.Color,
-                    ImageUrl = h.ImageUrl
-                })
-                .ToListAsync();
-        }
-
         public async Task<PagedResponse<HorseResponse>> GetActiveHorsesPagedAsync(Guid accountId, bool isAdmin, int page, int pageSize)
         {
             if (page < 1) page = 1;
@@ -271,71 +239,6 @@ namespace HorseRacingAPI.Services
                 Page       = page,
                 PageSize   = pageSize,
                 TotalCount = total
-            };
-        }
-
-        public async Task<List<HorseScheduleResponse>> GetMyScheduleAsync(Guid ownerId)
-        {
-            return await BuildScheduleQuery()
-                .Where(r => r.Horse.OwnerId == ownerId)
-                .OrderBy(r => r.Race.StartTime)
-                .Select(r => MapToScheduleResponse(r))
-                .ToListAsync();
-        }
-
-        public async Task<List<HorseScheduleResponse>> GetHorseScheduleAsync(Guid horseId, Guid accountId, bool isAdmin)
-        {
-            await GetHorseEntityAsync(horseId, accountId, isAdmin);
-
-            return await BuildScheduleQuery()
-                .Where(r => r.HorseId == horseId)
-                .OrderBy(r => r.Race.StartTime)
-                .Select(r => MapToScheduleResponse(r))
-                .ToListAsync();
-        }
-
-        public async Task<HorseRewardsResponse> GetHorseRewardsAsync(Guid horseId, Guid accountId, bool isAdmin, HorseRewardsQueryRequest query)
-        {
-            NormalizePaging(query);
-
-            Horse horse = await GetHorseEntityAsync(horseId, accountId, isAdmin);
-
-            IQueryable<Prize> rewardQuery = _uow.GetRepository<Prize>().Entities
-                .Where(p => p.Registration.HorseId == horseId && !p.Registration.Horse.IsDeleted);
-
-            int rewardCount = await rewardQuery.CountAsync();
-            decimal totalRewardAmount = await rewardQuery.SumAsync(p => p.Amount ?? 0);
-
-            List<HorseRewardItemResponse> items = await rewardQuery
-                .OrderByDescending(p => p.DistributedAt ?? DateTimeOffset.MinValue)
-                .ThenByDescending(p => p.PrizeId)
-                .Skip((query.Page - 1) * query.PageSize)
-                .Take(query.PageSize)
-                .Select(p => new HorseRewardItemResponse
-                {
-                    PrizeId = p.PrizeId,
-                    RegistrationId = p.RegistrationId,
-                    RaceId = p.Registration.RaceId,
-                    RaceNumber = p.Registration.Race.RaceNumber,
-                    PrizeType = p.PrizeType.ToString(),
-                    Amount = p.Amount,
-                    DistributedAt = p.DistributedAt
-                })
-                .ToListAsync();
-
-            return new HorseRewardsResponse
-            {
-                HorseId = horse.Id,
-                HorseName = horse.HorseName,
-                TotalRewardAmount = totalRewardAmount,
-                RewardCount = rewardCount,
-                Rewards = new PagedResponse<HorseRewardItemResponse>
-                {
-                    Items = items,
-                    Page = query.Page,
-                    PageSize = query.PageSize,
-                    TotalCount = rewardCount
-                }
             };
         }
 
@@ -439,28 +342,7 @@ namespace HorseRacingAPI.Services
                 throw new InvalidOperationException("Only HorseOwner accounts can own horses.");
         }
 
-        private IQueryable<Registration> BuildScheduleQuery()
-        {
-            return _uow.GetRepository<Registration>().Entities
-                .Where(r => !r.Horse.IsDeleted && !r.Race.IsDeleted)
-                .Include(r => r.Horse)
-                .Include(r => r.Race)
-                    .ThenInclude(r => r.Racecourse);
-        }
-
         private static void NormalizePaging(HorseQueryRequest query)
-        {
-            if (query.Page < 1)
-                query.Page = 1;
-
-            if (query.PageSize < 1)
-                query.PageSize = 10;
-
-            if (query.PageSize > 100)
-                query.PageSize = 100;
-        }
-
-        private static void NormalizePaging(HorseRewardsQueryRequest query)
         {
             if (query.Page < 1)
                 query.Page = 1;
@@ -516,25 +398,5 @@ namespace HorseRacingAPI.Services
 
             return horse.Status.ToString();
         }
-
-        private static HorseScheduleResponse MapToScheduleResponse(Registration registration) => new HorseScheduleResponse
-        {
-            HorseId = registration.HorseId,
-            HorseName = registration.Horse.HorseName,
-            RegistrationId = registration.RegistrationId,
-            JockeyId = registration.JockeyId,
-            GateNumber = registration.GateNumber,
-            OwnerConfirmation = registration.OwnerConfirmation,
-            JockeyConfirmation = registration.JockeyConfirmation,
-            RegistrationStatus = registration.Status.ToString(),
-            RaceId = registration.RaceId,
-            RaceNumber = registration.Race.RaceNumber,
-            StartTime = registration.Race.StartTime,
-            TrackLength = registration.Race.TrackLength,
-            MaxParticipants = registration.Race.MaxParticipants,
-            RaceStatus = registration.Race.Status.ToString(),
-            RacecourseName = registration.Race.Racecourse.RacecourseName,
-            Location = registration.Race.Racecourse.Location
-        };
     }
 }

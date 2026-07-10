@@ -21,48 +21,12 @@ namespace HorseRacingAPI.Controllers
         }
 
         [Authorize]
-        [HttpPost]
-        public async Task<IActionResult> CreateUserProfile([FromForm] UserProfileCreateRequest req)
-        {
-            Guid accountId = GetAccountIdFromToken();
-            UserProfileResponse response = await _userProfileService.CreateUserProfileAsync(accountId, req);
-            ApiResponse<UserProfileResponse> apiResponse = ApiResponse<UserProfileResponse>.SuccessResponse(response, "Create user profile successfully.");
-            return StatusCode(StatusCodes.Status201Created, apiResponse);
-        }
-
-        [Authorize(Roles = "Admin")]
-        [HttpGet]
-        public async Task<IActionResult> GetAllUserProfiles()
-        {
-            List<UserProfileResponse> profiles = await _userProfileService.GetAllUserProfilesAsync();
-            ApiResponse<List<UserProfileResponse>> apiResponse = ApiResponse<List<UserProfileResponse>>.SuccessResponse(profiles, "Get all user profiles successfully.");
-            return Ok(apiResponse);
-        }
-
-        [Authorize(Roles = "Admin")]
-        [HttpGet("paged")]
-        public async Task<IActionResult> GetAllUserProfilesPaged([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
-        {
-            PagedResponse<UserProfileResponse> result = await _userProfileService.GetAllUserProfilesPagedAsync(page, pageSize);
-            return Ok(ApiResponse<PagedResponse<UserProfileResponse>>.SuccessResponse(result, "Get all user profiles successfully."));
-        }
-
-        [Authorize]
         [HttpGet("my")]
         public async Task<IActionResult> GetMyProfile()
         {
             Guid accountId = GetAccountIdFromToken();
             UserProfileResponse response = await _userProfileService.GetUserProfileByIdAsync(accountId);
             return Ok(ApiResponse<UserProfileResponse>.SuccessResponse(response, "Get my profile successfully."));
-        }
-
-        [Authorize]
-        [HttpGet("{accountId}")]
-        public async Task<IActionResult> GetUserProfileById(Guid accountId)
-        {
-            UserProfileResponse response = await _userProfileService.GetUserProfileByIdAsync(accountId);
-            ApiResponse<UserProfileResponse> apiResponse = ApiResponse<UserProfileResponse>.SuccessResponse(response, "Get user profile details successfully.");
-            return Ok(apiResponse);
         }
 
         [Authorize]

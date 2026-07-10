@@ -66,17 +66,6 @@ namespace HorseRacingAPI.Services
             };
         }
 
-        public async Task<RacecourseResponse> GetRacecourseByIdAsync(Guid id)
-        {
-            IGenericRepository<Racecourse> repo = _uow.GetRepository<Racecourse>();
-            Racecourse? racecourse = await repo.GetByIdAsync(id);
-
-            if (racecourse == null || racecourse.IsDeleted)
-                throw new KeyNotFoundException($"Racecourse with id {id} not found.");
-
-            return MapToResponse(racecourse);
-        }
-
         public async Task<RacecourseResponse> CreateRacecourseAsync(CreateRacecourseRequest request)
         {
             IGenericRepository<Racecourse> repo = _uow.GetRepository<Racecourse>();

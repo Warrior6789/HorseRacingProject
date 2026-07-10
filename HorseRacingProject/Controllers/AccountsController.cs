@@ -17,13 +17,6 @@ namespace HorseRacingAPI.Controllers
             _accountService = accountService;
         }
 
-        [HttpGet]
-        public async Task<IActionResult> GetAccountsByStatus([FromQuery] string status = "Active")
-        {
-            List<AccountResponse> accounts = await _accountService.GetAccountByStatusAsync(status);
-            return Ok(ApiResponse<List<AccountResponse>>.SuccessResponse(accounts, "Get accounts successfully."));
-        }
-
         [HttpGet("paged")]
         public async Task<IActionResult> GetAccountsByStatusPaged(
             [FromQuery] string status = "Active",
@@ -62,13 +55,6 @@ namespace HorseRacingAPI.Controllers
         {
             UpgradeRequestResponse result = await _accountService.GetUpgradeRequestDetailAsync(accountId);
             return Ok(ApiResponse<UpgradeRequestResponse>.SuccessResponse(result, "Get upgrade request detail successfully."));
-        }
-
-        [HttpGet("upgrades")]
-        public async Task<IActionResult> GetRoleUpgradeRequests()
-        {
-            List<UpgradeRequestResponse> result = await _accountService.GetRoleUpgradeRequestsAsync();
-            return Ok(ApiResponse<List<UpgradeRequestResponse>>.SuccessResponse(result, "Get upgrade requests successfully."));
         }
 
         [HttpGet("upgrades/paged")]

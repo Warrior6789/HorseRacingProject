@@ -84,31 +84,6 @@ public class WithdrawalService : IWithdrawalService
         return MapToResponse(withdrawal);
     }
 
-    public async Task<PagedResponse<WithdrawalResponse>> GetMyHistoryAsync(Guid accountId, int page, int pageSize)
-    {
-        if (page < 1) page = 1;
-        if (pageSize < 1) pageSize = 10;
-        if (pageSize > 100) pageSize = 100;
-
-        var repo = _uow.GetRepository<Withdrawal>();
-        int total = await repo.Entities.CountAsync(w => w.AccountId == accountId);
-        var items = await repo.Entities
-            .Where(w => w.AccountId == accountId)
-            .OrderByDescending(w => w.CreateAt)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .Select(w => MapToResponse(w))
-            .ToListAsync();
-
-        return new PagedResponse<WithdrawalResponse>
-        {
-            Items      = items,
-            Page       = page,
-            PageSize   = pageSize,
-            TotalCount = total
-        };
-    }
-
     public async Task<PagedResponse<WithdrawalResponse>> GetPendingAsync(int page, int pageSize)
     {
         if (page < 1) page = 1;

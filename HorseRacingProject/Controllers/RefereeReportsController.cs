@@ -27,16 +27,6 @@ namespace HorseRacingAPI.Controllers
                 ApiResponse<RefereeReportResponse>.SuccessResponse(result, "Referee report created successfully."));
         }
 
-        [HttpGet("{reportId}")]
-        [Authorize(Roles = "Admin,Referee")]
-        public async Task<IActionResult> GetById(Guid reportId)
-        {
-            Guid requesterId = GetAccountIdFromToken();
-            bool isAdmin = User.IsInRole("Admin");
-            RefereeReportResponse result = await _refereeReportService.GetReportByIdAsync(reportId, requesterId, isAdmin);
-            return Ok(ApiResponse<RefereeReportResponse>.SuccessResponse(result, "Get report successfully."));
-        }
-
         [HttpPut("{reportId}")]
         [Authorize(Roles = "Referee")]
         public async Task<IActionResult> Update(Guid reportId, [FromBody] UpdateRefereeReportDto dto)

@@ -77,34 +77,4 @@ public class InputValidationTests
             $"Role '{role}' là hợp lệ, không được throw ArgumentException.");
     }
 
-    [Theory]
-    [InlineData("InvalidStatus")]
-    [InlineData("Deleted")]
-    [InlineData("0")]
-    [InlineData("99")]
-    [InlineData("")]
-    [InlineData("unknown")]
-    public async Task GetAccountByStatus_InvalidStatus_ThrowsArgumentException(string status)
-    {
-        var service = new AccountService(EmptyUow(), EmptyHub());
-
-        await Assert.ThrowsAsync<ArgumentException>(() =>
-            service.GetAccountByStatusAsync(status));
-    }
-
-    [Theory]
-    [InlineData("Active")]
-    [InlineData("Banned")]
-    [InlineData("Suspended")]
-    [InlineData("active")]
-    [InlineData("BANNED")]
-    public async Task GetAccountByStatus_ValidStatus_DoesNotThrowArgumentException(string status)
-    {
-        var service = new AccountService(EmptyUow(), EmptyHub());
-
-        var ex = await Record.ExceptionAsync(() =>
-            service.GetAccountByStatusAsync(status));
-        Assert.False(ex is ArgumentException,
-            $"Status '{status}' là hợp lệ, không được throw ArgumentException.");
-    }
 }

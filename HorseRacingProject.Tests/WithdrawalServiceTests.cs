@@ -129,23 +129,6 @@ public class WithdrawalServiceTests
     }
 
     [Fact]
-    public async Task GetMyHistoryAsync_FiltersByAccountId()
-    {
-        using HorseRacingDataContext db = CreateContext();
-        Account account = NewAccount(AccountRole.Spectator);
-        Account other = NewAccount(AccountRole.Spectator);
-        db.Withdrawals.Add(new Withdrawal { WithdrawalId = Guid.NewGuid(), AccountId = account.Id, Amount = 1000, BankAccountNumber = "1", BankName = "B", AccountHolderName = "H", Status = WithdrawalStatus.Pending, CreateAt = DateTimeOffset.UtcNow });
-        db.Withdrawals.Add(new Withdrawal { WithdrawalId = Guid.NewGuid(), AccountId = other.Id, Amount = 2000, BankAccountNumber = "2", BankName = "B", AccountHolderName = "H", Status = WithdrawalStatus.Pending, CreateAt = DateTimeOffset.UtcNow });
-        await db.SaveChangesAsync();
-        WithdrawalService service = CreateService(db);
-
-        PagedResponse<WithdrawalResponse> result = await service.GetMyHistoryAsync(account.Id, page: 1, pageSize: 10);
-
-        Assert.Single(result.Items);
-        Assert.Equal(1000, result.Items[0].Amount);
-    }
-
-    [Fact]
     public async Task GetPendingAsync_OnlyReturnsPendingWithdrawals()
     {
         using HorseRacingDataContext db = CreateContext();

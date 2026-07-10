@@ -30,13 +30,6 @@ namespace HorseRacingAPI.Controllers
             return Ok(ApiResponse<PagedResponse<RacecourseResponse>>.SuccessResponse(racecourses, "Get racecourses successfully."));
         }
 
-        [HttpGet("{id}")]
-        public async Task<IActionResult> GetById(Guid id)
-        {
-            RacecourseResponse racecourse = await _racecourseService.GetRacecourseByIdAsync(id);
-            return Ok(ApiResponse<RacecourseResponse>.SuccessResponse(racecourse, "Get racecourse successfully."));
-        }
-
         [Authorize(Roles = "Admin")]
         [HttpPost]
         [Consumes("multipart/form-data")]
