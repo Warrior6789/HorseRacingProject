@@ -244,12 +244,10 @@ public class BetSettlementIntegrationTests
         Assert.All(bets, b => Assert.Equal(BetStatus.Lost, b.Status));
         Assert.All(bets, b => Assert.Equal(0f, b.PayoutRatio));
 
-        // the race's own prize pool is untouched by the unclaimed bet pool
         Prize winnerOwnerPrize = await db.Prizes.AsNoTracking()
             .SingleAsync(p => p.RegistrationId == fixture.Registrations[0].RegistrationId && p.PrizeType == PrizeType.Owner);
         Assert.Equal(450_000m, winnerOwnerPrize.Amount);
 
-        // 100,000 pool * (1 - 10% takeout) = 90,000, banked for the next Win bet at this racecourse
         BetCarryover carryover = await db.BetCarryovers.AsNoTracking()
             .SingleAsync(c => c.RacecourseId == fixture.Race.RacecourseId && c.BetType == BetType.Win);
         Assert.Equal(90_000m, carryover.Amount);
@@ -279,7 +277,6 @@ public class BetSettlementIntegrationTests
 
         await service.TrySettleAsync(raceB.Race.RaceId);
 
-        // 100,000 bet - 10% takeout = 90,000, plus the 90,000 carried over from race A = 180,000 for the sole winner
         Bet winningBet = await db.Bets.AsNoTracking().SingleAsync(b => b.RegistrationId == raceB.Registrations[0].RegistrationId);
         Assert.Equal(BetStatus.Won, winningBet.Status);
         Assert.Equal(1.8f, winningBet.PayoutRatio);
@@ -290,6 +287,41 @@ public class BetSettlementIntegrationTests
         BetCarryover carryoverAfterRaceB = await db.BetCarryovers.AsNoTracking()
             .SingleAsync(c => c.RacecourseId == raceA.Race.RacecourseId && c.BetType == BetType.Win);
         Assert.Equal(0m, carryoverAfterRaceB.Amount);
+    }
+
+    [Fact]
+    public async Task TrySettleAsync_CarryoverAtOneRacecourse_DoesNotLeakIntoADifferentRacecourse()
+    {
+        await using HorseRacingDataContext db = await CreateContextAsync();
+
+        RaceFixture raceAtCourseA = await SeedFinishedRaceAsync(db, takeoutPercentage: 0.10f, spectatorCount: 2);
+        AddBet(db, raceAtCourseA.Spectators[0], raceAtCourseA.Registrations[1], 50_000m, BetType.Win);
+        AddBet(db, raceAtCourseA.Spectators[1], raceAtCourseA.Registrations[2], 50_000m, BetType.Win);
+        await db.SaveChangesAsync();
+
+        IUnitofWork uow = new UnitofWork(db);
+        var service = new RaceSettlementService(CreateScopeFactory(uow), CreateHubContext());
+        await service.TrySettleAsync(raceAtCourseA.Race.RaceId);
+
+        BetCarryover carryoverAtCourseA = await db.BetCarryovers.AsNoTracking()
+            .SingleAsync(c => c.RacecourseId == raceAtCourseA.Race.RacecourseId && c.BetType == BetType.Win);
+        Assert.Equal(90_000m, carryoverAtCourseA.Amount);
+
+        RaceFixture raceAtCourseB = await SeedFinishedRaceAsync(db, takeoutPercentage: 0.10f, spectatorCount: 1);
+        AddBet(db, raceAtCourseB.Spectators[0], raceAtCourseB.Registrations[0], 100_000m, BetType.Win);
+        await db.SaveChangesAsync();
+
+        await service.TrySettleAsync(raceAtCourseB.Race.RaceId);
+
+        Bet winningBetAtCourseB = await db.Bets.AsNoTracking().SingleAsync(b => b.RegistrationId == raceAtCourseB.Registrations[0].RegistrationId);
+        Assert.Equal(1.0f, winningBetAtCourseB.PayoutRatio);
+
+        UserProfile winnerProfile = await db.UserProfiles.AsNoTracking().SingleAsync(p => p.AccountId == raceAtCourseB.Spectators[0].Id);
+        Assert.Equal(100_000L, winnerProfile.Balance);
+
+        BetCarryover carryoverAtCourseAAfter = await db.BetCarryovers.AsNoTracking()
+            .SingleAsync(c => c.RacecourseId == raceAtCourseA.Race.RacecourseId && c.BetType == BetType.Win);
+        Assert.Equal(90_000m, carryoverAtCourseAAfter.Amount);
     }
 
     [Fact]

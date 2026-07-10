@@ -243,4 +243,51 @@ public class RaceSettlementServiceIntegrationTests
         Guid reg1 = fixture.Registrations[0].RegistrationId;
         Assert.True(OwnerAmountFor(reg1) > 0);
     }
+
+    [Fact]
+    public async Task TrySettleAsync_DisqualifiedFirstPlace_ExcludedFromPrizesAndWinIncrement()
+    {
+        await using HorseRacingDataContext db = await CreateContextAsync();
+        Fixture fixture = await SeedThreeFinisherRaceAsync(db, withBet: false);
+
+        RaceResult firstPlaceResult = await db.RaceResults.SingleAsync(r => r.RegistrationId == fixture.Registrations[0].RegistrationId);
+        firstPlaceResult.IsDisqualified = true;
+        await db.SaveChangesAsync();
+
+        IUnitofWork uow = new UnitofWork(db);
+        var service = new RaceSettlementService(CreateScopeFactory(uow), CreateHubContext());
+        await service.TrySettleAsync(fixture.Race.RaceId);
+
+        Guid disqualifiedReg = fixture.Registrations[0].RegistrationId;
+        Guid newFirstReg = fixture.Registrations[1].RegistrationId;
+
+        Assert.False(await db.Prizes.AsNoTracking().AnyAsync(p => p.RegistrationId == disqualifiedReg));
+        Assert.True(await db.Prizes.AsNoTracking().AnyAsync(p => p.RegistrationId == newFirstReg && p.PrizeType == PrizeType.Owner && p.Amount == 562_500m));
+
+        Horse disqualifiedHorse = await db.Horses.AsNoTracking().SingleAsync(h => h.Id == fixture.Horses[0].Id);
+        Horse promotedHorse = await db.Horses.AsNoTracking().SingleAsync(h => h.Id == fixture.Horses[1].Id);
+        Assert.Equal(0, disqualifiedHorse.RecordWins);
+        Assert.Equal(1, promotedHorse.RecordWins);
+    }
+
+    [Fact]
+    public async Task TrySettleAsync_OnlyTwoRegisteredFinishers_DistributesEntirePurseAcrossThemOnly()
+    {
+        await using HorseRacingDataContext db = await CreateContextAsync();
+        Fixture fixture = await SeedThreeFinisherRaceAsync(db, withBet: false);
+
+        await db.RaceResults
+            .Where(r => r.RegistrationId == fixture.Registrations[2].RegistrationId)
+            .ExecuteDeleteAsync();
+
+        IUnitofWork uow = new UnitofWork(db);
+        var service = new RaceSettlementService(CreateScopeFactory(uow), CreateHubContext());
+        await service.TrySettleAsync(fixture.Race.RaceId);
+
+        List<Prize> prizes = await db.Prizes.AsNoTracking().ToListAsync();
+        Assert.DoesNotContain(prizes, p => p.RegistrationId == fixture.Registrations[2].RegistrationId);
+
+        decimal totalDistributed = prizes.Sum(p => p.Amount ?? 0m);
+        Assert.Equal(fixture.Race.PrizePool, totalDistributed);
+    }
 }

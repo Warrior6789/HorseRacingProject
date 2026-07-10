@@ -182,4 +182,74 @@ public class RegistrationServiceAcceptIntegrationTests
             .SingleAsync(p => p.AccountId == fixture.Owner.Id);
         Assert.Equal(0L, ownerProfile.Balance);
     }
+
+    [Fact]
+    public async Task AcceptRegistrationAsync_WrongJockey_ThrowsAndLeavesRegistrationPending()
+    {
+        using Fixture fixture = await SeedAsync();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => fixture.Service.AcceptRegistrationAsync(fixture.RegistrationToAccept.RegistrationId, Guid.NewGuid()));
+
+        Registration reg = await fixture.Db.Registrations.AsNoTracking()
+            .SingleAsync(r => r.RegistrationId == fixture.RegistrationToAccept.RegistrationId);
+        Assert.Equal(RegistrationStatus.Pending, reg.Status);
+    }
+
+    [Fact]
+    public async Task AcceptRegistrationAsync_JockeyAlreadyConfirmedInSameRaceWithAnotherHorse_Throws()
+    {
+        using Fixture fixture = await SeedAsync();
+
+        var otherOwner = new Account { Id = Guid.NewGuid(), Email = "owner2@test.com", PasswordHash = "x", Role = AccountRole.HorseOwner, Status = AccountStatus.Active };
+        var otherHorse = new Horse { Id = Guid.NewGuid(), OwnerId = otherOwner.Id, HorseName = "Bolt", Status = HorseStatus.Healthy };
+        var confirmedInSameRace = new Registration
+        {
+            RegistrationId = Guid.NewGuid(),
+            RaceId = fixture.RaceToAccept.RaceId,
+            HorseId = otherHorse.Id,
+            JockeyId = fixture.Jockey.Id,
+            Status = RegistrationStatus.Confirmed
+        };
+        fixture.Db.AddRange(otherOwner, otherHorse, confirmedInSameRace);
+        await fixture.Db.SaveChangesAsync();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => fixture.Service.AcceptRegistrationAsync(fixture.RegistrationToAccept.RegistrationId, fixture.Jockey.Id));
+
+        Registration reg = await fixture.Db.Registrations.AsNoTracking()
+            .SingleAsync(r => r.RegistrationId == fixture.RegistrationToAccept.RegistrationId);
+        Assert.Equal(RegistrationStatus.Pending, reg.Status);
+    }
+
+    [Fact]
+    public async Task AcceptRegistrationAsync_JockeyTimeConflictWithAnotherConfirmedRace_Throws()
+    {
+        using Fixture fixture = await SeedAsync();
+
+        var otherRacecourse = new Racecourse { Id = Guid.NewGuid(), RacecourseName = "Other Track" };
+        var conflictingRace = new Race
+        {
+            RaceId = Guid.NewGuid(),
+            RacecourseId = otherRacecourse.Id,
+            Status = RaceStatus.Scheduled,
+            StartTime = fixture.RaceToAccept.StartTime!.Value.AddHours(1)
+        };
+        var otherOwner = new Account { Id = Guid.NewGuid(), Email = "owner2@test.com", PasswordHash = "x", Role = AccountRole.HorseOwner, Status = AccountStatus.Active };
+        var otherHorse = new Horse { Id = Guid.NewGuid(), OwnerId = otherOwner.Id, HorseName = "Bolt", Status = HorseStatus.Healthy };
+        var confirmedElsewhere = new Registration
+        {
+            RegistrationId = Guid.NewGuid(),
+            RaceId = conflictingRace.RaceId,
+            HorseId = otherHorse.Id,
+            JockeyId = fixture.Jockey.Id,
+            Status = RegistrationStatus.Confirmed
+        };
+        fixture.Db.AddRange(otherRacecourse, conflictingRace, otherOwner, otherHorse, confirmedElsewhere);
+        await fixture.Db.SaveChangesAsync();
+
+        InvalidOperationException ex = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => fixture.Service.AcceptRegistrationAsync(fixture.RegistrationToAccept.RegistrationId, fixture.Jockey.Id));
+        Assert.Contains("conflicts in time", ex.Message);
+    }
 }
