@@ -11,11 +11,6 @@ using Moq;
 
 namespace HorseRacingProject.Tests;
 
-// RaceEngineService is a BackgroundService whose real work happens in a protected ExecuteAsync
-// loop with Task.Delay at the tail and randomized live-race tick simulation. These tests invoke
-// ExecuteAsync once via reflection and cancel the token so the loop stops at the Task.Delay,
-// asserting only on the deterministic parts (resting wake-up, scheduling transitions) while
-// avoiding any scenario that would enter the random tick-simulation branch.
 public class RaceEngineServiceTests
 {
     private static HorseRacingDataContext CreateContext()

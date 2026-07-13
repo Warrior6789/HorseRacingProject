@@ -326,51 +326,6 @@ public class RefereeReportServiceTests
     }
 
     [Fact]
-    public async Task GetReportByIdAsync_NonAdminNotOwningReferee_ThrowsUnauthorized()
-    {
-        using Fixture fixture = await SeedAsync();
-        var report = new RefereeReport
-        {
-            ReportId = Guid.NewGuid(),
-            RaceId = fixture.Race.RaceId,
-            RefereeId = fixture.Referee.Id,
-            RegistrationId = fixture.Registration.RegistrationId,
-            IncidentDescription = "Some incident",
-            PenaltyType = PenaltyType.Warning,
-            Status = RefereeReportStatus.Pending,
-            CreatedAt = DateTimeOffset.UtcNow
-        };
-        fixture.Db.RefereeReports.Add(report);
-        await fixture.Db.SaveChangesAsync();
-
-        await Assert.ThrowsAsync<UnauthorizedAccessException>(
-            () => fixture.Service.GetReportByIdAsync(report.ReportId, Guid.NewGuid(), isAdmin: false));
-    }
-
-    [Fact]
-    public async Task GetReportByIdAsync_OwningReferee_ReturnsReport()
-    {
-        using Fixture fixture = await SeedAsync();
-        var report = new RefereeReport
-        {
-            ReportId = Guid.NewGuid(),
-            RaceId = fixture.Race.RaceId,
-            RefereeId = fixture.Referee.Id,
-            RegistrationId = fixture.Registration.RegistrationId,
-            IncidentDescription = "Some incident",
-            PenaltyType = PenaltyType.Warning,
-            Status = RefereeReportStatus.Pending,
-            CreatedAt = DateTimeOffset.UtcNow
-        };
-        fixture.Db.RefereeReports.Add(report);
-        await fixture.Db.SaveChangesAsync();
-
-        RefereeReportResponse result = await fixture.Service.GetReportByIdAsync(report.ReportId, fixture.Referee.Id, isAdmin: false);
-
-        Assert.Equal(report.ReportId, result.ReportId);
-    }
-
-    [Fact]
     public async Task GetReportsByRaceAsync_FiltersByRaceIdAndCountsByStatus()
     {
         using Fixture fixture = await SeedAsync();

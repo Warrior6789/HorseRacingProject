@@ -331,9 +331,9 @@ namespace HorseRacingAPI.Services
                 .Include(r => r.Registration)
                     .ThenInclude(r => r.Horse)
                 .Include(r => r.Referee)
-                    .ThenInclude(r => r.UserProfiles)
+                    .ThenInclude(r => r.UserProfile)
                 .Include(r => r.Registration)
-                    .ThenInclude(r => r.RaceResults)
+                    .ThenInclude(r => r.RaceResult)
                 .OrderByDescending(r => r.CreatedAt)
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
@@ -343,10 +343,10 @@ namespace HorseRacingAPI.Services
                     RaceId              = r.RaceId,
                     RaceNumber          = r.Race.RaceNumber,
                     RefereeId           = r.RefereeId,
-                    RefereeName         = r.Referee.UserProfiles.Select(up => up.FullName).FirstOrDefault() ?? r.Referee.Email ?? "",
+                    RefereeName         = (r.Referee.UserProfile != null ? r.Referee.UserProfile.FullName : null) ?? r.Referee.Email ?? "",
                     RegistrationId      = r.RegistrationId,
                     HorseName           = r.Registration.Horse.HorseName,
-                    OriginalPosition    = r.Registration.RaceResults.FirstOrDefault() != null ? r.Registration.RaceResults.FirstOrDefault()!.FinishPosition : null,
+                    OriginalPosition    = r.Registration.RaceResult != null ? r.Registration.RaceResult.FinishPosition : null,
                     IncidentDescription = r.IncidentDescription,
                     PenaltyApplied      = r.PenaltyApplied,
                     Status              = r.Status.ToString(),
@@ -380,9 +380,9 @@ namespace HorseRacingAPI.Services
                 .Include(r => r.Registration)
                     .ThenInclude(r => r.Horse)
                 .Include(r => r.Referee)
-                    .ThenInclude(r => r.UserProfiles)
+                    .ThenInclude(r => r.UserProfile)
                 .Include(r => r.Registration)
-                    .ThenInclude(r => r.RaceResults)
+                    .ThenInclude(r => r.RaceResult)
                 .Where(r => r.RefereeId == refereeId)
                 .OrderByDescending(r => r.CreatedAt)
                 .Skip((page - 1) * pageSize)
@@ -393,10 +393,10 @@ namespace HorseRacingAPI.Services
                     RaceId              = r.RaceId,
                     RaceNumber          = r.Race.RaceNumber,
                     RefereeId           = r.RefereeId,
-                    RefereeName         = r.Referee.UserProfiles.Select(up => up.FullName).FirstOrDefault() ?? r.Referee.Email ?? "",
+                    RefereeName         = (r.Referee.UserProfile != null ? r.Referee.UserProfile.FullName : null) ?? r.Referee.Email ?? "",
                     RegistrationId      = r.RegistrationId,
                     HorseName           = r.Registration.Horse.HorseName,
-                    OriginalPosition    = r.Registration.RaceResults.FirstOrDefault() != null ? r.Registration.RaceResults.FirstOrDefault()!.FinishPosition : null,
+                    OriginalPosition    = r.Registration.RaceResult != null ? r.Registration.RaceResult.FinishPosition : null,
                     IncidentDescription = r.IncidentDescription,
                     PenaltyApplied      = r.PenaltyApplied,
                     Status              = r.Status.ToString(),
@@ -410,36 +410,6 @@ namespace HorseRacingAPI.Services
                 Page       = page,
                 PageSize   = pageSize,
                 TotalCount = total
-            };
-        }
-
-        public async Task<RefereeReportResponse> GetReportByIdAsync(Guid reportId, Guid requesterId, bool isAdmin)
-        {
-            RefereeReport? report = await _uow.GetRepository<RefereeReport>().Entities
-                .Include(r => r.Race)
-                .Include(r => r.Registration).ThenInclude(r => r.Horse)
-                .Include(r => r.Referee).ThenInclude(r => r.UserProfiles)
-                .Include(r => r.Registration).ThenInclude(r => r.RaceResults)
-                .FirstOrDefaultAsync(r => r.ReportId == reportId)
-                ?? throw new KeyNotFoundException("Report not found.");
-
-            if (!isAdmin && report.RefereeId != requesterId)
-                throw new UnauthorizedAccessException("Access denied.");
-
-            return new RefereeReportResponse
-            {
-                ReportId            = report.ReportId,
-                RaceId              = report.RaceId,
-                RaceNumber          = report.Race.RaceNumber,
-                RefereeId           = report.RefereeId,
-                RefereeName         = report.Referee.UserProfiles.Select(p => p.FullName).FirstOrDefault() ?? report.Referee.Email ?? "",
-                RegistrationId      = report.RegistrationId,
-                HorseName           = report.Registration.Horse.HorseName,
-                OriginalPosition    = report.Registration.RaceResults.FirstOrDefault()?.FinishPosition,
-                IncidentDescription = report.IncidentDescription,
-                PenaltyApplied      = report.PenaltyApplied,
-                Status              = report.Status.ToString(),
-                CreatedAt           = report.CreatedAt,
             };
         }
 

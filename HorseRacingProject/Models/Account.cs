@@ -30,7 +30,7 @@ public partial class Account
 
     public virtual ICollection<Horse> Horses { get; set; } = new List<Horse>();
 
-    public virtual ICollection<JockeyProfile> JockeyProfiles { get; set; } = new List<JockeyProfile>();
+    public virtual JockeyProfile? JockeyProfile { get; set; }
 
     public virtual ICollection<Race> RefereeRaces { get; set; } = new List<Race>();
 
@@ -38,5 +38,5 @@ public partial class Account
 
     public virtual ICollection<Registration> Registrations { get; set; } = new List<Registration>();
 
-    public virtual ICollection<UserProfile> UserProfiles { get; set; } = new List<UserProfile>();
+    public virtual UserProfile? UserProfile { get; set; }
 }

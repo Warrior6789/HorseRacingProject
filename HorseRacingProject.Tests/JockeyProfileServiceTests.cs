@@ -35,63 +35,6 @@ public class JockeyProfileServiceTests
     };
 
     [Fact]
-    public async Task CreateJockeyProfileAsync_AccountDoesNotExist_ThrowsInvalidOperation()
-    {
-        using HorseRacingDataContext db = CreateContext();
-        JockeyProfileService service = CreateService(db);
-
-        await Assert.ThrowsAsync<InvalidOperationException>(
-            () => service.CreateJockeyProfileAsync(Guid.NewGuid(), new JockeyProfileCreateRequest()));
-    }
-
-    [Fact]
-    public async Task CreateJockeyProfileAsync_AccountNotJockeyRole_ThrowsInvalidOperation()
-    {
-        using HorseRacingDataContext db = CreateContext();
-        Account account = NewAccount(AccountRole.Spectator);
-        db.Accounts.Add(account);
-        await db.SaveChangesAsync();
-
-        JockeyProfileService service = CreateService(db);
-
-        await Assert.ThrowsAsync<InvalidOperationException>(
-            () => service.CreateJockeyProfileAsync(account.Id, new JockeyProfileCreateRequest()));
-    }
-
-    [Fact]
-    public async Task CreateJockeyProfileAsync_ProfileAlreadyExists_ThrowsInvalidOperation()
-    {
-        using HorseRacingDataContext db = CreateContext();
-        Account account = NewAccount(AccountRole.Jockey);
-        db.Accounts.Add(account);
-        db.JockeyProfiles.Add(new JockeyProfile { JockeyProfileId = Guid.NewGuid(), AccountId = account.Id });
-        await db.SaveChangesAsync();
-
-        JockeyProfileService service = CreateService(db);
-
-        await Assert.ThrowsAsync<InvalidOperationException>(
-            () => service.CreateJockeyProfileAsync(account.Id, new JockeyProfileCreateRequest()));
-    }
-
-    [Fact]
-    public async Task CreateJockeyProfileAsync_Valid_CreatesProfileWithZeroStats()
-    {
-        using HorseRacingDataContext db = CreateContext();
-        Account account = NewAccount(AccountRole.Jockey);
-        db.Accounts.Add(account);
-        await db.SaveChangesAsync();
-
-        JockeyProfileService service = CreateService(db);
-        var request = new JockeyProfileCreateRequest { FullName = "Jockey A", Nationality = "VN" };
-
-        JockeyProfileResponse result = await service.CreateJockeyProfileAsync(account.Id, request);
-
-        Assert.Equal("Jockey A", result.FullName);
-        Assert.Equal(0, result.TotalRaces);
-        Assert.Equal(0, result.TotalWins);
-    }
-
-    [Fact]
     public async Task GetJockeyProfileByAccountIdAsync_EmptyAccountId_ThrowsInvalidOperation()
     {
         using HorseRacingDataContext db = CreateContext();
@@ -206,25 +149,6 @@ public class JockeyProfileServiceTests
         JockeyProfileService service = CreateService(db);
 
         await Assert.ThrowsAsync<KeyNotFoundException>(() => service.GetJockeyRewardsAsync(Guid.NewGuid(), 1, 10));
-    }
-
-    [Fact]
-    public async Task GetAllJockeyProfilesAsync_ExcludesDeletedProfiles()
-    {
-        using HorseRacingDataContext db = CreateContext();
-        Account account1 = NewAccount(AccountRole.Jockey);
-        Account account2 = NewAccount(AccountRole.Jockey);
-        db.Accounts.AddRange(account1, account2);
-        db.JockeyProfiles.Add(new JockeyProfile { JockeyProfileId = Guid.NewGuid(), AccountId = account1.Id, FullName = "Active Jockey", IsDeleted = false });
-        db.JockeyProfiles.Add(new JockeyProfile { JockeyProfileId = Guid.NewGuid(), AccountId = account2.Id, FullName = "Deleted Jockey", IsDeleted = true });
-        await db.SaveChangesAsync();
-
-        JockeyProfileService service = CreateService(db);
-
-        List<JockeyProfileResponse> result = await service.GetAllJockeyProfilesAsync();
-
-        Assert.Single(result);
-        Assert.Equal("Active Jockey", result[0].FullName);
     }
 
     [Fact]

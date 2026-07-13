@@ -26,6 +26,7 @@ namespace HorseRacingAPI.Services
             var race = await uow.GetRepository<Race>().Entities
                 .Include(r => r.PositionPrizeConfig)
                 .Include(r => r.JockeyRewardConfig)
+                .Include(r => r.TakeoutConfig)
                 .FirstOrDefaultAsync(r => r.RaceId == raceId && !r.IsDeleted);
             if (race == null || race.Status != RaceStatus.Finished) return;
 
@@ -59,9 +60,7 @@ namespace HorseRacingAPI.Services
         {
             Guid raceId = race.RaceId;
 
-            TakeoutConfig? takeoutConfig = await uow.GetRepository<TakeoutConfig>().Entities
-                .FirstOrDefaultAsync(c => c.Status == ConfigStatus.Active);
-            decimal takeout = (decimal)(takeoutConfig?.TakeoutPercentage ?? 0.20f);
+            decimal takeout = (decimal)(race.TakeoutConfig?.TakeoutPercentage ?? 0.20f);
 
             Dictionary<Guid, int> positions = sortedRegs
                 .Select((r, i) => new { r.RegistrationId, Position = i + 1 })

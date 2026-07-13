@@ -4,10 +4,7 @@ namespace HorseRacingAPI.Services
 {
     public interface IUserProfileService
     {
-        Task<UserProfileResponse> CreateUserProfileAsync(Guid accountId, UserProfileCreateRequest req);
         Task<UserProfileResponse> GetUserProfileByIdAsync(Guid accountId);
-        Task<List<UserProfileResponse>> GetAllUserProfilesAsync();
-        Task<PagedResponse<UserProfileResponse>> GetAllUserProfilesPagedAsync(int page, int pageSize);
         Task UpdateUserProfileAsync(Guid accountId, UserProfileUpdateRequest req);
         Task<string> UploadImageAsync(Guid accountId, IFormFile file);
 

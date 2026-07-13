@@ -185,8 +185,10 @@ public partial class HorseRacingDataContext : DbContext
             entity.Property(e => e.ImageUrl).HasMaxLength(500);
             entity.Property(e => e.UpdatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
 
-            entity.HasOne(d => d.Account).WithMany(p => p.JockeyProfiles)
-                .HasForeignKey(d => d.AccountId)
+            entity.HasIndex(e => e.AccountId, "JockeyProfile_AccountId_key").IsUnique();
+
+            entity.HasOne(d => d.Account).WithOne(p => p.JockeyProfile)
+                .HasForeignKey<JockeyProfile>(d => d.AccountId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_JockeyProfile_Account");
         });
@@ -204,6 +206,11 @@ public partial class HorseRacingDataContext : DbContext
             entity.Property(e => e.Amount).HasPrecision(18, 2);
             entity.Property(e => e.CreateAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
             entity.Property(e => e.Status).HasMaxLength(20).HasConversion<string>();
+
+            entity.HasOne(d => d.Account).WithMany()
+                .HasForeignKey(d => d.AccountId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_Payment_Account");
         });
 
         modelBuilder.Entity<Prize>(entity =>
@@ -257,6 +264,11 @@ public partial class HorseRacingDataContext : DbContext
                 .OnDelete(DeleteBehavior.SetNull)
                 .HasConstraintName("FK_Races_JockeyRewardConfigs");
 
+            entity.HasOne(d => d.TakeoutConfig).WithMany(p => p.Races)
+                .HasForeignKey(d => d.TakeoutConfigId)
+                .OnDelete(DeleteBehavior.SetNull)
+                .HasConstraintName("FK_Races_TakeoutConfigs");
+
             entity.Property(e => e.RefereeId).HasColumnName("RefereeID");
             entity.HasOne(d => d.Referee).WithMany(p => p.RefereeRaces)
                 .HasForeignKey(d => d.RefereeId)
@@ -275,8 +287,10 @@ public partial class HorseRacingDataContext : DbContext
             entity.Property(e => e.IsDisqualified).HasDefaultValue(false);
             entity.Property(e => e.RegistrationId).HasColumnName("RegistrationID");
 
-            entity.HasOne(d => d.Registration).WithMany(p => p.RaceResults)
-                .HasForeignKey(d => d.RegistrationId)
+            entity.HasIndex(e => e.RegistrationId, "RaceResults_RegistrationId_key").IsUnique();
+
+            entity.HasOne(d => d.Registration).WithOne(p => p.RaceResult)
+                .HasForeignKey<RaceResult>(d => d.RegistrationId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_RaceResults_Registrations");
         });
@@ -372,8 +386,10 @@ public partial class HorseRacingDataContext : DbContext
             entity.Property(e => e.ImageUrl).HasMaxLength(500);
             entity.Property(e => e.UpdatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
 
-            entity.HasOne(d => d.Account).WithMany(p => p.UserProfiles)
-                .HasForeignKey(d => d.AccountId)
+            entity.HasIndex(e => e.AccountId, "UserProfiles_AccountId_key").IsUnique();
+
+            entity.HasOne(d => d.Account).WithOne(p => p.UserProfile)
+                .HasForeignKey<UserProfile>(d => d.AccountId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_UserProfiles_Account");
         });

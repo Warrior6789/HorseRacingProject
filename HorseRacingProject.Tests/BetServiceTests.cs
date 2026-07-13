@@ -150,37 +150,6 @@ public class BetServiceTests
     }
 
     [Fact]
-    public async Task GetMyBetsAsync_ReturnsMappedBetsWithEstimatedPayout()
-    {
-        using Fixture fixture = await SeedAsync();
-        fixture.Db.Bets.Add(new Bet
-        {
-            BetId = Guid.NewGuid(),
-            SpectatorId = fixture.Spectator.Id,
-            RegistrationId = fixture.Registration.RegistrationId,
-            BetAmount = 100_000,
-            BetType = BetType.Win,
-            Status = BetStatus.Active,
-            CreatedAt = DateTimeOffset.UtcNow
-        });
-        fixture.Db.RacePools.Add(new RacePool
-        {
-            RacePoolId = Guid.NewGuid(),
-            RaceId = fixture.Race.RaceId,
-            BetType = BetType.Win,
-            TotalAmount = 100_000
-        });
-        await fixture.Db.SaveChangesAsync();
-
-        List<BetResponse> result = await fixture.Service.GetMyBetsAsync(fixture.Spectator.Id);
-
-        Assert.Single(result);
-        Assert.Equal(100_000, result[0].BetAmount);
-        Assert.Equal("Win", result[0].BetType);
-        Assert.NotNull(result[0].EstimatedPayout);
-    }
-
-    [Fact]
     public async Task GetMyBetsPagedAsync_ClampsInvalidPageAndPageSize_FiltersBySpectator()
     {
         using Fixture fixture = await SeedAsync();

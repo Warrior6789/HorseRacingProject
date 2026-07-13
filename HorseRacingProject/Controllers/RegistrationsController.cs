@@ -54,24 +54,6 @@ namespace HorseRacingAPI.Controllers
         }
 
         [Authorize(Roles = "HorseOwner")]
-        [HttpGet("owner/my-requests")]
-        public async Task<IActionResult> GetOwnerRequests()
-        {
-            Guid accountId = GetAccountIdFromToken();
-            List<RegistrationResponse> result = await _registrationService.GetOwnerRequestAsync(accountId);
-            return Ok(ApiResponse<List<RegistrationResponse>>.SuccessResponse(result, "Get owner registration requests successfully."));
-        }
-
-        [Authorize(Roles = "HorseOwner")]
-        [HttpGet("owner/my-requests/paged")]
-        public async Task<IActionResult> GetOwnerRequestsPaged([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
-        {
-            Guid accountId = GetAccountIdFromToken();
-            PagedResponse<RegistrationResponse> result = await _registrationService.GetOwnerRequestPagedAsync(accountId, page, pageSize);
-            return Ok(ApiResponse<PagedResponse<RegistrationResponse>>.SuccessResponse(result, "Get owner registration requests successfully."));
-        }
-
-        [Authorize(Roles = "HorseOwner")]
         [HttpGet("owner")]
         public async Task<IActionResult> GetAllOwnerRegistrations()
         {

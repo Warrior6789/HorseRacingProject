@@ -192,4 +192,41 @@ public class RaceServiceResetRaceIntegrationTests
         JockeyProfile jockeyProfile = await fixture.Db.JockeyProfiles.AsNoTracking().SingleAsync(p => p.AccountId == fixture.Jockey.Id);
         Assert.Equal(0L, jockeyProfile.Balance);
     }
+
+    [Fact]
+    public async Task ResetRaceAsync_RaceNotFound_ThrowsKeyNotFoundException()
+    {
+        HorseRacingDataContext db = await CreateContextAsync();
+        IUnitofWork uow = new UnitofWork(db);
+        var service = new RaceService(uow, CreateEngine(), Mock.Of<ICloudinaryService>(), CreateHubContext());
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(() => service.ResetRaceAsync(Guid.NewGuid()));
+    }
+
+    [Fact]
+    public async Task ResetRaceAsync_ScheduledRaceWithNoParticipants_ResetsWithoutError()
+    {
+        HorseRacingDataContext db = await CreateContextAsync();
+
+        var racecourse = new Racecourse { Id = Guid.NewGuid(), RacecourseName = "Track" };
+        var race = new Race
+        {
+            RaceId = Guid.NewGuid(),
+            RacecourseId = racecourse.Id,
+            Status = RaceStatus.Scheduled,
+            StartTime = DateTimeOffset.UtcNow.AddDays(1),
+            PrizePool = 0m
+        };
+        db.AddRange(racecourse, race);
+        await db.SaveChangesAsync();
+
+        IUnitofWork uow = new UnitofWork(db);
+        var service = new RaceService(uow, CreateEngine(), Mock.Of<ICloudinaryService>(), CreateHubContext());
+
+        await service.ResetRaceAsync(race.RaceId);
+
+        Race reloaded = await db.Races.AsNoTracking().SingleAsync(r => r.RaceId == race.RaceId);
+        Assert.Equal(RaceStatus.Scheduled, reloaded.Status);
+        Assert.Equal(0m, reloaded.PrizePool);
+    }
 }

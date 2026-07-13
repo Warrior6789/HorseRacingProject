@@ -18,25 +18,6 @@ namespace HorseRacingAPI.Controllers
             _jockeyProfileService = jockeyProfileService;
         }
 
-        [Authorize]
-        [HttpPost]
-        public async Task<IActionResult> CreateJockeyProfile([FromForm] JockeyProfileCreateRequest req)
-        {
-            Guid accountId = GetAccountIdFromToken();
-            JockeyProfileResponse response = await _jockeyProfileService.CreateJockeyProfileAsync(accountId, req);
-            ApiResponse<JockeyProfileResponse> apiResponse = ApiResponse<JockeyProfileResponse>.SuccessResponse(response, "Create jockey profile successfully.");
-            return StatusCode(StatusCodes.Status201Created, apiResponse);
-        }
-
-        [Authorize(Roles = "Admin")]
-        [HttpGet]
-        public async Task<IActionResult> GetAllJockeyProfiles()
-        {
-            List<JockeyProfileResponse> profiles = await _jockeyProfileService.GetAllJockeyProfilesAsync();
-            ApiResponse<List<JockeyProfileResponse>> apiResponse = ApiResponse<List<JockeyProfileResponse>>.SuccessResponse(profiles, "Get all jockey profiles successfully.");
-            return Ok(apiResponse);
-        }
-
         [Authorize(Roles = "Admin,HorseOwner")]
         [HttpGet("paged")]
         public async Task<IActionResult> GetAllJockeyProfilesPaged([FromQuery] int page = 1, [FromQuery] int pageSize = 10)

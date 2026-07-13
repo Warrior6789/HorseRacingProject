@@ -581,30 +581,6 @@ namespace HorseRacingAPI.Services
                 .ToListAsync();
         }
 
-        public async Task<List<RaceResultHorseDto>> GetRaceHorsesAsync(Guid raceId)
-        {
-            bool exists = await _uow.GetRepository<Race>().Entities
-                .AnyAsync(r => r.RaceId == raceId && !r.IsDeleted);
-
-            if (!exists)
-                throw new KeyNotFoundException($"Race with id {raceId} not found.");
-
-            return await _uow.GetRepository<Registration>().Entities
-                .Include(r => r.Horse)
-                .Where(r => r.RaceId == raceId && r.Status == RegistrationStatus.Confirmed)
-                .Select(r => new RaceResultHorseDto
-                {
-                    Id = r.Horse.Id,
-                    RegistrationId = r.RegistrationId,
-                    HorseName = r.Horse.HorseName,
-                    Breed = r.Horse.Breed,
-                    Color = r.Horse.Color,
-                    Age = r.Horse.Age,
-                    Status = r.Horse.Status.ToString()
-                })
-                .ToListAsync();
-        }
-
         public async Task<List<RegistrationResponse>> GetRaceRegistrationsAsync(Guid raceId)
         {
             bool exists = await _uow.GetRepository<Race>().Entities
@@ -619,45 +595,43 @@ namespace HorseRacingAPI.Services
                 .Include(r => r.Race)
                     .ThenInclude(r => r.Racecourse)
                 .Include(r => r.Jockey)
-                    .ThenInclude(a => a.JockeyProfiles)
+                    .ThenInclude(a => a.JockeyProfile)
                 .Where(r => r.RaceId == raceId && r.Status == RegistrationStatus.Confirmed)
                 .OrderBy(r => r.GateNumber)
                 .Select(r => new RegistrationResponse
                 {
                     RegistrationId = r.RegistrationId,
                     JockeyId = r.JockeyId,
-                    JockeyName = r.Jockey.JockeyProfiles.Where(p => !p.IsDeleted).Select(p => p.FullName).FirstOrDefault(),
-                    Jockey = r.Jockey.JockeyProfiles
-                        .Where(p => !p.IsDeleted)
-                        .Select(p => new JockeyProfileResponse
+                    JockeyName = r.Jockey.JockeyProfile != null && !r.Jockey.JockeyProfile.IsDeleted ? r.Jockey.JockeyProfile.FullName : null,
+                    Jockey = r.Jockey.JockeyProfile != null && !r.Jockey.JockeyProfile.IsDeleted
+                        ? new JockeyProfileResponse
                         {
-                            JockeyProfileId = p.JockeyProfileId,
-                            AccountId = p.AccountId,
-                            FullName = p.FullName,
-                            DateOfBirth = p.DateOfBirth,
-                            Nationality = p.Nationality,
-                            LicenseNumber = p.LicenseNumber,
-                            Weight = p.Weight,
-                            Height = p.Height,
-                            TotalRaces = p.TotalRaces,
-                            TotalWins = p.TotalWins,
-                            ImageUrl = p.ImageUrl,
-                            CreateAt = p.CreateAt,
-                            UpdatedAt = p.UpdatedAt
-                        })
-                        .FirstOrDefault(),
-                    Owner = r.Horse.Owner.UserProfiles
-                        .Where(up => !up.IsDeleted)
-                        .Select(up => new UserProfileResponse
+                            JockeyProfileId = r.Jockey.JockeyProfile.JockeyProfileId,
+                            AccountId = r.Jockey.JockeyProfile.AccountId,
+                            FullName = r.Jockey.JockeyProfile.FullName,
+                            DateOfBirth = r.Jockey.JockeyProfile.DateOfBirth,
+                            Nationality = r.Jockey.JockeyProfile.Nationality,
+                            LicenseNumber = r.Jockey.JockeyProfile.LicenseNumber,
+                            Weight = r.Jockey.JockeyProfile.Weight,
+                            Height = r.Jockey.JockeyProfile.Height,
+                            TotalRaces = r.Jockey.JockeyProfile.TotalRaces,
+                            TotalWins = r.Jockey.JockeyProfile.TotalWins,
+                            ImageUrl = r.Jockey.JockeyProfile.ImageUrl,
+                            CreateAt = r.Jockey.JockeyProfile.CreateAt,
+                            UpdatedAt = r.Jockey.JockeyProfile.UpdatedAt
+                        }
+                        : null,
+                    Owner = r.Horse.Owner.UserProfile != null && !r.Horse.Owner.UserProfile.IsDeleted
+                        ? new UserProfileResponse
                         {
-                            ProfileId = up.ProfileId,
-                            AccountId = up.AccountId,
-                            FullName = up.FullName,
-                            ImageUrl = up.ImageUrl,
-                            CreateAt = up.CreateAt,
-                            UpdatedAt = up.UpdatedAt
-                        })
-                        .FirstOrDefault(),
+                            ProfileId = r.Horse.Owner.UserProfile.ProfileId,
+                            AccountId = r.Horse.Owner.UserProfile.AccountId,
+                            FullName = r.Horse.Owner.UserProfile.FullName,
+                            ImageUrl = r.Horse.Owner.UserProfile.ImageUrl,
+                            CreateAt = r.Horse.Owner.UserProfile.CreateAt,
+                            UpdatedAt = r.Horse.Owner.UserProfile.UpdatedAt
+                        }
+                        : null,
                     GateNumber = r.GateNumber,
                     Horse = new HorseResponse
                     {
@@ -866,12 +840,15 @@ namespace HorseRacingAPI.Services
                     .FirstOrDefaultAsync(c => c.Status == ConfigStatus.Active);
                 JockeyRewardConfig? jockeyConfig = await _uow.GetRepository<JockeyRewardConfig>().Entities
                     .FirstOrDefaultAsync(c => c.Status == ConfigStatus.Active);
+                TakeoutConfig? takeoutConfig = await _uow.GetRepository<TakeoutConfig>().Entities
+                    .FirstOrDefaultAsync(c => c.Status == ConfigStatus.Active);
 
-                if (posConfig == null || jockeyConfig == null)
-                    throw new InvalidOperationException("Position prize config and jockey reward config must be active before opening betting.");
+                if (posConfig == null || jockeyConfig == null || takeoutConfig == null)
+                    throw new InvalidOperationException("Position prize config, jockey reward config and takeout config must be active before opening betting.");
 
                 race.PositionPrizeConfigId = posConfig.PositionPrizeConfigId;
                 race.JockeyRewardConfigId = jockeyConfig.JockeyRewardConfigId;
+                race.TakeoutConfigId = takeoutConfig.TakeoutConfigId;
             }
 
             if (nextStatus == RaceStatus.Live)
@@ -1029,13 +1006,14 @@ namespace HorseRacingAPI.Services
 
         public async Task<RacePoolOverviewResponse> GetRacePoolOverviewAsync(Guid raceId)
         {
-            bool exists = await _uow.GetRepository<Race>().Entities
-                .AnyAsync(r => r.RaceId == raceId && !r.IsDeleted);
-            if (!exists)
+            Race? race = await _uow.GetRepository<Race>().Entities
+                .Include(r => r.TakeoutConfig)
+                .FirstOrDefaultAsync(r => r.RaceId == raceId && !r.IsDeleted);
+            if (race == null)
                 throw new KeyNotFoundException($"Race with id {raceId} not found.");
 
             List<Bet> bets = await _uow.GetRepository<Bet>().Entities
-                .Include(b => b.Spectator).ThenInclude(a => a.UserProfiles)
+                .Include(b => b.Spectator).ThenInclude(a => a.UserProfile)
                 .Include(b => b.Registration).ThenInclude(r => r.Horse)
                 .Where(b => b.Registration.RaceId == raceId)
                 .OrderByDescending(b => b.CreatedAt)
@@ -1045,9 +1023,7 @@ namespace HorseRacingAPI.Services
                 .Where(p => p.RaceId == raceId)
                 .ToListAsync();
 
-            TakeoutConfig? takeoutConfig = await _uow.GetRepository<TakeoutConfig>().Entities
-                .FirstOrDefaultAsync(c => c.Status == ConfigStatus.Active);
-            decimal takeout = (decimal)(takeoutConfig?.TakeoutPercentage ?? 0.20f);
+            decimal takeout = (decimal)(race.TakeoutConfig?.TakeoutPercentage ?? 0.20f);
 
             var perHorsePools = bets
                 .Where(b => b.Status == BetStatus.Active)
@@ -1073,7 +1049,7 @@ namespace HorseRacingAPI.Services
                 {
                     BetId = b.BetId,
                     SpectatorId = b.SpectatorId,
-                    SpectatorName = b.Spectator.UserProfiles.Where(p => !p.IsDeleted).Select(p => p.FullName).FirstOrDefault(),
+                    SpectatorName = b.Spectator.UserProfile != null && !b.Spectator.UserProfile.IsDeleted ? b.Spectator.UserProfile.FullName : null,
                     RegistrationId = b.RegistrationId,
                     HorseId = b.Registration.HorseId,
                     HorseName = b.Registration.Horse.HorseName,
@@ -1126,10 +1102,10 @@ namespace HorseRacingAPI.Services
                         HorseId = p.Registration.HorseId,
                         HorseName = p.Registration.Horse.HorseName,
                         OwnerId = p.Registration.Horse.OwnerId,
-                        OwnerName = p.Registration.Horse.Owner.UserProfiles.Where(up => !up.IsDeleted).Select(up => up.FullName).FirstOrDefault(),
+                        OwnerName = p.Registration.Horse.Owner.UserProfile != null && !p.Registration.Horse.Owner.UserProfile.IsDeleted ? p.Registration.Horse.Owner.UserProfile.FullName : null,
                         JockeyId = p.Registration.JockeyId,
-                        JockeyName = p.Registration.Jockey.JockeyProfiles.Where(jp => !jp.IsDeleted).Select(jp => jp.FullName).FirstOrDefault(),
-                        Position = p.Registration.RaceResults.Select(rr => rr.FinishPosition).FirstOrDefault()
+                        JockeyName = p.Registration.Jockey.JockeyProfile != null && !p.Registration.Jockey.JockeyProfile.IsDeleted ? p.Registration.Jockey.JockeyProfile.FullName : null,
+                        Position = p.Registration.RaceResult != null ? p.Registration.RaceResult.FinishPosition : null
                     })
                     .ToListAsync();
 
@@ -1167,8 +1143,8 @@ namespace HorseRacingAPI.Services
                 .FirstOrDefaultAsync(c => c.Status == ConfigStatus.Active);
 
             List<Registration> sortedRegs = await _uow.GetRepository<RaceResult>().Entities
-                .Include(r => r.Registration).ThenInclude(reg => reg.Horse).ThenInclude(h => h.Owner).ThenInclude(o => o.UserProfiles)
-                .Include(r => r.Registration).ThenInclude(reg => reg.Jockey).ThenInclude(j => j.JockeyProfiles)
+                .Include(r => r.Registration).ThenInclude(reg => reg.Horse).ThenInclude(h => h.Owner).ThenInclude(o => o.UserProfile)
+                .Include(r => r.Registration).ThenInclude(reg => reg.Jockey).ThenInclude(j => j.JockeyProfile)
                 .Where(r => r.Registration.RaceId == raceId && r.IsDisqualified != true)
                 .OrderBy(r => r.FinishPosition)
                 .Select(r => r.Registration)
@@ -1185,24 +1161,24 @@ namespace HorseRacingAPI.Services
                 };
             }
 
-            double[] allRatios =
+            decimal[] allRatios =
             [
-                posConfig.Pos1Ratio, posConfig.Pos2Ratio, posConfig.Pos3Ratio,
-                posConfig.Pos4Ratio, posConfig.Pos5Ratio, posConfig.Pos6Ratio
+                (decimal)posConfig.Pos1Ratio, (decimal)posConfig.Pos2Ratio, (decimal)posConfig.Pos3Ratio,
+                (decimal)posConfig.Pos4Ratio, (decimal)posConfig.Pos5Ratio, (decimal)posConfig.Pos6Ratio
             ];
             int finisherCount = Math.Min(sortedRegs.Count, allRatios.Length);
-            double[] usedRatios = allRatios.Take(finisherCount).ToArray();
-            double ratioSum = usedRatios.Sum();
+            decimal[] usedRatios = allRatios.Take(finisherCount).ToArray();
+            decimal ratioSum = usedRatios.Sum();
 
             List<RacePrizePreviewItemResponse> previewItems = new();
             if (ratioSum > 0)
             {
-                double[] normalizedRatios = usedRatios.Select(r => r / ratioSum).ToArray();
+                decimal[] normalizedRatios = usedRatios.Select(r => r / ratioSum).ToArray();
                 for (int i = 0; i < finisherCount; i++)
                 {
                     Registration reg = sortedRegs[i];
                     int position = i + 1;
-                    decimal positionPrize = race.PrizePool * (decimal)normalizedRatios[i];
+                    decimal positionPrize = race.PrizePool * normalizedRatios[i];
                     decimal jockeyAmount = position switch
                     {
                         1 => positionPrize * (decimal)jockeyConfig.WinCut,
@@ -1217,9 +1193,9 @@ namespace HorseRacingAPI.Services
                         HorseId = reg.HorseId,
                         HorseName = reg.Horse.HorseName,
                         OwnerId = reg.Horse.OwnerId,
-                        OwnerName = reg.Horse.Owner.UserProfiles.Where(p => !p.IsDeleted).Select(p => p.FullName).FirstOrDefault(),
+                        OwnerName = reg.Horse.Owner.UserProfile != null && !reg.Horse.Owner.UserProfile.IsDeleted ? reg.Horse.Owner.UserProfile.FullName : null,
                         JockeyId = reg.JockeyId,
-                        JockeyName = reg.Jockey.JockeyProfiles.Where(p => !p.IsDeleted).Select(p => p.FullName).FirstOrDefault(),
+                        JockeyName = reg.Jockey.JockeyProfile != null && !reg.Jockey.JockeyProfile.IsDeleted ? reg.Jockey.JockeyProfile.FullName : null,
                         Position = position,
                         PositionPrize = positionPrize,
                         OwnerAmount = ownerAmount,

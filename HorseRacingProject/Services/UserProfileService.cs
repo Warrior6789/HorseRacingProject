@@ -16,84 +16,6 @@ namespace HorseRacingAPI.Services
             _uow = uow;
             _cloudinaryService = cloudinaryService;
         }
-        public async Task<UserProfileResponse> CreateUserProfileAsync(Guid accountId, UserProfileCreateRequest req)
-        {
-            IGenericRepository<UserProfile> userProfileRepo = _uow.GetRepository<UserProfile>();
-
-            IGenericRepository<Account> accRepo = _uow.GetRepository<Account>();
-            bool accountExsit = await accRepo.Entities.AnyAsync(a => a.Id == accountId && !a.IsDeleted);
-            if (!accountExsit)
-            {
-                throw new Exception("Account does not exist.");
-            }
-            int existingCount = await userProfileRepo.Entities.CountAsync(p => p.AccountId == accountId);
-            if (existingCount > 0)
-            {
-                throw new InvalidOperationException("A profile already exists for this account.");
-            }
-            string? imageUrl = null;
-            if (req.Image != null)
-                imageUrl = await _cloudinaryService.UploadImageAsync(req.Image, "user-profiles");
-
-            UserProfile userProfile = new UserProfile
-            {
-                ProfileId = Guid.NewGuid(),
-                AccountId = accountId,
-                FullName = req.FullName,
-                Phone = req.Phone,
-                ImageUrl = imageUrl,
-                Balance = 0,
-                CreateAt = DateTimeOffset.UtcNow,
-                UpdatedAt = DateTimeOffset.UtcNow,
-                IsDeleted = false
-            };
-            await userProfileRepo.AddAsync(userProfile);
-            await _uow.SaveAsync();
-            return MapToResponse(userProfile);
-        }
-
-        public async Task<List<UserProfileResponse>> GetAllUserProfilesAsync()
-        {
-            IGenericRepository<UserProfile> userProfileRepo = _uow.GetRepository<UserProfile>();
-            return await userProfileRepo.Entities.Select(u => new UserProfileResponse
-            {
-                ProfileId = u.ProfileId,
-                AccountId = u.AccountId,
-                FullName = u.FullName,
-                Phone = u.Phone,
-                Balance = u.Balance,
-                ImageUrl = u.ImageUrl,
-                CreateAt = u.CreateAt,
-                UpdatedAt = u.UpdatedAt,
-            }).ToListAsync();
-        }
-
-        public async Task<PagedResponse<UserProfileResponse>> GetAllUserProfilesPagedAsync(int page, int pageSize)
-        {
-            if (page < 1) page = 1;
-            if (pageSize < 1) pageSize = 10;
-            if (pageSize > 100) pageSize = 100;
-            IGenericRepository<UserProfile> userProfileRepo = _uow.GetRepository<UserProfile>();
-            int totalCount = await userProfileRepo.Entities.CountAsync();
-            IEnumerable<UserProfileResponse> items = await userProfileRepo.FindAsync<UserProfileResponse>(
-                predicate: null,
-                orderBy: q => q.OrderBy(u => u.CreateAt),
-                selector: u => new UserProfileResponse
-                {
-                    ProfileId = u.ProfileId,
-                    AccountId = u.AccountId,
-                    FullName = u.FullName,
-                    Phone = u.Phone,
-                    Balance = u.Balance,
-                    ImageUrl = u.ImageUrl,
-                    CreateAt = u.CreateAt,
-                    UpdatedAt = u.UpdatedAt,
-                },
-                pageIndex: page - 1,
-                pageSize: pageSize);
-            return new PagedResponse<UserProfileResponse> { Items = items.ToList(), Page = page, PageSize = pageSize, TotalCount = totalCount };
-        }
-
         public async Task<UserProfileResponse> GetUserProfileByIdAsync(Guid accountId)
         {
             IGenericRepository<UserProfile> userProfileRepo = _uow.GetRepository<UserProfile>();
@@ -148,18 +70,6 @@ namespace HorseRacingAPI.Services
             userProfile.UpdatedAt = DateTimeOffset.UtcNow;
             await _uow.SaveAsync();
         }
-
-        private static UserProfileResponse MapToResponse(UserProfile u) => new UserProfileResponse
-        {
-            ProfileId = u.ProfileId,
-            AccountId = u.AccountId,
-            FullName = u.FullName,
-            Phone = u.Phone,
-            Balance = u.Balance,
-            ImageUrl = u.ImageUrl,
-            CreateAt = u.CreateAt,
-            UpdatedAt = u.UpdatedAt
-        };
 
         public async Task<string> UploadImageAsync(Guid accountId, IFormFile file)
         {

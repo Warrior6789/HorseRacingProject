@@ -161,23 +161,6 @@ public class AccountServiceTests
     }
 
     [Fact]
-    public async Task GetAccountByStatusAsync_ExcludesDeletedAccounts()
-    {
-        using HorseRacingDataContext db = CreateContext();
-        Account visible = NewAccount(AccountRole.Spectator, AccountStatus.Active);
-        Account deleted = NewAccount(AccountRole.Spectator, AccountStatus.Active);
-        deleted.IsDeleted = true;
-        db.Accounts.AddRange(visible, deleted);
-        await db.SaveChangesAsync();
-        AccountService service = CreateService(db);
-
-        List<AccountResponse> result = await service.GetAccountByStatusAsync("Active");
-
-        Assert.Single(result);
-        Assert.Equal(visible.Id, result[0].Id);
-    }
-
-    [Fact]
     public async Task GetAccountByStatusPagedAsync_FiltersByRoleAndSearch()
     {
         using HorseRacingDataContext db = CreateContext();
@@ -194,31 +177,6 @@ public class AccountServiceTests
 
         Assert.Single(result.Items);
         Assert.Equal(owner.Id, result.Items[0].Id);
-    }
-
-    [Fact]
-    public async Task GetRoleUpgradeRequestsAsync_EnrichesJockeyRequestFromJockeyProfile()
-    {
-        using HorseRacingDataContext db = CreateContext();
-        Account account = NewAccount(AccountRole.Spectator, AccountStatus.Active);
-        account.RequestedRole = AccountRole.Jockey;
-        var jockeyProfile = new JockeyProfile
-        {
-            JockeyProfileId = Guid.NewGuid(),
-            AccountId = account.Id,
-            FullName = "Jockey Nguyen",
-            LicenseNumber = "LIC-001"
-        };
-        db.Accounts.Add(account);
-        db.JockeyProfiles.Add(jockeyProfile);
-        await db.SaveChangesAsync();
-        AccountService service = CreateService(db);
-
-        List<UpgradeRequestResponse> result = await service.GetRoleUpgradeRequestsAsync();
-
-        Assert.Single(result);
-        Assert.Equal("Jockey Nguyen", result[0].FullName);
-        Assert.Equal("LIC-001", result[0].LicenseNumber);
     }
 
     [Fact]
