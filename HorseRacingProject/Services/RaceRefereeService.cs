@@ -104,7 +104,7 @@ namespace HorseRacingAPI.Services
         {
             var race = await _uow.GetRepository<Race>().Entities
                 .Include(r => r.Referee)
-                    .ThenInclude(a => a!.UserProfiles)
+                    .ThenInclude(a => a!.UserProfile)
                 .FirstOrDefaultAsync(r => r.RaceId == raceId && !r.IsDeleted)
                 ?? throw new KeyNotFoundException("Race not found.");
 
@@ -114,7 +114,7 @@ namespace HorseRacingAPI.Services
             {
                 RaceId       = raceId,
                 RefereeId    = race.Referee.Id,
-                RefereeName  = race.Referee.UserProfiles.Select(p => p.FullName).FirstOrDefault() ?? race.Referee.Email,
+                RefereeName  = (race.Referee.UserProfile != null ? race.Referee.UserProfile.FullName : null) ?? race.Referee.Email,
                 RefereeEmail = race.Referee.Email
             };
         }

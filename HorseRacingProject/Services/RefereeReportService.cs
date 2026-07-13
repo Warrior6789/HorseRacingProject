@@ -331,9 +331,9 @@ namespace HorseRacingAPI.Services
                 .Include(r => r.Registration)
                     .ThenInclude(r => r.Horse)
                 .Include(r => r.Referee)
-                    .ThenInclude(r => r.UserProfiles)
+                    .ThenInclude(r => r.UserProfile)
                 .Include(r => r.Registration)
-                    .ThenInclude(r => r.RaceResults)
+                    .ThenInclude(r => r.RaceResult)
                 .OrderByDescending(r => r.CreatedAt)
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
@@ -343,10 +343,10 @@ namespace HorseRacingAPI.Services
                     RaceId              = r.RaceId,
                     RaceNumber          = r.Race.RaceNumber,
                     RefereeId           = r.RefereeId,
-                    RefereeName         = r.Referee.UserProfiles.Select(up => up.FullName).FirstOrDefault() ?? r.Referee.Email ?? "",
+                    RefereeName         = (r.Referee.UserProfile != null ? r.Referee.UserProfile.FullName : null) ?? r.Referee.Email ?? "",
                     RegistrationId      = r.RegistrationId,
                     HorseName           = r.Registration.Horse.HorseName,
-                    OriginalPosition    = r.Registration.RaceResults.FirstOrDefault() != null ? r.Registration.RaceResults.FirstOrDefault()!.FinishPosition : null,
+                    OriginalPosition    = r.Registration.RaceResult != null ? r.Registration.RaceResult.FinishPosition : null,
                     IncidentDescription = r.IncidentDescription,
                     PenaltyApplied      = r.PenaltyApplied,
                     Status              = r.Status.ToString(),
@@ -380,9 +380,9 @@ namespace HorseRacingAPI.Services
                 .Include(r => r.Registration)
                     .ThenInclude(r => r.Horse)
                 .Include(r => r.Referee)
-                    .ThenInclude(r => r.UserProfiles)
+                    .ThenInclude(r => r.UserProfile)
                 .Include(r => r.Registration)
-                    .ThenInclude(r => r.RaceResults)
+                    .ThenInclude(r => r.RaceResult)
                 .Where(r => r.RefereeId == refereeId)
                 .OrderByDescending(r => r.CreatedAt)
                 .Skip((page - 1) * pageSize)
@@ -393,10 +393,10 @@ namespace HorseRacingAPI.Services
                     RaceId              = r.RaceId,
                     RaceNumber          = r.Race.RaceNumber,
                     RefereeId           = r.RefereeId,
-                    RefereeName         = r.Referee.UserProfiles.Select(up => up.FullName).FirstOrDefault() ?? r.Referee.Email ?? "",
+                    RefereeName         = (r.Referee.UserProfile != null ? r.Referee.UserProfile.FullName : null) ?? r.Referee.Email ?? "",
                     RegistrationId      = r.RegistrationId,
                     HorseName           = r.Registration.Horse.HorseName,
-                    OriginalPosition    = r.Registration.RaceResults.FirstOrDefault() != null ? r.Registration.RaceResults.FirstOrDefault()!.FinishPosition : null,
+                    OriginalPosition    = r.Registration.RaceResult != null ? r.Registration.RaceResult.FinishPosition : null,
                     IncidentDescription = r.IncidentDescription,
                     PenaltyApplied      = r.PenaltyApplied,
                     Status              = r.Status.ToString(),

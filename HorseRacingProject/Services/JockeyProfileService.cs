@@ -230,7 +230,7 @@ namespace HorseRacingAPI.Services
                     HorseImageUrl = p.Registration.Horse.ImageUrl,
                     RacecourseName = p.Registration.Race.Racecourse.RacecourseName,
                     TrackType = p.Registration.Race.Racecourse.TrackType,
-                    Position = p.Registration.RaceResults.Select(rr => rr.FinishPosition).FirstOrDefault(),
+                    Position = p.Registration.RaceResult != null ? p.Registration.RaceResult.FinishPosition : null,
                     Earnings = p.Amount
                 })
                 .ToListAsync();

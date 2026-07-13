@@ -215,24 +215,23 @@ namespace HorseRacingAPI.Services
                     RegistrationId = r.RegistrationId,
                     JockeyId = r.JockeyId,
                     GateNumber = r.GateNumber,
-                    Owner = r.Horse.Owner.UserProfiles
-                        .Where(up => !up.IsDeleted)
-                        .Select(up => new UserProfileResponse
+                    Owner = r.Horse.Owner.UserProfile != null && !r.Horse.Owner.UserProfile.IsDeleted
+                        ? new UserProfileResponse
                         {
-                            ProfileId  = up.ProfileId,
-                            AccountId  = up.AccountId,
-                            FullName   = up.FullName,
-                            Phone      = up.Phone,
-                            ImageUrl   = up.ImageUrl,
-                            CreateAt   = up.CreateAt,
-                            UpdatedAt  = up.UpdatedAt
-                        })
-                        .FirstOrDefault(),
+                            ProfileId  = r.Horse.Owner.UserProfile.ProfileId,
+                            AccountId  = r.Horse.Owner.UserProfile.AccountId,
+                            FullName   = r.Horse.Owner.UserProfile.FullName,
+                            Phone      = r.Horse.Owner.UserProfile.Phone,
+                            ImageUrl   = r.Horse.Owner.UserProfile.ImageUrl,
+                            CreateAt   = r.Horse.Owner.UserProfile.CreateAt,
+                            UpdatedAt  = r.Horse.Owner.UserProfile.UpdatedAt
+                        }
+                        : null,
                     Horse = new HorseResponse
                     {
                         Id = r.HorseId,
                         OwnerId = r.Horse.OwnerId,
-                        OwnerName = r.Horse.Owner.UserProfiles.Select(up => up.FullName).FirstOrDefault(),
+                        OwnerName = r.Horse.Owner.UserProfile != null ? r.Horse.Owner.UserProfile.FullName : null,
                         HorseName = r.Horse.HorseName,
                         Breed = r.Horse.Breed,
                         Color = r.Horse.Color,
@@ -288,24 +287,23 @@ namespace HorseRacingAPI.Services
                     RegistrationId = r.RegistrationId,
                     JockeyId = r.JockeyId,
                     GateNumber = r.GateNumber,
-                    Owner = r.Horse.Owner.UserProfiles
-                        .Where(up => !up.IsDeleted)
-                        .Select(up => new UserProfileResponse
+                    Owner = r.Horse.Owner.UserProfile != null && !r.Horse.Owner.UserProfile.IsDeleted
+                        ? new UserProfileResponse
                         {
-                            ProfileId  = up.ProfileId,
-                            AccountId  = up.AccountId,
-                            FullName   = up.FullName,
-                            Phone      = up.Phone,
-                            ImageUrl   = up.ImageUrl,
-                            CreateAt   = up.CreateAt,
-                            UpdatedAt  = up.UpdatedAt
-                        })
-                        .FirstOrDefault(),
+                            ProfileId  = r.Horse.Owner.UserProfile.ProfileId,
+                            AccountId  = r.Horse.Owner.UserProfile.AccountId,
+                            FullName   = r.Horse.Owner.UserProfile.FullName,
+                            Phone      = r.Horse.Owner.UserProfile.Phone,
+                            ImageUrl   = r.Horse.Owner.UserProfile.ImageUrl,
+                            CreateAt   = r.Horse.Owner.UserProfile.CreateAt,
+                            UpdatedAt  = r.Horse.Owner.UserProfile.UpdatedAt
+                        }
+                        : null,
                     Horse = new HorseResponse
                     {
                         Id = r.HorseId,
                         OwnerId = r.Horse.OwnerId,
-                        OwnerName = r.Horse.Owner.UserProfiles.Select(up => up.FullName).FirstOrDefault(),
+                        OwnerName = r.Horse.Owner.UserProfile != null ? r.Horse.Owner.UserProfile.FullName : null,
                         HorseName = r.Horse.HorseName,
                         Breed = r.Horse.Breed,
                         Color = r.Horse.Color,
@@ -423,26 +421,25 @@ namespace HorseRacingAPI.Services
                     Status            = r.Status.ToString(),
                     CreateAt          = r.CreateAt,
                     UpdatedAt         = r.UpdatedAt,
-                    Jockey = r.Jockey.JockeyProfiles
-                        .Where(jp => !jp.IsDeleted)
-                        .Select(jp => new JockeyProfileResponse
+                    Jockey = r.Jockey.JockeyProfile != null && !r.Jockey.JockeyProfile.IsDeleted
+                        ? new JockeyProfileResponse
                         {
-                            JockeyProfileId    = jp.JockeyProfileId,
-                            AccountId          = jp.AccountId,
-                            FullName           = jp.FullName,
-                            DateOfBirth        = jp.DateOfBirth,
-                            Nationality        = jp.Nationality,
-                            LicenseNumber      = jp.LicenseNumber,
-                            Weight             = jp.Weight,
-                            Height             = jp.Height,
-                            TotalRaces         = jp.TotalRaces,
-                            TotalWins          = jp.TotalWins,
-                            ImageUrl           = jp.ImageUrl,
-                            CertificateImageUrl = jp.CertificateImageUrl,
-                            CreateAt           = jp.CreateAt,
-                            UpdatedAt          = jp.UpdatedAt
-                        })
-                        .FirstOrDefault(),
+                            JockeyProfileId    = r.Jockey.JockeyProfile.JockeyProfileId,
+                            AccountId          = r.Jockey.JockeyProfile.AccountId,
+                            FullName           = r.Jockey.JockeyProfile.FullName,
+                            DateOfBirth        = r.Jockey.JockeyProfile.DateOfBirth,
+                            Nationality        = r.Jockey.JockeyProfile.Nationality,
+                            LicenseNumber      = r.Jockey.JockeyProfile.LicenseNumber,
+                            Weight             = r.Jockey.JockeyProfile.Weight,
+                            Height             = r.Jockey.JockeyProfile.Height,
+                            TotalRaces         = r.Jockey.JockeyProfile.TotalRaces,
+                            TotalWins          = r.Jockey.JockeyProfile.TotalWins,
+                            ImageUrl           = r.Jockey.JockeyProfile.ImageUrl,
+                            CertificateImageUrl = r.Jockey.JockeyProfile.CertificateImageUrl,
+                            CreateAt           = r.Jockey.JockeyProfile.CreateAt,
+                            UpdatedAt          = r.Jockey.JockeyProfile.UpdatedAt
+                        }
+                        : null,
                     Horse = new HorseResponse
                     {
                         Id            = r.HorseId,

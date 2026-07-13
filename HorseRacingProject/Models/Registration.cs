@@ -36,5 +36,5 @@ public partial class Registration
 
     public virtual Race Race { get; set; } = null!;
 
-    public virtual ICollection<RaceResult> RaceResults { get; set; } = new List<RaceResult>();
+    public virtual RaceResult? RaceResult { get; set; }
 }
