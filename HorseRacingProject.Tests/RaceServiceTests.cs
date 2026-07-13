@@ -438,7 +438,8 @@ public class RaceServiceTests
         var race = new Race { RaceId = Guid.NewGuid(), RacecourseId = racecourse.Id, Status = RaceStatus.Scheduled, StartTime = DateTimeOffset.UtcNow.AddHours(1) };
         var posConfig = new PositionPrizeConfig { PositionPrizeConfigId = Guid.NewGuid(), Status = ConfigStatus.Active, CreatedAt = DateTimeOffset.UtcNow };
         var jockeyConfig = new JockeyRewardConfig { JockeyRewardConfigId = Guid.NewGuid(), Status = ConfigStatus.Active, CreatedAt = DateTimeOffset.UtcNow };
-        db.AddRange(racecourse, race, posConfig, jockeyConfig);
+        var takeoutConfig = new TakeoutConfig { TakeoutConfigId = Guid.NewGuid(), Status = ConfigStatus.Active, CreatedAt = DateTimeOffset.UtcNow };
+        db.AddRange(racecourse, race, posConfig, jockeyConfig, takeoutConfig);
         await db.SaveChangesAsync();
         RaceService service = CreateService(db);
 
@@ -448,6 +449,7 @@ public class RaceServiceTests
         Race updated = await db.Races.AsNoTracking().SingleAsync(r => r.RaceId == race.RaceId);
         Assert.Equal(posConfig.PositionPrizeConfigId, updated.PositionPrizeConfigId);
         Assert.Equal(jockeyConfig.JockeyRewardConfigId, updated.JockeyRewardConfigId);
+        Assert.Equal(takeoutConfig.TakeoutConfigId, updated.TakeoutConfigId);
     }
 
     [Fact]

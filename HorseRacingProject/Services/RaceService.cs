@@ -842,12 +842,15 @@ namespace HorseRacingAPI.Services
                     .FirstOrDefaultAsync(c => c.Status == ConfigStatus.Active);
                 JockeyRewardConfig? jockeyConfig = await _uow.GetRepository<JockeyRewardConfig>().Entities
                     .FirstOrDefaultAsync(c => c.Status == ConfigStatus.Active);
+                TakeoutConfig? takeoutConfig = await _uow.GetRepository<TakeoutConfig>().Entities
+                    .FirstOrDefaultAsync(c => c.Status == ConfigStatus.Active);
 
-                if (posConfig == null || jockeyConfig == null)
-                    throw new InvalidOperationException("Position prize config and jockey reward config must be active before opening betting.");
+                if (posConfig == null || jockeyConfig == null || takeoutConfig == null)
+                    throw new InvalidOperationException("Position prize config, jockey reward config and takeout config must be active before opening betting.");
 
                 race.PositionPrizeConfigId = posConfig.PositionPrizeConfigId;
                 race.JockeyRewardConfigId = jockeyConfig.JockeyRewardConfigId;
+                race.TakeoutConfigId = takeoutConfig.TakeoutConfigId;
             }
 
             if (nextStatus == RaceStatus.Live)
@@ -1005,9 +1008,10 @@ namespace HorseRacingAPI.Services
 
         public async Task<RacePoolOverviewResponse> GetRacePoolOverviewAsync(Guid raceId)
         {
-            bool exists = await _uow.GetRepository<Race>().Entities
-                .AnyAsync(r => r.RaceId == raceId && !r.IsDeleted);
-            if (!exists)
+            Race? race = await _uow.GetRepository<Race>().Entities
+                .Include(r => r.TakeoutConfig)
+                .FirstOrDefaultAsync(r => r.RaceId == raceId && !r.IsDeleted);
+            if (race == null)
                 throw new KeyNotFoundException($"Race with id {raceId} not found.");
 
             List<Bet> bets = await _uow.GetRepository<Bet>().Entities
@@ -1021,9 +1025,7 @@ namespace HorseRacingAPI.Services
                 .Where(p => p.RaceId == raceId)
                 .ToListAsync();
 
-            TakeoutConfig? takeoutConfig = await _uow.GetRepository<TakeoutConfig>().Entities
-                .FirstOrDefaultAsync(c => c.Status == ConfigStatus.Active);
-            decimal takeout = (decimal)(takeoutConfig?.TakeoutPercentage ?? 0.20f);
+            decimal takeout = (decimal)(race.TakeoutConfig?.TakeoutPercentage ?? 0.20f);
 
             var perHorsePools = bets
                 .Where(b => b.Status == BetStatus.Active)

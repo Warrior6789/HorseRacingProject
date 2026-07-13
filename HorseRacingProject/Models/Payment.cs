@@ -21,4 +21,6 @@ public partial class Payment
     public long? BalanceChanged { get; set; }
 
     public long? CurrentBalance { get; set; }
+
+    public virtual Account Account { get; set; } = null!;
 }

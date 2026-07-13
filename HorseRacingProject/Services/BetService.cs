@@ -176,12 +176,13 @@ namespace HorseRacingAPI.Services
             List<BetResponse> activeBets = bets.Where(b => b.Status == BetStatus.Active.ToString()).ToList();
             if (!activeBets.Any()) return;
 
-            TakeoutConfig? takeoutConfig = await _uow.GetRepository<TakeoutConfig>().Entities
-                .FirstOrDefaultAsync(c => c.Status == ConfigStatus.Active);
-            decimal takeout = (decimal)(takeoutConfig?.TakeoutPercentage ?? 0.20f);
-
             List<Guid> raceIds = activeBets.Select(b => b.RaceId).Distinct().ToList();
             List<Guid> registrationIds = activeBets.Select(b => b.RegistrationId).Distinct().ToList();
+
+            Dictionary<Guid, decimal> takeoutByRace = await _uow.GetRepository<Race>().Entities
+                .Include(r => r.TakeoutConfig)
+                .Where(r => raceIds.Contains(r.RaceId))
+                .ToDictionaryAsync(r => r.RaceId, r => (decimal)(r.TakeoutConfig?.TakeoutPercentage ?? 0.20f));
 
             List<RacePool> pools = await _uow.GetRepository<RacePool>().Entities
                 .Where(p => raceIds.Contains(p.RaceId))
@@ -202,6 +203,7 @@ namespace HorseRacingAPI.Services
 
                 if (pool == null || horsePool == null || horsePool.Total <= 0) continue;
 
+                decimal takeout = takeoutByRace.GetValueOrDefault(bet.RaceId, 0.20m);
                 decimal netPool = pool.TotalAmount * (1 - takeout);
                 bet.EstimatedPayout = Math.Round(bet.BetAmount * (netPool / horsePool.Total), 0);
             }

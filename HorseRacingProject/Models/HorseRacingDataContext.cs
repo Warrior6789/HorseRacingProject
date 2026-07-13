@@ -204,6 +204,11 @@ public partial class HorseRacingDataContext : DbContext
             entity.Property(e => e.Amount).HasPrecision(18, 2);
             entity.Property(e => e.CreateAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
             entity.Property(e => e.Status).HasMaxLength(20).HasConversion<string>();
+
+            entity.HasOne(d => d.Account).WithMany()
+                .HasForeignKey(d => d.AccountId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_Payment_Account");
         });
 
         modelBuilder.Entity<Prize>(entity =>
@@ -256,6 +261,11 @@ public partial class HorseRacingDataContext : DbContext
                 .HasForeignKey(d => d.JockeyRewardConfigId)
                 .OnDelete(DeleteBehavior.SetNull)
                 .HasConstraintName("FK_Races_JockeyRewardConfigs");
+
+            entity.HasOne(d => d.TakeoutConfig).WithMany(p => p.Races)
+                .HasForeignKey(d => d.TakeoutConfigId)
+                .OnDelete(DeleteBehavior.SetNull)
+                .HasConstraintName("FK_Races_TakeoutConfigs");
 
             entity.Property(e => e.RefereeId).HasColumnName("RefereeID");
             entity.HasOne(d => d.Referee).WithMany(p => p.RefereeRaces)

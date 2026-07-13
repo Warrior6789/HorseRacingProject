@@ -94,6 +94,13 @@ public class RaceServiceAdvanceStatusIntegrationTests
                 Status = ConfigStatus.Active,
                 CreatedAt = DateTimeOffset.UtcNow
             });
+            db.Add(new TakeoutConfig
+            {
+                TakeoutConfigId = Guid.NewGuid(),
+                TakeoutPercentage = 0.20f,
+                Status = ConfigStatus.Active,
+                CreatedAt = DateTimeOffset.UtcNow
+            });
         }
 
         await db.SaveChangesAsync();
@@ -136,6 +143,7 @@ public class RaceServiceAdvanceStatusIntegrationTests
         Assert.Equal(RaceStatus.BettingOpen, race.Status);
         Assert.NotNull(race.PositionPrizeConfigId);
         Assert.NotNull(race.JockeyRewardConfigId);
+        Assert.NotNull(race.TakeoutConfigId);
     }
 
     [Fact]

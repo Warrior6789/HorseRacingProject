@@ -114,6 +114,7 @@ public class BetSettlementIntegrationTests
         db.Add(race);
         db.AddRange(registrations);
 
+        TakeoutConfig? takeoutConfig;
         if (isNewRacecourse)
         {
             db.Add(racecourse);
@@ -134,14 +135,20 @@ public class BetSettlementIntegrationTests
                 Status = ConfigStatus.Active,
                 CreatedAt = DateTimeOffset.UtcNow
             });
-            db.Add(new TakeoutConfig
+            takeoutConfig = new TakeoutConfig
             {
                 TakeoutConfigId = Guid.NewGuid(),
                 TakeoutPercentage = takeoutPercentage,
                 Status = ConfigStatus.Active,
                 CreatedAt = DateTimeOffset.UtcNow
-            });
+            };
+            db.Add(takeoutConfig);
         }
+        else
+        {
+            takeoutConfig = await db.TakeoutConfigs.FirstOrDefaultAsync(c => c.Status == ConfigStatus.Active);
+        }
+        race.TakeoutConfigId = takeoutConfig?.TakeoutConfigId;
 
         for (int i = 0; i < 3; i++)
         {

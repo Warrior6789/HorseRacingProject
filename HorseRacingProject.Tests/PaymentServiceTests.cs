@@ -71,8 +71,11 @@ public class PaymentServiceTests
     {
         using HorseRacingDataContext db = CreateContext();
         Guid accountId = Guid.NewGuid();
+        Guid otherAccountId = Guid.NewGuid();
+        db.Accounts.Add(new Account { Id = accountId, Email = "owner@test.com", PasswordHash = "x", Role = AccountRole.Spectator, Status = AccountStatus.Active });
+        db.Accounts.Add(new Account { Id = otherAccountId, Email = "other@test.com", PasswordHash = "x", Role = AccountRole.Spectator, Status = AccountStatus.Active });
         db.Payments.Add(new Payment { PaymentId = Guid.NewGuid(), AccountId = accountId, Amount = 10_000, OrderCode = 1, Status = PaymentStatus.Completed, CreateAt = DateTimeOffset.UtcNow, BalanceChanged = 10_000, CurrentBalance = 10_000 });
-        db.Payments.Add(new Payment { PaymentId = Guid.NewGuid(), AccountId = Guid.NewGuid(), Amount = 20_000, OrderCode = 2, Status = PaymentStatus.Completed, CreateAt = DateTimeOffset.UtcNow });
+        db.Payments.Add(new Payment { PaymentId = Guid.NewGuid(), AccountId = otherAccountId, Amount = 20_000, OrderCode = 2, Status = PaymentStatus.Completed, CreateAt = DateTimeOffset.UtcNow });
         await db.SaveChangesAsync();
         PaymentService service = CreateService(db);
 
@@ -89,7 +92,11 @@ public class PaymentServiceTests
     {
         using HorseRacingDataContext db = CreateContext();
         for (int i = 0; i < 3; i++)
-            db.Payments.Add(new Payment { PaymentId = Guid.NewGuid(), AccountId = Guid.NewGuid(), Amount = 10_000, OrderCode = i, Status = PaymentStatus.Completed, CreateAt = DateTimeOffset.UtcNow.AddMinutes(i) });
+        {
+            Guid accountId = Guid.NewGuid();
+            db.Accounts.Add(new Account { Id = accountId, Email = $"account{i}@test.com", PasswordHash = "x", Role = AccountRole.Spectator, Status = AccountStatus.Active });
+            db.Payments.Add(new Payment { PaymentId = Guid.NewGuid(), AccountId = accountId, Amount = 10_000, OrderCode = i, Status = PaymentStatus.Completed, CreateAt = DateTimeOffset.UtcNow.AddMinutes(i) });
+        }
         await db.SaveChangesAsync();
         PaymentService service = CreateService(db);
 

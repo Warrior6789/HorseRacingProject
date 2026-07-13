@@ -203,6 +203,8 @@ namespace HorseRacingAPI.Services
                 selector: p => new PaymentResponse
                 {
                     PaymentId       = p.PaymentId,
+                    AccountId       = p.AccountId,
+                    AccountEmail    = p.Account.Email,
                     Amount          = p.Amount,
                     Status          = p.Status.ToString(),
                     TransactionType = PaymentType.Deposit.ToString(),
@@ -233,6 +235,7 @@ namespace HorseRacingAPI.Services
             int totalCount = await paymentRepo.Entities.CountAsync();
 
             List<Payment> entities = await paymentRepo.Entities
+                .Include(p => p.Account)
                 .OrderByDescending(p => p.CreateAt)
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
@@ -243,6 +246,8 @@ namespace HorseRacingAPI.Services
                 Items = entities.Select(p => new PaymentResponse
                 {
                     PaymentId       = p.PaymentId,
+                    AccountId       = p.AccountId,
+                    AccountEmail    = p.Account?.Email,
                     Amount          = p.Amount,
                     Status          = p.Status.ToString(),
                     TransactionType = PaymentType.Deposit.ToString(),

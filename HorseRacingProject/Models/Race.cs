@@ -42,6 +42,8 @@ public partial class Race
 
     public Guid? JockeyRewardConfigId { get; set; }
 
+    public Guid? TakeoutConfigId { get; set; }
+
     public Guid? RefereeId { get; set; }
 
     public virtual Racecourse Racecourse { get; set; } = null!;
@@ -51,6 +53,8 @@ public partial class Race
     public virtual PositionPrizeConfig? PositionPrizeConfig { get; set; }
 
     public virtual JockeyRewardConfig? JockeyRewardConfig { get; set; }
+
+    public virtual TakeoutConfig? TakeoutConfig { get; set; }
 
     public virtual Account? Referee { get; set; }
 
