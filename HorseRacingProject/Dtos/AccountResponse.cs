@@ -8,5 +8,6 @@
         public string Status { get; set; } = string.Empty;
         public string? RequestedRole { get; set; }
         public DateTimeOffset? CreateAt { get; set; }
+        public string? AvatarUrl { get; set; }
     }
 }

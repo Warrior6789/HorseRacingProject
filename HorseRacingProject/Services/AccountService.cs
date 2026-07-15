@@ -66,7 +66,8 @@ namespace HorseRacingAPI.Services
                     Email = a.Email,
                     Role = a.Role.ToString(),
                     Status = a.Status.ToString(),
-                    CreateAt = a.CreateAt
+                    CreateAt = a.CreateAt,
+                    AvatarUrl = a.JockeyProfile != null ? a.JockeyProfile.ImageUrl : (a.UserProfile != null ? a.UserProfile.ImageUrl : null)
                 },
                 pageIndex: page - 1,
                 pageSize: pageSize
