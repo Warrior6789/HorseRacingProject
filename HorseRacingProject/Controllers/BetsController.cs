@@ -31,10 +31,10 @@ namespace HorseRacingAPI.Controllers
 
         [Authorize]
         [HttpGet("my/paged")]
-        public async Task<IActionResult> GetMyBetsPaged([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
+        public async Task<IActionResult> GetMyBetsPaged([FromQuery] int page = 1, [FromQuery] int pageSize = 10, [FromQuery] string? status = null)
         {
             Guid spectatorId = GetAccountIdFromToken();
-            PagedResponse<BetResponse> result = await _betService.GetMyBetsPagedAsync(spectatorId, page, pageSize);
+            PagedResponse<BetResponse> result = await _betService.GetMyBetsPagedAsync(spectatorId, page, pageSize, status);
             return Ok(ApiResponse<PagedResponse<BetResponse>>.SuccessResponse(result, "Get bets successfully."));
         }
 
