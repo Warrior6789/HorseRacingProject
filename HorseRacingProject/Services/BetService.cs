@@ -21,15 +21,24 @@ namespace HorseRacingAPI.Services
             _uow = uow;
             _hubContext = hubContext;
         }
-        public async Task<PagedResponse<BetResponse>> GetMyBetsPagedAsync(Guid spectatorId, int page, int pageSize)
+        public async Task<PagedResponse<BetResponse>> GetMyBetsPagedAsync(Guid spectatorId, int page, int pageSize, string? status = null)
         {
             if (page < 1) page = 1;
             if (pageSize < 1) pageSize = 10;
             if (pageSize > 100) pageSize = 100;
+
+            BetStatus? parsedStatus = null;
+            if (!string.IsNullOrWhiteSpace(status))
+            {
+                if (!Enum.TryParse<BetStatus>(status, ignoreCase: true, out BetStatus parsed) || !Enum.IsDefined(parsed))
+                    throw new ArgumentException("Invalid bet status");
+                parsedStatus = parsed;
+            }
+
             IGenericRepository<Bet> repo = _uow.GetRepository<Bet>();
-            int totalCount = await repo.Entities.CountAsync(b => b.SpectatorId == spectatorId);
+            int totalCount = await repo.Entities.CountAsync(b => b.SpectatorId == spectatorId && (parsedStatus == null || b.Status == parsedStatus));
             IEnumerable<BetResponse> items = await repo.FindAsync<BetResponse>(
-                predicate: b => b.SpectatorId == spectatorId,
+                predicate: b => b.SpectatorId == spectatorId && (parsedStatus == null || b.Status == parsedStatus),
                 orderBy: q => q.OrderByDescending(b => b.CreatedAt),
                 selector: b => new BetResponse
                 {
