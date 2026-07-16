@@ -336,6 +336,48 @@ namespace HorseRacingAPI.Services
             };
         }
 
+        public async Task<PagedResponse<OwnerRaceHistoryItemResponse>> GetOwnerRaceHistoryAsync(Guid ownerId, int page, int pageSize)
+        {
+            if (page < 1) page = 1;
+            if (pageSize < 1) pageSize = 10;
+            if (pageSize > 100) pageSize = 100;
+
+            IQueryable<Prize> query = _uow.GetRepository<Prize>().Entities
+                .Where(p => p.PrizeType == PrizeType.Owner && p.Registration.Horse.OwnerId == ownerId);
+
+            int totalCount = await query.CountAsync();
+
+            List<OwnerRaceHistoryItemResponse> items = await query
+                .OrderByDescending(p => p.DistributedAt ?? DateTimeOffset.MinValue)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(p => new OwnerRaceHistoryItemResponse
+                {
+                    RegistrationId = p.RegistrationId,
+                    RaceId = p.Registration.RaceId,
+                    Date = p.Registration.Race.StartTime,
+                    RaceName = p.Registration.Race.RaceName,
+                    RaceNumber = p.Registration.Race.RaceNumber,
+                    HorseId = p.Registration.HorseId,
+                    HorseName = p.Registration.Horse.HorseName,
+                    HorseImageUrl = p.Registration.Horse.ImageUrl,
+                    JockeyName = p.Registration.Jockey.JockeyProfile != null ? p.Registration.Jockey.JockeyProfile.FullName : null,
+                    RacecourseName = p.Registration.Race.Racecourse.RacecourseName,
+                    TrackType = p.Registration.Race.Racecourse.TrackType,
+                    Position = p.Registration.RaceResult != null ? p.Registration.RaceResult.FinishPosition : null,
+                    Earnings = p.Amount
+                })
+                .ToListAsync();
+
+            return new PagedResponse<OwnerRaceHistoryItemResponse>
+            {
+                Items = items,
+                Page = page,
+                PageSize = pageSize,
+                TotalCount = totalCount
+            };
+        }
+
         private async Task<Horse> GetHorseEntityAsync(Guid horseId, Guid accountId, bool isAdmin)
         {
             Horse? horse = await _uow.GetRepository<Horse>().Entities
