@@ -122,6 +122,17 @@ namespace HorseRacingAPI.Services
                 ownerProfile.Balance = Math.Max(0, (ownerProfile.Balance ?? 0) - fine);
                 ownerProfile.UpdatedAt = DateTimeOffset.UtcNow;
                 await _uow.GetRepository<UserProfile>().UpdateAsync(ownerProfile);
+
+                await _uow.GetRepository<WalletTransaction>().AddAsync(new WalletTransaction
+                {
+                    WalletTransactionId = Guid.NewGuid(),
+                    AccountId = report.Registration.Horse.OwnerId,
+                    Type = WalletTransactionType.Fine,
+                    Amount = -fine,
+                    BalanceAfter = ownerProfile.Balance ?? 0,
+                    ReferenceId = report.ReportId,
+                    CreatedAt = DateTimeOffset.UtcNow
+                });
             }
 
             await _uow.GetRepository<Prize>().AddAsync(new Prize
@@ -177,9 +188,21 @@ namespace HorseRacingAPI.Services
                         .FirstOrDefaultAsync(p => p.AccountId == prize.Registration.Horse.OwnerId && !p.IsDeleted);
                     if (ownerProfile != null)
                     {
-                        ownerProfile.Balance = Math.Max(0, (ownerProfile.Balance ?? 0) - (long)Math.Round(prize.Amount ?? 0));
+                        long ownerDelta = (long)Math.Round(prize.Amount ?? 0);
+                        ownerProfile.Balance = Math.Max(0, (ownerProfile.Balance ?? 0) - ownerDelta);
                         ownerProfile.UpdatedAt = DateTimeOffset.UtcNow;
                         await _uow.GetRepository<UserProfile>().UpdateAsync(ownerProfile);
+
+                        await _uow.GetRepository<WalletTransaction>().AddAsync(new WalletTransaction
+                        {
+                            WalletTransactionId = Guid.NewGuid(),
+                            AccountId = prize.Registration.Horse.OwnerId,
+                            Type = WalletTransactionType.PrizeAdjustment,
+                            Amount = -ownerDelta,
+                            BalanceAfter = ownerProfile.Balance ?? 0,
+                            ReferenceId = prize.Registration.RegistrationId,
+                            CreatedAt = DateTimeOffset.UtcNow
+                        });
                     }
                 }
                 else if (prize.PrizeType == PrizeType.Jockey)
@@ -188,9 +211,21 @@ namespace HorseRacingAPI.Services
                         .FirstOrDefaultAsync(p => p.AccountId == prize.Registration.JockeyId && !p.IsDeleted);
                     if (jockeyProfile != null)
                     {
-                        jockeyProfile.Balance = Math.Max(0, (jockeyProfile.Balance ?? 0) - (long)Math.Round(prize.Amount ?? 0));
+                        long jockeyReversalDelta = (long)Math.Round(prize.Amount ?? 0);
+                        jockeyProfile.Balance = Math.Max(0, (jockeyProfile.Balance ?? 0) - jockeyReversalDelta);
                         jockeyProfile.UpdatedAt = DateTimeOffset.UtcNow;
                         await _uow.GetRepository<JockeyProfile>().UpdateAsync(jockeyProfile);
+
+                        await _uow.GetRepository<WalletTransaction>().AddAsync(new WalletTransaction
+                        {
+                            WalletTransactionId = Guid.NewGuid(),
+                            AccountId = prize.Registration.JockeyId,
+                            Type = WalletTransactionType.PrizeAdjustment,
+                            Amount = -jockeyReversalDelta,
+                            BalanceAfter = jockeyProfile.Balance ?? 0,
+                            ReferenceId = prize.Registration.RegistrationId,
+                            CreatedAt = DateTimeOffset.UtcNow
+                        });
                     }
                 }
 
@@ -253,6 +288,17 @@ namespace HorseRacingAPI.Services
                         : Math.Max(0, (ownerProfile.Balance ?? 0) - ownerDelta);
                     ownerProfile.UpdatedAt = DateTimeOffset.UtcNow;
                     await _uow.GetRepository<UserProfile>().UpdateAsync(ownerProfile);
+
+                    await _uow.GetRepository<WalletTransaction>().AddAsync(new WalletTransaction
+                    {
+                        WalletTransactionId = Guid.NewGuid(),
+                        AccountId = result.Registration.Horse.OwnerId,
+                        Type = WalletTransactionType.PrizeAdjustment,
+                        Amount = ownerNew > 0 ? ownerDelta : -ownerDelta,
+                        BalanceAfter = ownerProfile.Balance ?? 0,
+                        ReferenceId = result.RegistrationId,
+                        CreatedAt = DateTimeOffset.UtcNow
+                    });
                 }
 
                 var jockeyProfile = await _uow.GetRepository<JockeyProfile>().Entities
@@ -265,6 +311,17 @@ namespace HorseRacingAPI.Services
                         : Math.Max(0, (jockeyProfile.Balance ?? 0) - jockeyDelta);
                     jockeyProfile.UpdatedAt = DateTimeOffset.UtcNow;
                     await _uow.GetRepository<JockeyProfile>().UpdateAsync(jockeyProfile);
+
+                    await _uow.GetRepository<WalletTransaction>().AddAsync(new WalletTransaction
+                    {
+                        WalletTransactionId = Guid.NewGuid(),
+                        AccountId = result.Registration.JockeyId,
+                        Type = WalletTransactionType.PrizeAdjustment,
+                        Amount = jockeyNew > 0 ? jockeyDelta : -jockeyDelta,
+                        BalanceAfter = jockeyProfile.Balance ?? 0,
+                        ReferenceId = result.RegistrationId,
+                        CreatedAt = DateTimeOffset.UtcNow
+                    });
                 }
 
                 if (ownerNew != 0)

@@ -103,6 +103,7 @@ builder.Services.AddScoped<IRefereeReportService, RefereeReportService>();
 builder.Services.AddScoped<IRaceRefereeService, RaceRefereeService>();
 
 builder.Services.AddScoped<IWithdrawalService, WithdrawalService>();
+builder.Services.AddScoped<IWalletTransactionService, WalletTransactionService>();
 builder.Services.AddSingleton<IRaceSettlementService, RaceSettlementService>();
 builder.Services.AddSingleton<RaceEngineService>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<RaceEngineService>());

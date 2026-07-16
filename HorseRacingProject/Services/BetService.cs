@@ -105,6 +105,11 @@ namespace HorseRacingAPI.Services
                 if (deducted == 0)
                     throw new InvalidOperationException("Insufficient balance.");
 
+                long balanceAfterBet = await _uow.GetRepository<UserProfile>().Entities
+                    .Where(p => p.AccountId == spectatorId)
+                    .Select(p => p.Balance ?? 0)
+                    .FirstOrDefaultAsync();
+
                 int poolUpdated = await _uow.GetRepository<RacePool>().Entities
                     .Where(p => p.RaceId == registration.RaceId && p.BetType == betType)
                     .ExecuteUpdateAsync(s => s.SetProperty(p => p.TotalAmount, p => p.TotalAmount + req.BetAmount));
@@ -137,6 +142,18 @@ namespace HorseRacingAPI.Services
                     CreatedAt = DateTimeOffset.UtcNow
                 };
                 await _uow.GetRepository<Bet>().AddAsync(bet);
+
+                await _uow.GetRepository<WalletTransaction>().AddAsync(new WalletTransaction
+                {
+                    WalletTransactionId = Guid.NewGuid(),
+                    AccountId = spectatorId,
+                    Type = WalletTransactionType.BetPlaced,
+                    Amount = -(long)req.BetAmount,
+                    BalanceAfter = balanceAfterBet,
+                    ReferenceId = bet.BetId,
+                    CreatedAt = DateTimeOffset.UtcNow
+                });
+
                 await _uow.SaveAsync();
                 await _uow.CommitTransactionAsync();
 

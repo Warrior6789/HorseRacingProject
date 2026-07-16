@@ -169,6 +169,17 @@ namespace HorseRacingAPI.Services
                             profile.UpdatedAt = DateTimeOffset.UtcNow;
                             await uow.GetRepository<UserProfile>().UpdateAsync(profile);
                             betPayouts.Add((bet.SpectatorId, payout, profile.Balance ?? 0));
+
+                            await uow.GetRepository<WalletTransaction>().AddAsync(new WalletTransaction
+                            {
+                                WalletTransactionId = Guid.NewGuid(),
+                                AccountId = bet.SpectatorId,
+                                Type = WalletTransactionType.BetPayout,
+                                Amount = payout,
+                                BalanceAfter = profile.Balance ?? 0,
+                                ReferenceId = bet.BetId,
+                                CreatedAt = DateTimeOffset.UtcNow
+                            });
                         }
                     }
                 }
@@ -255,6 +266,17 @@ namespace HorseRacingAPI.Services
                     ownerProfile.UpdatedAt = DateTimeOffset.UtcNow;
                     await uow.GetRepository<UserProfile>().UpdateAsync(ownerProfile);
                     prizePayouts.Add((reg.Horse.OwnerId, (long)ownerAmount, ownerProfile.Balance ?? 0, "PrizePayout"));
+
+                    await uow.GetRepository<WalletTransaction>().AddAsync(new WalletTransaction
+                    {
+                        WalletTransactionId = Guid.NewGuid(),
+                        AccountId = reg.Horse.OwnerId,
+                        Type = WalletTransactionType.PrizePayout,
+                        Amount = (long)ownerAmount,
+                        BalanceAfter = ownerProfile.Balance ?? 0,
+                        ReferenceId = reg.RegistrationId,
+                        CreatedAt = DateTimeOffset.UtcNow
+                    });
                 }
 
                 JockeyProfile? jockeyProfile = await uow.GetRepository<JockeyProfile>().Entities
@@ -265,6 +287,17 @@ namespace HorseRacingAPI.Services
                     jockeyProfile.UpdatedAt = DateTimeOffset.UtcNow;
                     await uow.GetRepository<JockeyProfile>().UpdateAsync(jockeyProfile);
                     prizePayouts.Add((reg.JockeyId, (long)jockeyAmount, jockeyProfile.Balance ?? 0, "PrizePayout"));
+
+                    await uow.GetRepository<WalletTransaction>().AddAsync(new WalletTransaction
+                    {
+                        WalletTransactionId = Guid.NewGuid(),
+                        AccountId = reg.JockeyId,
+                        Type = WalletTransactionType.PrizePayout,
+                        Amount = (long)jockeyAmount,
+                        BalanceAfter = jockeyProfile.Balance ?? 0,
+                        ReferenceId = reg.RegistrationId,
+                        CreatedAt = DateTimeOffset.UtcNow
+                    });
                 }
             }
 

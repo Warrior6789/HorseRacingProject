@@ -139,6 +139,17 @@ namespace HorseRacingAPI.Services
                             ownerProfile.Balance = (ownerProfile.Balance ?? 0) + (long)other.Race.RegistrationFee;
                             ownerProfile.UpdatedAt = DateTimeOffset.UtcNow;
                             await _uow.GetRepository<UserProfile>().UpdateAsync(ownerProfile);
+
+                            await _uow.GetRepository<WalletTransaction>().AddAsync(new WalletTransaction
+                            {
+                                WalletTransactionId = Guid.NewGuid(),
+                                AccountId = other.Horse.OwnerId,
+                                Type = WalletTransactionType.RegistrationFeeRefund,
+                                Amount = (long)other.Race.RegistrationFee,
+                                BalanceAfter = ownerProfile.Balance ?? 0,
+                                ReferenceId = other.RegistrationId,
+                                CreatedAt = DateTimeOffset.UtcNow
+                            });
                         }
                         other.Race.PrizePool = Math.Max(0, other.Race.PrizePool - other.Race.RegistrationFee);
                         await _uow.GetRepository<Race>().UpdateAsync(other.Race);
@@ -171,6 +182,17 @@ namespace HorseRacingAPI.Services
                             ownerProfile.Balance = (ownerProfile.Balance ?? 0) + (long)other.Race.RegistrationFee;
                             ownerProfile.UpdatedAt = DateTimeOffset.UtcNow;
                             await _uow.GetRepository<UserProfile>().UpdateAsync(ownerProfile);
+
+                            await _uow.GetRepository<WalletTransaction>().AddAsync(new WalletTransaction
+                            {
+                                WalletTransactionId = Guid.NewGuid(),
+                                AccountId = other.Horse.OwnerId,
+                                Type = WalletTransactionType.RegistrationFeeRefund,
+                                Amount = (long)other.Race.RegistrationFee,
+                                BalanceAfter = ownerProfile.Balance ?? 0,
+                                ReferenceId = other.RegistrationId,
+                                CreatedAt = DateTimeOffset.UtcNow
+                            });
                         }
                         other.Race.PrizePool = Math.Max(0, other.Race.PrizePool - other.Race.RegistrationFee);
                         await _uow.GetRepository<Race>().UpdateAsync(other.Race);
@@ -506,6 +528,17 @@ namespace HorseRacingAPI.Services
                     ownerProfile.Balance = (ownerProfile.Balance ?? 0) + (long)registration.Race.RegistrationFee;
                     ownerProfile.UpdatedAt = DateTimeOffset.UtcNow;
                     await _uow.GetRepository<UserProfile>().UpdateAsync(ownerProfile);
+
+                    await _uow.GetRepository<WalletTransaction>().AddAsync(new WalletTransaction
+                    {
+                        WalletTransactionId = Guid.NewGuid(),
+                        AccountId = registration.Horse.OwnerId,
+                        Type = WalletTransactionType.RegistrationFeeRefund,
+                        Amount = (long)registration.Race.RegistrationFee,
+                        BalanceAfter = ownerProfile.Balance ?? 0,
+                        ReferenceId = registration.RegistrationId,
+                        CreatedAt = DateTimeOffset.UtcNow
+                    });
                 }
                 registration.Race.PrizePool = Math.Max(0, registration.Race.PrizePool - registration.Race.RegistrationFee);
                 await _uow.GetRepository<Race>().UpdateAsync(registration.Race);
@@ -605,6 +638,17 @@ namespace HorseRacingAPI.Services
                             ownerProfile.Balance = (ownerProfile.Balance ?? 0) + (long)other.Race.RegistrationFee;
                             ownerProfile.UpdatedAt = DateTimeOffset.UtcNow;
                             await _uow.GetRepository<UserProfile>().UpdateAsync(ownerProfile);
+
+                            await _uow.GetRepository<WalletTransaction>().AddAsync(new WalletTransaction
+                            {
+                                WalletTransactionId = Guid.NewGuid(),
+                                AccountId = other.Horse.OwnerId,
+                                Type = WalletTransactionType.RegistrationFeeRefund,
+                                Amount = (long)other.Race.RegistrationFee,
+                                BalanceAfter = ownerProfile.Balance ?? 0,
+                                ReferenceId = other.RegistrationId,
+                                CreatedAt = DateTimeOffset.UtcNow
+                            });
                         }
                         other.Race.PrizePool = Math.Max(0, other.Race.PrizePool - other.Race.RegistrationFee);
                         await _uow.GetRepository<Race>().UpdateAsync(other.Race);
@@ -659,6 +703,17 @@ namespace HorseRacingAPI.Services
                     ownerProfile.Balance = (ownerProfile.Balance ?? 0) + (long)registration.Race.RegistrationFee;
                     ownerProfile.UpdatedAt = DateTimeOffset.UtcNow;
                     await _uow.GetRepository<UserProfile>().UpdateAsync(ownerProfile);
+
+                    await _uow.GetRepository<WalletTransaction>().AddAsync(new WalletTransaction
+                    {
+                        WalletTransactionId = Guid.NewGuid(),
+                        AccountId = registration.Horse.OwnerId,
+                        Type = WalletTransactionType.RegistrationFeeRefund,
+                        Amount = (long)registration.Race.RegistrationFee,
+                        BalanceAfter = ownerProfile.Balance ?? 0,
+                        ReferenceId = registration.RegistrationId,
+                        CreatedAt = DateTimeOffset.UtcNow
+                    });
                 }
                 registration.Race.PrizePool = Math.Max(0, registration.Race.PrizePool - registration.Race.RegistrationFee);
                 await _uow.GetRepository<Race>().UpdateAsync(registration.Race);
@@ -771,6 +826,17 @@ namespace HorseRacingAPI.Services
                         ownerProfile.Balance = (ownerProfile.Balance ?? 0) + (long)registration.Race.RegistrationFee;
                         ownerProfile.UpdatedAt = DateTimeOffset.UtcNow;
                         await _uow.GetRepository<UserProfile>().UpdateAsync(ownerProfile);
+
+                        await _uow.GetRepository<WalletTransaction>().AddAsync(new WalletTransaction
+                        {
+                            WalletTransactionId = Guid.NewGuid(),
+                            AccountId = registration.Horse.OwnerId,
+                            Type = WalletTransactionType.RegistrationFeeRefund,
+                            Amount = (long)registration.Race.RegistrationFee,
+                            BalanceAfter = ownerProfile.Balance ?? 0,
+                            ReferenceId = registration.RegistrationId,
+                            CreatedAt = DateTimeOffset.UtcNow
+                        });
                     }
                     registration.Race.PrizePool = Math.Max(0, registration.Race.PrizePool - registration.Race.RegistrationFee);
                     await _uow.GetRepository<Race>().UpdateAsync(registration.Race);
@@ -792,6 +858,17 @@ namespace HorseRacingAPI.Services
                         profile.Balance = (profile.Balance ?? 0) + (long)bet.BetAmount;
                         profile.UpdatedAt = DateTimeOffset.UtcNow;
                         await _uow.GetRepository<UserProfile>().UpdateAsync(profile);
+
+                        await _uow.GetRepository<WalletTransaction>().AddAsync(new WalletTransaction
+                        {
+                            WalletTransactionId = Guid.NewGuid(),
+                            AccountId = bet.SpectatorId,
+                            Type = WalletTransactionType.BetRefund,
+                            Amount = (long)bet.BetAmount,
+                            BalanceAfter = profile.Balance ?? 0,
+                            ReferenceId = bet.BetId,
+                            CreatedAt = DateTimeOffset.UtcNow
+                        });
                     }
                 }
 
