@@ -101,6 +101,15 @@ namespace HorseRacingAPI.Controllers
             return Ok(ApiResponse<HorsePerformanceSummaryResponse>.SuccessResponse(summary, "Get horse performance summary successfully."));
         }
 
+        [HttpGet("race-history")]
+        public async Task<IActionResult> GetOwnerRaceHistory([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
+        {
+            Guid accountId = GetAccountIdFromToken();
+
+            PagedResponse<OwnerRaceHistoryItemResponse> history = await _horseService.GetOwnerRaceHistoryAsync(accountId, page, pageSize);
+            return Ok(ApiResponse<PagedResponse<OwnerRaceHistoryItemResponse>>.SuccessResponse(history, "Get owner race history successfully."));
+        }
+
         private Guid GetAccountIdFromToken()
         {
             string? value = HttpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
