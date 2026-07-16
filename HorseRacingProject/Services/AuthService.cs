@@ -250,6 +250,8 @@ namespace HorseRacingAPI.Services
         public async Task<MeResponse> GetMeAsync(Guid accountId)
         {
             Account? account = await _unitOfWork.GetRepository<Account>().Entities
+                .Include(a => a.JockeyProfile)
+                .Include(a => a.UserProfile)
                 .FirstOrDefaultAsync(a => a.Id == accountId && !a.IsDeleted);
             if (account == null)
                 throw new KeyNotFoundException("Account not found.");
@@ -259,7 +261,8 @@ namespace HorseRacingAPI.Services
                 AccountId     = account.Id,
                 Email         = account.Email,
                 Role          = account.Role.ToString(),
-                RequestedRole = account.RequestedRole?.ToString()
+                RequestedRole = account.RequestedRole?.ToString(),
+                AvatarUrl     = account.JockeyProfile != null ? account.JockeyProfile.ImageUrl : account.UserProfile?.ImageUrl
             };
         }
     }
