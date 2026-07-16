@@ -169,7 +169,20 @@ namespace HorseRacingAPI.Services
                 horse.Weight = request.Weight;
 
             if (!string.IsNullOrWhiteSpace(request.Status))
-                horse.Status = HorseStatusPolicy.NormalizeRequired(request.Status);
+            {
+                HorseStatus newStatus = HorseStatusPolicy.NormalizeRequired(request.Status);
+                if (newStatus != HorseStatus.Healthy)
+                {
+                    bool hasActiveRace = horse.Registrations.Any(r =>
+                        (r.Status == RegistrationStatus.Confirmed || r.Status == RegistrationStatus.Pending)
+                        && r.Race.Status != RaceStatus.Finished
+                        && r.Race.Status != RaceStatus.Completed
+                        && r.Race.Status != RaceStatus.Cancelled);
+                    if (hasActiveRace)
+                        throw new InvalidOperationException($"Cannot mark horse as {newStatus} while it has an active race registration. Contact an admin to scratch it from the race first.");
+                }
+                horse.Status = newStatus;
+            }
 
             if (request.RecordWins.HasValue)
                 horse.RecordWins = request.RecordWins;
@@ -186,6 +199,15 @@ namespace HorseRacingAPI.Services
         public async Task DeleteHorseAsync(Guid horseId, Guid accountId, bool isAdmin)
         {
             Horse horse = await GetHorseEntityAsync(horseId, accountId, isAdmin);
+
+            bool hasActiveRace = horse.Registrations.Any(r =>
+                (r.Status == RegistrationStatus.Confirmed || r.Status == RegistrationStatus.Pending)
+                && r.Race.Status != RaceStatus.Finished
+                && r.Race.Status != RaceStatus.Completed
+                && r.Race.Status != RaceStatus.Cancelled);
+            if (hasActiveRace)
+                throw new InvalidOperationException("Cannot delete a horse with an active or upcoming race registration.");
+
             horse.IsDeleted = true;
             horse.DeletedAt = DateTimeOffset.UtcNow;
             horse.UpdatedAt = DateTimeOffset.UtcNow;

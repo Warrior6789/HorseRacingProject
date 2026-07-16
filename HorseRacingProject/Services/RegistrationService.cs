@@ -376,7 +376,7 @@ namespace HorseRacingAPI.Services
                 .Include(r => r.Horse)
                 .Include(r => r.Race)
                 .ThenInclude(r => r.Racecourse)
-                .Where(r => r.Horse.OwnerId == ownerAccountId)
+                .Where(r => r.Horse.OwnerId == ownerAccountId && !r.Race.IsDeleted)
                 .OrderByDescending(r => r.CreateAt)
                 .Select(r => new RegistrationResponse
                 {
@@ -427,7 +427,7 @@ namespace HorseRacingAPI.Services
             IQueryable<Registration> query = repo.Entities
                 .Include(r => r.Horse)
                 .Include(r => r.Race).ThenInclude(r => r.Racecourse)
-                .Where(r => r.Horse.OwnerId == ownerAccountId)
+                .Where(r => r.Horse.OwnerId == ownerAccountId && !r.Race.IsDeleted)
                 .OrderByDescending(r => r.CreateAt);
 
             int total = await query.CountAsync();
