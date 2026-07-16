@@ -285,6 +285,17 @@ namespace HorseRacingAPI.Services
                         ownerProfile.Balance = (ownerProfile.Balance ?? 0) + (long)race.RegistrationFee;
                         ownerProfile.UpdatedAt = DateTimeOffset.UtcNow;
                         await _uow.GetRepository<UserProfile>().UpdateAsync(ownerProfile);
+
+                        await _uow.GetRepository<WalletTransaction>().AddAsync(new WalletTransaction
+                        {
+                            WalletTransactionId = Guid.NewGuid(),
+                            AccountId = reg.Horse.OwnerId,
+                            Type = WalletTransactionType.RegistrationFeeRefund,
+                            Amount = (long)race.RegistrationFee,
+                            BalanceAfter = ownerProfile.Balance ?? 0,
+                            ReferenceId = reg.RegistrationId,
+                            CreatedAt = DateTimeOffset.UtcNow
+                        });
                     }
                 }
             }
@@ -432,9 +443,10 @@ namespace HorseRacingAPI.Services
                     throw new InvalidOperationException("This jockey is already confirmed in another race that conflicts in time.");
             }
 
+            UserProfile? ownerProfile = null;
             if (race.RegistrationFee > 0)
             {
-                UserProfile? ownerProfile = await _uow.GetRepository<UserProfile>().Entities
+                ownerProfile = await _uow.GetRepository<UserProfile>().Entities
                     .FirstOrDefaultAsync(p => p.AccountId == ownerId && !p.IsDeleted);
                 if (ownerProfile == null || (ownerProfile.Balance ?? 0) < (long)race.RegistrationFee)
                     throw new InvalidOperationException($"Insufficient balance. Registration fee is {race.RegistrationFee} coins.");
@@ -460,6 +472,21 @@ namespace HorseRacingAPI.Services
             };
 
             await _uow.GetRepository<Registration>().AddAsync(registration);
+
+            if (race.RegistrationFee > 0)
+            {
+                await _uow.GetRepository<WalletTransaction>().AddAsync(new WalletTransaction
+                {
+                    WalletTransactionId = Guid.NewGuid(),
+                    AccountId = ownerId,
+                    Type = WalletTransactionType.RegistrationFeeCharged,
+                    Amount = -(long)race.RegistrationFee,
+                    BalanceAfter = ownerProfile!.Balance ?? 0,
+                    ReferenceId = registration.RegistrationId,
+                    CreatedAt = DateTimeOffset.UtcNow
+                });
+            }
+
             await _uow.SaveAsync();
 
             if (race.RegistrationFee > 0)

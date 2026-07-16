@@ -145,6 +145,18 @@ namespace HorseRacingAPI.Services
                         .SetProperty(p => p.BalanceChanged, balanceToAdd)
                         .SetProperty(p => p.CurrentBalance, currentBalance));
 
+                await _uow.GetRepository<WalletTransaction>().AddAsync(new WalletTransaction
+                {
+                    WalletTransactionId = Guid.NewGuid(),
+                    AccountId = payment.AccountId,
+                    Type = WalletTransactionType.Deposit,
+                    Amount = balanceToAdd,
+                    BalanceAfter = currentBalance,
+                    ReferenceId = payment.PaymentId,
+                    CreatedAt = DateTimeOffset.UtcNow
+                });
+                await _uow.SaveAsync();
+
                 await _uow.CommitTransactionAsync();
 
                 await _hubContext.Clients.All.SendAsync("PaymentsUpdated", new

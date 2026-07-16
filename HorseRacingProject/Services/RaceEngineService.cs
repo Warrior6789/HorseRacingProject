@@ -388,6 +388,17 @@ namespace HorseRacingAPI.Services
                     profile.UpdatedAt = DateTimeOffset.UtcNow;
                     await uow.GetRepository<UserProfile>().UpdateAsync(profile);
                     refunds.Add((reg.Horse.OwnerId, (long)race.RegistrationFee, profile.Balance ?? 0));
+
+                    await uow.GetRepository<WalletTransaction>().AddAsync(new WalletTransaction
+                    {
+                        WalletTransactionId = Guid.NewGuid(),
+                        AccountId = reg.Horse.OwnerId,
+                        Type = WalletTransactionType.RegistrationFeeRefund,
+                        Amount = (long)race.RegistrationFee,
+                        BalanceAfter = profile.Balance ?? 0,
+                        ReferenceId = reg.RegistrationId,
+                        CreatedAt = DateTimeOffset.UtcNow
+                    });
                 }
             }
 
@@ -427,6 +438,17 @@ namespace HorseRacingAPI.Services
                     profile.UpdatedAt = DateTimeOffset.UtcNow;
                     await uow.GetRepository<UserProfile>().UpdateAsync(profile);
                     refunds.Add((bet.SpectatorId, (long)bet.BetAmount, profile.Balance ?? 0));
+
+                    await uow.GetRepository<WalletTransaction>().AddAsync(new WalletTransaction
+                    {
+                        WalletTransactionId = Guid.NewGuid(),
+                        AccountId = bet.SpectatorId,
+                        Type = WalletTransactionType.BetRefund,
+                        Amount = (long)bet.BetAmount,
+                        BalanceAfter = profile.Balance ?? 0,
+                        ReferenceId = bet.BetId,
+                        CreatedAt = DateTimeOffset.UtcNow
+                    });
                 }
             }
 

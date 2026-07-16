@@ -55,6 +55,8 @@ public partial class HorseRacingDataContext : DbContext
 
     public virtual DbSet<Withdrawal> Withdrawals { get; set; }
 
+    public virtual DbSet<WalletTransaction> WalletTransactions { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Account>(entity =>
@@ -474,6 +476,25 @@ public partial class HorseRacingDataContext : DbContext
                 .HasForeignKey(d => d.AccountId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_Withdrawal_Account");
+        });
+
+        modelBuilder.Entity<WalletTransaction>(entity =>
+        {
+            entity.HasKey(e => e.WalletTransactionId).HasName("WalletTransaction_pkey");
+
+            entity.ToTable("WalletTransaction");
+
+            entity.Property(e => e.WalletTransactionId)
+                .ValueGeneratedNever()
+                .HasColumnName("WalletTransactionId");
+            entity.Property(e => e.AccountId).HasColumnName("AccountId");
+            entity.Property(e => e.Type).HasConversion<int>();
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            entity.HasOne(d => d.Account).WithMany()
+                .HasForeignKey(d => d.AccountId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_WalletTransaction_Account");
         });
 
         OnModelCreatingPartial(modelBuilder);

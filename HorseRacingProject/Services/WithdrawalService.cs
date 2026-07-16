@@ -133,6 +133,7 @@ public class WithdrawalService : IWithdrawalService
                     .Where(u => u.AccountId == withdrawal.AccountId && (u.Balance ?? 0) >= withdrawal.Amount)
                     .ExecuteUpdateAsync(s => s.SetProperty(u => u.Balance, u => (u.Balance ?? 0) - withdrawal.Amount));
 
+            long newBalance = 0;
             if (updated == 0)
             {
                 withdrawal.Status      = WithdrawalStatus.Rejected;
@@ -144,15 +145,8 @@ public class WithdrawalService : IWithdrawalService
                 withdrawal.Status      = WithdrawalStatus.Completed;
                 withdrawal.AdminNote   = dto.AdminNote;
                 withdrawal.ProcessedAt = DateTimeOffset.UtcNow;
-            }
 
-            await _uow.GetRepository<Withdrawal>().UpdateAsync(withdrawal);
-            await _uow.SaveAsync();
-            await _uow.CommitTransactionAsync();
-
-            if (withdrawal.Status == WithdrawalStatus.Completed)
-            {
-                long newBalance = isJockey
+                newBalance = isJockey
                     ? await _uow.GetRepository<JockeyProfile>().Entities
                         .Where(j => j.AccountId == withdrawal.AccountId)
                         .Select(j => j.Balance ?? 0)
@@ -161,6 +155,25 @@ public class WithdrawalService : IWithdrawalService
                         .Where(u => u.AccountId == withdrawal.AccountId)
                         .Select(u => u.Balance ?? 0)
                         .FirstOrDefaultAsync();
+
+                await _uow.GetRepository<WalletTransaction>().AddAsync(new WalletTransaction
+                {
+                    WalletTransactionId = Guid.NewGuid(),
+                    AccountId = withdrawal.AccountId,
+                    Type = WalletTransactionType.Withdrawal,
+                    Amount = -withdrawal.Amount,
+                    BalanceAfter = newBalance,
+                    ReferenceId = withdrawal.WithdrawalId,
+                    CreatedAt = DateTimeOffset.UtcNow
+                });
+            }
+
+            await _uow.GetRepository<Withdrawal>().UpdateAsync(withdrawal);
+            await _uow.SaveAsync();
+            await _uow.CommitTransactionAsync();
+
+            if (withdrawal.Status == WithdrawalStatus.Completed)
+            {
                 await _hubContext.Clients.All.SendAsync("BalanceUpdated", new
                 {
                     accountId  = withdrawal.AccountId,
