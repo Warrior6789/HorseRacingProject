@@ -1,5 +1,7 @@
 using HorseRacingAPI.Dtos;
+using HorseRacingAPI.Enums;
 using HorseRacingAPI.Models;
+using HorseRacingAPI.Repositories;
 using HorseRacingAPI.Repository;
 using Microsoft.EntityFrameworkCore;
 
@@ -54,5 +56,50 @@ public class WalletTransactionService : IWalletTransactionService
             Check(accountId, balance, "JockeyProfile");
 
         return mismatches;
+    }
+
+    public async Task<PagedResponse<WalletTransactionResponse>> GetPagedAsync(int page, int pageSize, Guid? accountId, string? type)
+    {
+        if (page < 1) page = 1;
+        if (pageSize < 1) pageSize = 10;
+        if (pageSize > 100) pageSize = 100;
+
+        WalletTransactionType? parsedType = null;
+        if (!string.IsNullOrWhiteSpace(type) && Enum.TryParse<WalletTransactionType>(type, ignoreCase: true, out var t))
+            parsedType = t;
+
+        IGenericRepository<WalletTransaction> repo = _uow.GetRepository<WalletTransaction>();
+
+        int totalCount = await repo.Entities
+            .Where(w => (accountId == null || w.AccountId == accountId)
+                     && (parsedType == null || w.Type == parsedType))
+            .CountAsync();
+
+        IEnumerable<WalletTransactionResponse> items = await repo.FindAsync<WalletTransactionResponse>(
+            predicate: w => (accountId == null || w.AccountId == accountId)
+                          && (parsedType == null || w.Type == parsedType),
+            orderBy: q => q.OrderByDescending(w => w.CreatedAt),
+            selector: w => new WalletTransactionResponse
+            {
+                WalletTransactionId = w.WalletTransactionId,
+                AccountId           = w.AccountId,
+                AccountEmail        = w.Account.Email,
+                Type                = w.Type.ToString(),
+                Amount              = w.Amount,
+                BalanceAfter        = w.BalanceAfter,
+                ReferenceId         = w.ReferenceId,
+                CreatedAt           = w.CreatedAt
+            },
+            pageIndex: page - 1,
+            pageSize: pageSize
+        );
+
+        return new PagedResponse<WalletTransactionResponse>
+        {
+            Items      = items.ToList(),
+            Page       = page,
+            PageSize   = pageSize,
+            TotalCount = totalCount
+        };
     }
 }
