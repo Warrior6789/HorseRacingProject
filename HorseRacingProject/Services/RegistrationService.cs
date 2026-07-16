@@ -266,6 +266,7 @@ namespace HorseRacingAPI.Services
                     Race = new RaceResponse
                     {
                         RaceId = r.RaceId,
+                        RaceName = r.Race.RaceName,
                         RaceNumber = r.Race.RaceNumber,
                         StartTime = r.Race.StartTime,
                         TrackLength = r.Race.TrackLength,
@@ -339,6 +340,7 @@ namespace HorseRacingAPI.Services
                     Race = new RaceResponse
                     {
                         RaceId = r.RaceId,
+                        RaceName = r.Race.RaceName,
                         RaceNumber = r.Race.RaceNumber,
                         StartTime = r.Race.StartTime,
                         TrackLength = r.Race.TrackLength,
@@ -766,6 +768,7 @@ namespace HorseRacingAPI.Services
                     Race = new RaceResponse
                     {
                         RaceId = r.RaceId,
+                        RaceName = r.Race.RaceName,
                         RaceNumber = r.Race.RaceNumber,
                         StartTime = r.Race.StartTime,
                         TrackLength = r.Race.TrackLength,
