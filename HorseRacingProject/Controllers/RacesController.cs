@@ -67,6 +67,13 @@ namespace HorseRacingAPI.Controllers
             return Ok(ApiResponse<List<RegistrationResponse>>.SuccessResponse(result, "Get race registrations successfully."));
         }
 
+        [HttpGet("{raceId}/taken-gates")]
+        public async Task<IActionResult> GetTakenGateNumbers(Guid raceId)
+        {
+            List<int> result = await _raceService.GetTakenGateNumbersAsync(raceId);
+            return Ok(ApiResponse<List<int>>.SuccessResponse(result, "Get taken gate numbers successfully."));
+        }
+
         [HttpGet("{raceId}/results")]
         public async Task<IActionResult> GetRaceResults(Guid raceId)
         {
