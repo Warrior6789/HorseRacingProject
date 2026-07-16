@@ -1,4 +1,5 @@
 using HorseRacingAPI.Dtos;
+using HorseRacingAPI.Enums;
 using HorseRacingAPI.Models;
 using HorseRacingAPI.Repositories;
 using HorseRacingAPI.Repository;
@@ -119,6 +120,15 @@ namespace HorseRacingAPI.Services
 
             if (racecourse == null || racecourse.IsDeleted)
                 throw new KeyNotFoundException($"Racecourse with id {id} not found.");
+
+            bool hasActiveRace = await _uow.GetRepository<Race>().Entities
+                .AnyAsync(r => r.RacecourseId == id
+                    && !r.IsDeleted
+                    && r.Status != RaceStatus.Finished
+                    && r.Status != RaceStatus.Completed
+                    && r.Status != RaceStatus.Cancelled);
+            if (hasActiveRace)
+                throw new InvalidOperationException("Cannot delete a racecourse with an active or upcoming race scheduled there.");
 
             racecourse.IsDeleted = true;
             racecourse.DeletedAt = DateTimeOffset.UtcNow;

@@ -1,6 +1,7 @@
 using HorseRacingAPI.Enums;
 using HorseRacingAPI.Hubs;
 using HorseRacingAPI.Models;
+using HorseRacingAPI.Repositories;
 using HorseRacingAPI.Repository;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
@@ -52,8 +53,28 @@ namespace HorseRacingAPI.Services
                 await uow.GetRepository<Horse>().UpdateAsync(winnerHorse);
             }
 
+            await UpdateJockeyStatsAsync(uow, sortedRegs);
             await SettleBetsAsync(uow, race, sortedRegs);
             await DistributePrizesAsync(uow, race, sortedRegs);
+        }
+
+        private async Task UpdateJockeyStatsAsync(IUnitofWork uow, List<Registration> sortedRegs)
+        {
+            IGenericRepository<JockeyProfile> jockeyRepo = uow.GetRepository<JockeyProfile>();
+
+            for (int i = 0; i < sortedRegs.Count; i++)
+            {
+                JockeyProfile? jockeyProfile = await jockeyRepo.Entities
+                    .FirstOrDefaultAsync(p => p.AccountId == sortedRegs[i].JockeyId && !p.IsDeleted);
+                if (jockeyProfile == null) continue;
+
+                jockeyProfile.TotalRaces = (jockeyProfile.TotalRaces ?? 0) + 1;
+                if (i == 0)
+                    jockeyProfile.TotalWins = (jockeyProfile.TotalWins ?? 0) + 1;
+
+                jockeyProfile.UpdatedAt = DateTimeOffset.UtcNow;
+                await jockeyRepo.UpdateAsync(jockeyProfile);
+            }
         }
 
         private async Task SettleBetsAsync(IUnitofWork uow, Race race, List<Registration> sortedRegs)
