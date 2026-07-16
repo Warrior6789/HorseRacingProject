@@ -13,6 +13,7 @@ namespace HorseRacingAPI.Services
         Task<PagedResponse<UpcomingRaceResponse>> GetUpcomingRacesAsync(int page, int pageSize, List<string>? statuses);
 Task<List<RaceResultResponse>> GetRaceResultsAsync(Guid raceId);
         Task<List<RegistrationResponse>> GetRaceRegistrationsAsync(Guid raceId);
+        Task<List<int>> GetTakenGateNumbersAsync(Guid raceId);
         Task<RaceResponse> AdvanceRaceStatusAsync(Guid raceId);
         Task ResetRaceAsync(Guid raceId);
         Task<string> UploadImageAsync(Guid raceId, IFormFile file);

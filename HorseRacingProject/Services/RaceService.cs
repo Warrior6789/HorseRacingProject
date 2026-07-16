@@ -608,6 +608,25 @@ namespace HorseRacingAPI.Services
                 .ToListAsync();
         }
 
+        public async Task<List<int>> GetTakenGateNumbersAsync(Guid raceId)
+        {
+            bool exists = await _uow.GetRepository<Race>().Entities
+                .AnyAsync(r => r.RaceId == raceId && !r.IsDeleted);
+
+            if (!exists)
+                throw new KeyNotFoundException($"Race with id {raceId} not found.");
+
+            return await _uow.GetRepository<Registration>().Entities
+                .Where(r => r.RaceId == raceId
+                    && r.GateNumber != null
+                    && r.Status != RegistrationStatus.Rejected
+                    && r.Status != RegistrationStatus.Scratched)
+                .Select(r => r.GateNumber!.Value)
+                .Distinct()
+                .OrderBy(g => g)
+                .ToListAsync();
+        }
+
         public async Task<List<RegistrationResponse>> GetRaceRegistrationsAsync(Guid raceId)
         {
             bool exists = await _uow.GetRepository<Race>().Entities
