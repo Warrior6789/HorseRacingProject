@@ -13,14 +13,12 @@ namespace HorseRacingAPI.Controllers
     {
         private readonly IRaceService _raceService;
         private readonly IHubContext<RaceHub> _hubContext;
-        private readonly RaceEngineService _engineService;
         private readonly IRaceRefereeService _raceRefereeService;
 
-        public RacesController(IRaceService raceService, IHubContext<RaceHub> hubContext, RaceEngineService engineService, IRaceRefereeService raceRefereeService)
+        public RacesController(IRaceService raceService, IHubContext<RaceHub> hubContext, IRaceRefereeService raceRefereeService)
         {
             _raceService = raceService;
             _hubContext = hubContext;
-            _engineService = engineService;
             _raceRefereeService = raceRefereeService;
         }
 
@@ -101,36 +99,11 @@ namespace HorseRacingAPI.Controllers
         }
 
         [Authorize(Roles = "Admin")]
-        [HttpPost("{raceId}/engine/override-result")]
-        public IActionResult OverrideResult(Guid raceId, [FromBody] List<HorseRankOverrideDto> ranks)
-        {
-            var horseRanks = ranks.ToDictionary(r => r.HorseId, r => r.Rank);
-            _engineService.OverrideResult(raceId, horseRanks);
-            return Ok(ApiResponse<object>.SuccessResponse(null!, "Result override applied."));
-        }
-
-        [Authorize(Roles = "Admin")]
-        [HttpPost("{raceId}/reset")]
-        public async Task<IActionResult> ResetRace(Guid raceId)
-        {
-            await _raceService.ResetRaceAsync(raceId);
-            return Ok(ApiResponse<object>.SuccessResponse(null!, "Race reset to Scheduled successfully."));
-        }
-
-        [Authorize(Roles = "Admin")]
         [HttpPost("{raceId}/advance")]
         public async Task<IActionResult> AdvanceRaceStatus(Guid raceId)
         {
             RaceResponse result = await _raceService.AdvanceRaceStatusAsync(raceId);
             return Ok(ApiResponse<RaceResponse>.SuccessResponse(result, $"Race advanced to '{result.Status}' successfully."));
-        }
-
-        [Authorize(Roles = "Admin")]
-        [HttpPost("{raceId}/pool/collect")]
-        public async Task<IActionResult> CollectFromSpectators(Guid raceId, [FromBody] CollectToRacePoolRequest request)
-        {
-            CollectToRacePoolResponse result = await _raceService.CollectFromSpectatorsAsync(raceId, request);
-            return Ok(ApiResponse<CollectToRacePoolResponse>.SuccessResponse(result, $"Collected from {result.ChargedCount} spectators. Total: {result.TotalCollected} coins."));
         }
 
         [Authorize(Roles = "Admin")]

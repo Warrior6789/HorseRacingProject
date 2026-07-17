@@ -117,46 +117,6 @@ public class RaceServiceAdminEndpointsIntegrationTests
     }
 
     [Fact]
-    public async Task CollectFromSpectatorsAsync_BettingClosedRace_ChargesEligibleSpectatorsAndSkipsInsufficientBalance()
-    {
-        using Fixture fixture = await SeedAsync(RaceStatus.BettingClosed);
-
-        CollectToRacePoolResponse response = await fixture.Service.CollectFromSpectatorsAsync(
-            fixture.Race.RaceId, new CollectToRacePoolRequest { AmountPerSpectator = 5_000, BetType = BetType.Win });
-
-        Assert.Equal(2, response.ChargedCount);
-        Assert.Equal(1, response.SkippedCount);
-        Assert.Equal(10_000m, response.TotalCollected);
-
-        UserProfile chargedProfile = await fixture.Db.UserProfiles.AsNoTracking().SingleAsync(p => p.AccountId == fixture.Spectators[0].Id);
-        Assert.Equal(5_000L, chargedProfile.Balance);
-
-        UserProfile skippedProfile = await fixture.Db.UserProfiles.AsNoTracking().SingleAsync(p => p.AccountId == fixture.Spectators[2].Id);
-        Assert.Equal(100L, skippedProfile.Balance);
-
-        RacePool pool = await fixture.Db.RacePools.AsNoTracking().SingleAsync(p => p.RaceId == fixture.Race.RaceId && p.BetType == BetType.Win);
-        Assert.Equal(10_000m, pool.TotalAmount);
-    }
-
-    [Fact]
-    public async Task CollectFromSpectatorsAsync_RaceNotBettingClosed_Throws()
-    {
-        using Fixture fixture = await SeedAsync(RaceStatus.Scheduled);
-
-        await Assert.ThrowsAsync<InvalidOperationException>(() => fixture.Service.CollectFromSpectatorsAsync(
-            fixture.Race.RaceId, new CollectToRacePoolRequest { AmountPerSpectator = 5_000, BetType = BetType.Win }));
-    }
-
-    [Fact]
-    public async Task CollectFromSpectatorsAsync_ZeroAmount_Throws()
-    {
-        using Fixture fixture = await SeedAsync(RaceStatus.BettingClosed);
-
-        await Assert.ThrowsAsync<InvalidOperationException>(() => fixture.Service.CollectFromSpectatorsAsync(
-            fixture.Race.RaceId, new CollectToRacePoolRequest { AmountPerSpectator = 0, BetType = BetType.Win }));
-    }
-
-    [Fact]
     public async Task GetRacePoolOverviewAsync_ReturnsBetsAndPoolSummaries()
     {
         using Fixture fixture = await SeedAsync(RaceStatus.BettingClosed);

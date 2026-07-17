@@ -407,15 +407,6 @@ public class RaceServiceTests
     }
 
     [Fact]
-    public async Task ResetRaceAsync_NotFound_ThrowsKeyNotFound()
-    {
-        using HorseRacingDataContext db = CreateContext();
-        RaceService service = CreateService(db);
-
-        await Assert.ThrowsAsync<KeyNotFoundException>(() => service.ResetRaceAsync(Guid.NewGuid()));
-    }
-
-    [Fact]
     public async Task AdvanceRaceStatusAsync_NotFound_ThrowsKeyNotFound()
     {
         using HorseRacingDataContext db = CreateContext();
@@ -557,68 +548,6 @@ public class RaceServiceTests
 
         Assert.Equal("https://cdn.test/new/def.jpg", url);
         mockCloudinary.Verify(c => c.DeleteImageAsync(It.IsAny<string>()), Times.Once);
-    }
-
-    [Fact]
-    public async Task CollectFromSpectatorsAsync_NotFound_ThrowsKeyNotFound()
-    {
-        using HorseRacingDataContext db = CreateContext();
-        RaceService service = CreateService(db);
-
-        await Assert.ThrowsAsync<KeyNotFoundException>(
-            () => service.CollectFromSpectatorsAsync(Guid.NewGuid(), new CollectToRacePoolRequest { AmountPerSpectator = 1000, BetType = BetType.Win }));
-    }
-
-    [Fact]
-    public async Task CollectFromSpectatorsAsync_NotBettingClosed_ThrowsInvalidOperation()
-    {
-        using HorseRacingDataContext db = CreateContext();
-        Racecourse racecourse = NewRacecourse();
-        var race = new Race { RaceId = Guid.NewGuid(), RacecourseId = racecourse.Id, Status = RaceStatus.Scheduled, StartTime = DateTimeOffset.UtcNow.AddHours(1) };
-        db.AddRange(racecourse, race);
-        await db.SaveChangesAsync();
-        RaceService service = CreateService(db);
-
-        await Assert.ThrowsAsync<InvalidOperationException>(
-            () => service.CollectFromSpectatorsAsync(race.RaceId, new CollectToRacePoolRequest { AmountPerSpectator = 1000, BetType = BetType.Win }));
-    }
-
-    [Fact]
-    public async Task CollectFromSpectatorsAsync_AmountNotPositive_ThrowsInvalidOperation()
-    {
-        using HorseRacingDataContext db = CreateContext();
-        Racecourse racecourse = NewRacecourse();
-        var race = new Race { RaceId = Guid.NewGuid(), RacecourseId = racecourse.Id, Status = RaceStatus.BettingClosed, StartTime = DateTimeOffset.UtcNow.AddMinutes(5) };
-        db.AddRange(racecourse, race);
-        await db.SaveChangesAsync();
-        RaceService service = CreateService(db);
-
-        await Assert.ThrowsAsync<InvalidOperationException>(
-            () => service.CollectFromSpectatorsAsync(race.RaceId, new CollectToRacePoolRequest { AmountPerSpectator = 0, BetType = BetType.Win }));
-    }
-
-    [Fact]
-    public async Task CollectFromSpectatorsAsync_Valid_ChargesEligibleSpectatorsAndSkipsInsufficientBalance()
-    {
-        using HorseRacingDataContext db = CreateContext();
-        Racecourse racecourse = NewRacecourse();
-        var race = new Race { RaceId = Guid.NewGuid(), RacecourseId = racecourse.Id, Status = RaceStatus.BettingClosed, StartTime = DateTimeOffset.UtcNow.AddMinutes(5) };
-        Account richSpectator = NewAccount(AccountRole.Spectator);
-        Account poorSpectator = NewAccount(AccountRole.Spectator);
-        var richProfile = new UserProfile { ProfileId = Guid.NewGuid(), AccountId = richSpectator.Id, Balance = 5000 };
-        var poorProfile = new UserProfile { ProfileId = Guid.NewGuid(), AccountId = poorSpectator.Id, Balance = 100 };
-        db.AddRange(racecourse, race, richSpectator, poorSpectator, richProfile, poorProfile);
-        await db.SaveChangesAsync();
-        RaceService service = CreateService(db);
-
-        CollectToRacePoolResponse result = await service.CollectFromSpectatorsAsync(race.RaceId, new CollectToRacePoolRequest { AmountPerSpectator = 1000, BetType = BetType.Win });
-
-        Assert.Equal(1, result.ChargedCount);
-        Assert.Equal(1, result.SkippedCount);
-        Assert.Equal(1000, result.TotalCollected);
-
-        UserProfile updatedRich = await db.UserProfiles.AsNoTracking().SingleAsync(p => p.AccountId == richSpectator.Id);
-        Assert.Equal(4000, updatedRich.Balance);
     }
 
     [Fact]
