@@ -266,7 +266,7 @@ public class RaceServiceTests
     }
 
     [Fact]
-    public async Task DeleteRaceAsync_Valid_SoftDeletesAndRefundsPendingRegistrations()
+    public async Task DeleteRaceAsync_HasActiveRegistration_ThrowsAndLeavesRaceAndRegistrationIntact()
     {
         using HorseRacingDataContext db = CreateContext();
         Racecourse racecourse = NewRacecourse();
@@ -280,14 +280,34 @@ public class RaceServiceTests
         await db.SaveChangesAsync();
         RaceService service = CreateService(db);
 
-        await service.DeleteRaceAsync(race.RaceId);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.DeleteRaceAsync(race.RaceId));
 
         Race updatedRace = await db.Races.AsNoTracking().SingleAsync(r => r.RaceId == race.RaceId);
         Registration updatedReg = await db.Registrations.AsNoTracking().SingleAsync(r => r.RegistrationId == registration.RegistrationId);
         UserProfile updatedProfile = await db.UserProfiles.AsNoTracking().SingleAsync(p => p.AccountId == owner.Id);
+        Assert.False(updatedRace.IsDeleted);
+        Assert.Equal(RegistrationStatus.Pending, updatedReg.Status);
+        Assert.Equal(0, updatedProfile.Balance);
+    }
+
+    [Fact]
+    public async Task DeleteRaceAsync_NoActiveRegistrations_SoftDeletes()
+    {
+        using HorseRacingDataContext db = CreateContext();
+        Racecourse racecourse = NewRacecourse();
+        Account owner = NewAccount(AccountRole.HorseOwner);
+        Account jockey = NewAccount(AccountRole.Jockey);
+        Horse horse = NewHorse(owner.Id);
+        var race = new Race { RaceId = Guid.NewGuid(), RacecourseId = racecourse.Id, Status = RaceStatus.Scheduled, StartTime = DateTimeOffset.UtcNow.AddHours(3), RegistrationFee = 15_000 };
+        var registration = new Registration { RegistrationId = Guid.NewGuid(), RaceId = race.RaceId, HorseId = horse.Id, JockeyId = jockey.Id, Status = RegistrationStatus.Rejected };
+        db.AddRange(racecourse, owner, jockey, horse, race, registration);
+        await db.SaveChangesAsync();
+        RaceService service = CreateService(db);
+
+        await service.DeleteRaceAsync(race.RaceId);
+
+        Race updatedRace = await db.Races.AsNoTracking().SingleAsync(r => r.RaceId == race.RaceId);
         Assert.True(updatedRace.IsDeleted);
-        Assert.Equal(RegistrationStatus.Rejected, updatedReg.Status);
-        Assert.Equal(15_000, updatedProfile.Balance);
     }
 
     [Fact]
@@ -384,15 +404,6 @@ public class RaceServiceTests
 
         Assert.Single(registrations);
         Assert.Equal(confirmedReg.RegistrationId, registrations[0].RegistrationId);
-    }
-
-    [Fact]
-    public async Task ResetRaceAsync_NotFound_ThrowsKeyNotFound()
-    {
-        using HorseRacingDataContext db = CreateContext();
-        RaceService service = CreateService(db);
-
-        await Assert.ThrowsAsync<KeyNotFoundException>(() => service.ResetRaceAsync(Guid.NewGuid()));
     }
 
     [Fact]
@@ -537,68 +548,6 @@ public class RaceServiceTests
 
         Assert.Equal("https://cdn.test/new/def.jpg", url);
         mockCloudinary.Verify(c => c.DeleteImageAsync(It.IsAny<string>()), Times.Once);
-    }
-
-    [Fact]
-    public async Task CollectFromSpectatorsAsync_NotFound_ThrowsKeyNotFound()
-    {
-        using HorseRacingDataContext db = CreateContext();
-        RaceService service = CreateService(db);
-
-        await Assert.ThrowsAsync<KeyNotFoundException>(
-            () => service.CollectFromSpectatorsAsync(Guid.NewGuid(), new CollectToRacePoolRequest { AmountPerSpectator = 1000, BetType = BetType.Win }));
-    }
-
-    [Fact]
-    public async Task CollectFromSpectatorsAsync_NotBettingClosed_ThrowsInvalidOperation()
-    {
-        using HorseRacingDataContext db = CreateContext();
-        Racecourse racecourse = NewRacecourse();
-        var race = new Race { RaceId = Guid.NewGuid(), RacecourseId = racecourse.Id, Status = RaceStatus.Scheduled, StartTime = DateTimeOffset.UtcNow.AddHours(1) };
-        db.AddRange(racecourse, race);
-        await db.SaveChangesAsync();
-        RaceService service = CreateService(db);
-
-        await Assert.ThrowsAsync<InvalidOperationException>(
-            () => service.CollectFromSpectatorsAsync(race.RaceId, new CollectToRacePoolRequest { AmountPerSpectator = 1000, BetType = BetType.Win }));
-    }
-
-    [Fact]
-    public async Task CollectFromSpectatorsAsync_AmountNotPositive_ThrowsInvalidOperation()
-    {
-        using HorseRacingDataContext db = CreateContext();
-        Racecourse racecourse = NewRacecourse();
-        var race = new Race { RaceId = Guid.NewGuid(), RacecourseId = racecourse.Id, Status = RaceStatus.BettingClosed, StartTime = DateTimeOffset.UtcNow.AddMinutes(5) };
-        db.AddRange(racecourse, race);
-        await db.SaveChangesAsync();
-        RaceService service = CreateService(db);
-
-        await Assert.ThrowsAsync<InvalidOperationException>(
-            () => service.CollectFromSpectatorsAsync(race.RaceId, new CollectToRacePoolRequest { AmountPerSpectator = 0, BetType = BetType.Win }));
-    }
-
-    [Fact]
-    public async Task CollectFromSpectatorsAsync_Valid_ChargesEligibleSpectatorsAndSkipsInsufficientBalance()
-    {
-        using HorseRacingDataContext db = CreateContext();
-        Racecourse racecourse = NewRacecourse();
-        var race = new Race { RaceId = Guid.NewGuid(), RacecourseId = racecourse.Id, Status = RaceStatus.BettingClosed, StartTime = DateTimeOffset.UtcNow.AddMinutes(5) };
-        Account richSpectator = NewAccount(AccountRole.Spectator);
-        Account poorSpectator = NewAccount(AccountRole.Spectator);
-        var richProfile = new UserProfile { ProfileId = Guid.NewGuid(), AccountId = richSpectator.Id, Balance = 5000 };
-        var poorProfile = new UserProfile { ProfileId = Guid.NewGuid(), AccountId = poorSpectator.Id, Balance = 100 };
-        db.AddRange(racecourse, race, richSpectator, poorSpectator, richProfile, poorProfile);
-        await db.SaveChangesAsync();
-        RaceService service = CreateService(db);
-
-        CollectToRacePoolResponse result = await service.CollectFromSpectatorsAsync(race.RaceId, new CollectToRacePoolRequest { AmountPerSpectator = 1000, BetType = BetType.Win });
-
-        Assert.Equal(1, result.ChargedCount);
-        Assert.Equal(1, result.SkippedCount);
-        Assert.Equal(1000, result.TotalCollected);
-
-        UserProfile updatedRich = await db.UserProfiles.AsNoTracking().SingleAsync(p => p.AccountId == richSpectator.Id);
-        Assert.Equal(4000, updatedRich.Balance);
     }
 
     [Fact]

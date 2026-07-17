@@ -319,21 +319,6 @@ namespace HorseRacingAPI.Services
             }
         }
 
-        public void OverrideResult(Guid raceId, Dictionary<Guid, int> horseRanks)
-        {
-            if (_initializedRaces.Contains(raceId))
-            {
-                int currentTick = _raceTick.TryGetValue(raceId, out int ct) ? ct : 0;
-                var sorted = horseRanks.OrderBy(x => x.Value).ToList();
-                for (int i = 0; i < sorted.Count; i++)
-                    _targetFinishTick[sorted[i].Key] = currentTick + 200 + i * 8;
-            }
-            else
-            {
-                _pendingOverrides[raceId] = horseRanks;
-            }
-        }
-
         private void InitializeRace(Guid raceId, List<Registration> registrations)
         {
             _initializedRaces.Add(raceId);
