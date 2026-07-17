@@ -10,6 +10,7 @@ namespace HorseRacingAPI.Dtos
         [Required]
         public Guid JockeyId { get; set; }
 
+        [Range(1, 20, ErrorMessage = "GateNumber must be between 1 and 20.")]
         public int? GateNumber { get; set; }
     }
 }
