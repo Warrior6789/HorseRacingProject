@@ -225,7 +225,15 @@ public class AuthServiceTests
         await db.SaveChangesAsync();
         AuthService service = CreateService(db);
 
-        await service.RequestRoleUpgradeAsync(account.Id, new RequestRoleUpgradeDto { RequestedRole = "Jockey", FullName = "Jockey X", LicenseNumber = "LIC-9" });
+        await service.RequestRoleUpgradeAsync(account.Id, new RequestRoleUpgradeDto
+        {
+            RequestedRole = "Jockey",
+            FullName = "Jockey X",
+            LicenseNumber = "LIC-9",
+            DateOfBirth = new DateOnly(1995, 1, 1),
+            Weight = 55,
+            Height = 165
+        });
 
         Account updated = await db.Accounts.AsNoTracking().SingleAsync(a => a.Id == account.Id);
         Assert.Equal(AccountRole.Jockey, updated.RequestedRole);

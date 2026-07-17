@@ -12,6 +12,7 @@ namespace HorseRacingAPI.Dtos
         [Range(1, int.MaxValue, ErrorMessage = "RaceNumber must be greater than 0.")]
         public int RaceNumber { get; set; }
 
+        [Required]
         [MaxLength(100)]
         public string? RaceName { get; set; }
 

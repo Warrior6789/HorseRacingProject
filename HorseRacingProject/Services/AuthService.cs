@@ -114,15 +114,31 @@ namespace HorseRacingAPI.Services
             if (account.RequestedRole != null)
                 throw new InvalidOperationException("You already have a pending role upgrade request.");
 
+            if (parsedRole == AccountRole.Jockey)
+            {
+                if (string.IsNullOrWhiteSpace(dto.LicenseNumber))
+                    throw new ArgumentException("LicenseNumber is required for Jockey.");
+                if (string.IsNullOrWhiteSpace(dto.FullName))
+                    throw new ArgumentException("FullName is required for Jockey.");
+                if (!dto.DateOfBirth.HasValue)
+                    throw new ArgumentException("DateOfBirth is required for Jockey.");
+                if (!dto.Weight.HasValue)
+                    throw new ArgumentException("Weight is required for Jockey.");
+                if (!dto.Height.HasValue)
+                    throw new ArgumentException("Height is required for Jockey.");
+            }
+            else if (parsedRole == AccountRole.Referee)
+            {
+                if (dto.CertificateImage == null)
+                    throw new ArgumentException("CertificateImage is required for Referee.");
+            }
+
             string? imageUrl = null;
             if (dto.CertificateImage != null)
                 imageUrl = await _cloudinary.UploadImageAsync(dto.CertificateImage, "certificates");
 
             if (parsedRole == AccountRole.Jockey)
             {
-                if (string.IsNullOrWhiteSpace(dto.LicenseNumber))
-                    throw new ArgumentException("LicenseNumber is required for Jockey.");
-
                 await _unitOfWork.GetRepository<JockeyProfile>().AddAsync(new JockeyProfile
                 {
                     JockeyProfileId = Guid.NewGuid(),

@@ -45,6 +45,9 @@ namespace HorseRacingAPI.Services
             if (existing)
                 throw new InvalidOperationException("A report already exists for this horse in this race.");
 
+            if (dto.PenaltyType == PenaltyType.Fine && (!dto.FineAmount.HasValue || dto.FineAmount.Value <= 0))
+                throw new InvalidOperationException("FineAmount is required and must be greater than 0 when PenaltyType is Fine.");
+
             var report = new RefereeReport
             {
                 ReportId            = Guid.NewGuid(),
@@ -486,6 +489,9 @@ namespace HorseRacingAPI.Services
             report.PenaltyApplied      = dto.PenaltyApplied ?? report.PenaltyApplied;
             if (dto.PenaltyType.HasValue) report.PenaltyType = dto.PenaltyType.Value;
             report.FineAmount = report.PenaltyType == PenaltyType.Fine ? (dto.FineAmount ?? report.FineAmount) : null;
+
+            if (report.PenaltyType == PenaltyType.Fine && (!report.FineAmount.HasValue || report.FineAmount.Value <= 0))
+                throw new InvalidOperationException("FineAmount is required and must be greater than 0 when PenaltyType is Fine.");
 
             await _uow.GetRepository<RefereeReport>().UpdateAsync(report);
             await _uow.SaveAsync();
