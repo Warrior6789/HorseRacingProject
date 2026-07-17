@@ -264,41 +264,11 @@ namespace HorseRacingAPI.Services
             if (race.Status == RaceStatus.Live)
                 throw new InvalidOperationException("Cannot delete a race that is currently Live.");
 
-            List<Registration> registrations = await _uow.GetRepository<Registration>().Entities
-                .Include(r => r.Horse)
-                .Where(r => r.RaceId == raceId
-                    && (r.Status == RegistrationStatus.Pending || r.Status == RegistrationStatus.Confirmed))
-                .ToListAsync();
-
-            foreach (Registration reg in registrations)
-            {
-                reg.Status = RegistrationStatus.Rejected;
-                reg.UpdatedAt = DateTimeOffset.UtcNow;
-                await _uow.GetRepository<Registration>().UpdateAsync(reg);
-
-                if (race.RegistrationFee > 0)
-                {
-                    UserProfile? ownerProfile = await _uow.GetRepository<UserProfile>().Entities
-                        .FirstOrDefaultAsync(p => p.AccountId == reg.Horse.OwnerId && !p.IsDeleted);
-                    if (ownerProfile != null)
-                    {
-                        ownerProfile.Balance = (ownerProfile.Balance ?? 0) + (long)race.RegistrationFee;
-                        ownerProfile.UpdatedAt = DateTimeOffset.UtcNow;
-                        await _uow.GetRepository<UserProfile>().UpdateAsync(ownerProfile);
-
-                        await _uow.GetRepository<WalletTransaction>().AddAsync(new WalletTransaction
-                        {
-                            WalletTransactionId = Guid.NewGuid(),
-                            AccountId = reg.Horse.OwnerId,
-                            Type = WalletTransactionType.RegistrationFeeRefund,
-                            Amount = (long)race.RegistrationFee,
-                            BalanceAfter = ownerProfile.Balance ?? 0,
-                            ReferenceId = reg.RegistrationId,
-                            CreatedAt = DateTimeOffset.UtcNow
-                        });
-                    }
-                }
-            }
+            bool hasActiveRegistrations = await _uow.GetRepository<Registration>().Entities
+                .AnyAsync(r => r.RaceId == raceId
+                    && (r.Status == RegistrationStatus.Pending || r.Status == RegistrationStatus.Confirmed));
+            if (hasActiveRegistrations)
+                throw new InvalidOperationException("Cannot delete a race with active horse/jockey registrations. Reject or scratch them first.");
 
             race.IsDeleted = true;
             race.DeletedAt = DateTimeOffset.UtcNow;
