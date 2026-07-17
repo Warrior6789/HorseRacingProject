@@ -110,24 +110,41 @@ public class RaceServiceDeleteRaceIntegrationTests
     }
 
     [Fact]
-    public async Task DeleteRaceAsync_WithFee_SoftDeletesRaceRejectsRegistrationsAndRefundsOwner()
+    public async Task DeleteRaceAsync_HasActiveRegistrations_ThrowsAndLeavesRaceAndRegistrationsIntact()
     {
         using Fixture fixture = await SeedAsync(RaceStatus.Scheduled, registrationFee: 1_000m);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => fixture.Service.DeleteRaceAsync(fixture.Race.RaceId));
+
+        Race race = await fixture.Db.Races.AsNoTracking().SingleAsync(r => r.RaceId == fixture.Race.RaceId);
+        Assert.False(race.IsDeleted);
+        Assert.Null(race.DeletedAt);
+
+        Registration pending = await fixture.Db.Registrations.AsNoTracking().SingleAsync(r => r.RegistrationId == fixture.PendingRegistration.RegistrationId);
+        Assert.Equal(RegistrationStatus.Pending, pending.Status);
+
+        Registration confirmed = await fixture.Db.Registrations.AsNoTracking().SingleAsync(r => r.RegistrationId == fixture.ConfirmedRegistration.RegistrationId);
+        Assert.Equal(RegistrationStatus.Confirmed, confirmed.Status);
+
+        UserProfile ownerProfile = await fixture.Db.UserProfiles.AsNoTracking().SingleAsync(p => p.AccountId == fixture.Owner.Id);
+        Assert.Equal(0L, ownerProfile.Balance);
+    }
+
+    [Fact]
+    public async Task DeleteRaceAsync_NoActiveRegistrations_SoftDeletesRace()
+    {
+        using Fixture fixture = await SeedAsync(RaceStatus.Scheduled, registrationFee: 1_000m);
+        fixture.PendingRegistration.Status = RegistrationStatus.Rejected;
+        fixture.ConfirmedRegistration.Status = RegistrationStatus.Rejected;
+        fixture.Db.Update(fixture.PendingRegistration);
+        fixture.Db.Update(fixture.ConfirmedRegistration);
+        await fixture.Db.SaveChangesAsync();
 
         await fixture.Service.DeleteRaceAsync(fixture.Race.RaceId);
 
         Race race = await fixture.Db.Races.AsNoTracking().SingleAsync(r => r.RaceId == fixture.Race.RaceId);
         Assert.True(race.IsDeleted);
         Assert.NotNull(race.DeletedAt);
-
-        Registration pending = await fixture.Db.Registrations.AsNoTracking().SingleAsync(r => r.RegistrationId == fixture.PendingRegistration.RegistrationId);
-        Assert.Equal(RegistrationStatus.Rejected, pending.Status);
-
-        Registration confirmed = await fixture.Db.Registrations.AsNoTracking().SingleAsync(r => r.RegistrationId == fixture.ConfirmedRegistration.RegistrationId);
-        Assert.Equal(RegistrationStatus.Rejected, confirmed.Status);
-
-        UserProfile ownerProfile = await fixture.Db.UserProfiles.AsNoTracking().SingleAsync(p => p.AccountId == fixture.Owner.Id);
-        Assert.Equal(2_000L, ownerProfile.Balance);
     }
 
     [Fact]

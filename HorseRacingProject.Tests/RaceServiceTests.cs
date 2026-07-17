@@ -266,7 +266,7 @@ public class RaceServiceTests
     }
 
     [Fact]
-    public async Task DeleteRaceAsync_Valid_SoftDeletesAndRefundsPendingRegistrations()
+    public async Task DeleteRaceAsync_HasActiveRegistration_ThrowsAndLeavesRaceAndRegistrationIntact()
     {
         using HorseRacingDataContext db = CreateContext();
         Racecourse racecourse = NewRacecourse();
@@ -280,14 +280,34 @@ public class RaceServiceTests
         await db.SaveChangesAsync();
         RaceService service = CreateService(db);
 
-        await service.DeleteRaceAsync(race.RaceId);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.DeleteRaceAsync(race.RaceId));
 
         Race updatedRace = await db.Races.AsNoTracking().SingleAsync(r => r.RaceId == race.RaceId);
         Registration updatedReg = await db.Registrations.AsNoTracking().SingleAsync(r => r.RegistrationId == registration.RegistrationId);
         UserProfile updatedProfile = await db.UserProfiles.AsNoTracking().SingleAsync(p => p.AccountId == owner.Id);
+        Assert.False(updatedRace.IsDeleted);
+        Assert.Equal(RegistrationStatus.Pending, updatedReg.Status);
+        Assert.Equal(0, updatedProfile.Balance);
+    }
+
+    [Fact]
+    public async Task DeleteRaceAsync_NoActiveRegistrations_SoftDeletes()
+    {
+        using HorseRacingDataContext db = CreateContext();
+        Racecourse racecourse = NewRacecourse();
+        Account owner = NewAccount(AccountRole.HorseOwner);
+        Account jockey = NewAccount(AccountRole.Jockey);
+        Horse horse = NewHorse(owner.Id);
+        var race = new Race { RaceId = Guid.NewGuid(), RacecourseId = racecourse.Id, Status = RaceStatus.Scheduled, StartTime = DateTimeOffset.UtcNow.AddHours(3), RegistrationFee = 15_000 };
+        var registration = new Registration { RegistrationId = Guid.NewGuid(), RaceId = race.RaceId, HorseId = horse.Id, JockeyId = jockey.Id, Status = RegistrationStatus.Rejected };
+        db.AddRange(racecourse, owner, jockey, horse, race, registration);
+        await db.SaveChangesAsync();
+        RaceService service = CreateService(db);
+
+        await service.DeleteRaceAsync(race.RaceId);
+
+        Race updatedRace = await db.Races.AsNoTracking().SingleAsync(r => r.RaceId == race.RaceId);
         Assert.True(updatedRace.IsDeleted);
-        Assert.Equal(RegistrationStatus.Rejected, updatedReg.Status);
-        Assert.Equal(15_000, updatedProfile.Balance);
     }
 
     [Fact]
