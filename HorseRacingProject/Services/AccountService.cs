@@ -111,7 +111,7 @@ namespace HorseRacingAPI.Services
 
             List<Account> accounts = await accRepo.Entities
                 .Where(a => a.RequestedRole != null && !a.IsDeleted)
-                .OrderBy(a => a.UpdatedAt)
+                .OrderByDescending(a => a.UpdatedAt)
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
                 .ToListAsync();
