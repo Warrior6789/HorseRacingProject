@@ -13,10 +13,12 @@ namespace HorseRacingAPI.Controllers;
 public class PaymentsController : ControllerBase
 {
     private readonly IPaymentService _paymentService;
+    private readonly ILogger<PaymentsController> _logger;
 
-    public PaymentsController(IPaymentService paymentService)
+    public PaymentsController(IPaymentService paymentService, ILogger<PaymentsController> logger)
     {
         _paymentService = paymentService;
+        _logger = logger;
     }
 
     [Authorize]
@@ -39,16 +41,26 @@ public class PaymentsController : ControllerBase
     [HttpPost("webhook")]
     public async Task<IActionResult> Webhook()
     {
+        string body = string.Empty;
         try
         {
             using var reader = new System.IO.StreamReader(Request.Body);
-            string body = await reader.ReadToEndAsync();
+            body = await reader.ReadToEndAsync();
             var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
             var webhookBody = JsonSerializer.Deserialize<Webhook>(body, options);
-            if (webhookBody != null)
+            if (webhookBody == null)
+            {
+                _logger.LogWarning("PayOS webhook: could not deserialize body: {Body}", body);
+            }
+            else
+            {
                 await _paymentService.ProcessWebhookAsync(webhookBody);
+            }
         }
-        catch { }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "PayOS webhook processing failed. Body: {Body}", body);
+        }
         return Ok(new { success = true });
     }
 
