@@ -304,4 +304,28 @@ public class HorseServiceTests
         Assert.Equal("Healthy1", result.Items[0].HorseName);
     }
 
+    [Fact]
+    public async Task GetOwnerRaceHistoryAsync_FinishedRaceWithoutPrize_StillAppearsWithNullEarnings()
+    {
+        using HorseRacingDataContext db = CreateContext();
+        Account owner = NewAccount(AccountRole.HorseOwner);
+        Account jockeyAccount = NewAccount(AccountRole.Jockey);
+        var racecourse = new Racecourse { Id = Guid.NewGuid(), RacecourseName = "Track" };
+        var horse = new Horse { Id = Guid.NewGuid(), OwnerId = owner.Id, HorseName = "Shadow", Status = HorseStatus.Healthy };
+        var race = new Race { RaceId = Guid.NewGuid(), RacecourseId = racecourse.Id, Status = RaceStatus.Finished, RaceName = "No Purse Cup", StartTime = DateTimeOffset.UtcNow.AddDays(-1), PrizePool = 0m };
+        var registration = new Registration { RegistrationId = Guid.NewGuid(), RaceId = race.RaceId, HorseId = horse.Id, JockeyId = jockeyAccount.Id, Status = RegistrationStatus.Confirmed };
+        var raceResult = new RaceResult { ResultId = Guid.NewGuid(), RegistrationId = registration.RegistrationId, FinishPosition = 4 };
+        db.AddRange(owner, jockeyAccount, racecourse, horse, race, registration, raceResult);
+        await db.SaveChangesAsync();
+
+        HorseService service = CreateService(db);
+
+        PagedResponse<OwnerRaceHistoryItemResponse> result = await service.GetOwnerRaceHistoryAsync(owner.Id, page: 1, pageSize: 10);
+
+        Assert.Single(result.Items);
+        Assert.Equal(4, result.Items[0].Position);
+        Assert.Null(result.Items[0].Earnings);
+        Assert.Equal("No Purse Cup", result.Items[0].RaceName);
+    }
+
 }

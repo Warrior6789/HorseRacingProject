@@ -342,30 +342,32 @@ namespace HorseRacingAPI.Services
             if (pageSize < 1) pageSize = 10;
             if (pageSize > 100) pageSize = 100;
 
-            IQueryable<Prize> query = _uow.GetRepository<Prize>().Entities
-                .Where(p => p.PrizeType == PrizeType.Owner && p.Registration.Horse.OwnerId == ownerId);
+            IQueryable<Registration> query = _uow.GetRepository<Registration>().Entities
+                .Where(r => r.Horse.OwnerId == ownerId
+                    && r.Status == RegistrationStatus.Confirmed
+                    && r.Race.Status == RaceStatus.Finished);
 
             int totalCount = await query.CountAsync();
 
             List<OwnerRaceHistoryItemResponse> items = await query
-                .OrderByDescending(p => p.DistributedAt ?? DateTimeOffset.MinValue)
+                .OrderByDescending(r => r.Race.StartTime)
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
-                .Select(p => new OwnerRaceHistoryItemResponse
+                .Select(r => new OwnerRaceHistoryItemResponse
                 {
-                    RegistrationId = p.RegistrationId,
-                    RaceId = p.Registration.RaceId,
-                    Date = p.Registration.Race.StartTime,
-                    RaceName = p.Registration.Race.RaceName,
-                    RaceNumber = p.Registration.Race.RaceNumber,
-                    HorseId = p.Registration.HorseId,
-                    HorseName = p.Registration.Horse.HorseName,
-                    HorseImageUrl = p.Registration.Horse.ImageUrl,
-                    JockeyName = p.Registration.Jockey.JockeyProfile != null ? p.Registration.Jockey.JockeyProfile.FullName : null,
-                    RacecourseName = p.Registration.Race.Racecourse.RacecourseName,
-                    TrackType = p.Registration.Race.Racecourse.TrackType,
-                    Position = p.Registration.RaceResult != null ? p.Registration.RaceResult.FinishPosition : null,
-                    Earnings = p.Amount
+                    RegistrationId = r.RegistrationId,
+                    RaceId = r.RaceId,
+                    Date = r.Race.StartTime,
+                    RaceName = r.Race.RaceName,
+                    RaceNumber = r.Race.RaceNumber,
+                    HorseId = r.HorseId,
+                    HorseName = r.Horse.HorseName,
+                    HorseImageUrl = r.Horse.ImageUrl,
+                    JockeyName = r.Jockey.JockeyProfile != null ? r.Jockey.JockeyProfile.FullName : null,
+                    RacecourseName = r.Race.Racecourse.RacecourseName,
+                    TrackType = r.Race.Racecourse.TrackType,
+                    Position = r.RaceResult != null ? r.RaceResult.FinishPosition : null,
+                    Earnings = r.Prizes.Where(p => p.PrizeType == PrizeType.Owner).Select(p => (decimal?)p.Amount).FirstOrDefault()
                 })
                 .ToListAsync();
 
