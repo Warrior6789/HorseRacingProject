@@ -109,6 +109,7 @@ namespace HorseRacingAPI.Services
 
                 HashSet<Guid> startedRacecourses = new();
                 List<Guid> cancelledRaceIds = new();
+                List<Guid> startedRaceIds = new();
 
                 foreach (Race r in toStart)
                 {
@@ -152,6 +153,7 @@ namespace HorseRacingAPI.Services
                     r.Status = RaceStatus.Live;
                     await uow.GetRepository<Race>().UpdateAsync(r);
                     startedRacecourses.Add(r.RacecourseId);
+                    startedRaceIds.Add(r.RaceId);
                 }
 
                 if (toOpen.Count > 0 || toClose.Count > 0 || toStart.Count > 0 || cancelledRaceIds.Count > 0)
@@ -165,6 +167,9 @@ namespace HorseRacingAPI.Services
                     await RefundBetsAsync(uow, cancelledId);
                     await RefundRegistrationFeesAsync(uow, cancelledId);
                 }
+
+                foreach (Guid startedId in startedRaceIds)
+                    await AutoRejectPendingRegistrationsAsync(scope, startedId);
 
                 List<Race> liveRaces = await uow.GetRepository<Race>().Entities
                     .Where(r => r.Status == RaceStatus.Live && !r.IsDeleted)
@@ -399,6 +404,23 @@ namespace HorseRacingAPI.Services
                     newBalance,
                     reason = "RefundRegistrationFee"
                 });
+        }
+
+        private async Task AutoRejectPendingRegistrationsAsync(IServiceScope scope, Guid raceId)
+        {
+            IUnitofWork uow = scope.ServiceProvider.GetRequiredService<IUnitofWork>();
+
+            List<Guid> pendingRegistrationIds = await uow.GetRepository<Registration>().Entities
+                .Where(r => r.RaceId == raceId && r.Status == RegistrationStatus.Pending)
+                .Select(r => r.RegistrationId)
+                .ToListAsync();
+
+            if (pendingRegistrationIds.Count == 0)
+                return;
+
+            IRegistrationService registrationService = scope.ServiceProvider.GetRequiredService<IRegistrationService>();
+            foreach (Guid registrationId in pendingRegistrationIds)
+                await registrationService.AdminRejectRegistrationAsync(registrationId);
         }
 
         private async Task RefundBetsAsync(IUnitofWork uow, Guid raceId)
