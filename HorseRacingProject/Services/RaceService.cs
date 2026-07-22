@@ -419,7 +419,7 @@ namespace HorseRacingAPI.Services
                 ownerProfile = await _uow.GetRepository<UserProfile>().Entities
                     .FirstOrDefaultAsync(p => p.AccountId == ownerId && !p.IsDeleted);
                 if (ownerProfile == null || (ownerProfile.Balance ?? 0) < (long)race.RegistrationFee)
-                    throw new InvalidOperationException($"Insufficient balance. Registration fee is {race.RegistrationFee} coins.");
+                    throw new InvalidOperationException($"Insufficient balance. Registration fee is {race.RegistrationFee} VND.");
                 ownerProfile.Balance = (ownerProfile.Balance ?? 0) - (long)race.RegistrationFee;
                 ownerProfile.UpdatedAt = DateTimeOffset.UtcNow;
                 await _uow.GetRepository<UserProfile>().UpdateAsync(ownerProfile);

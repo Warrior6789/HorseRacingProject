@@ -80,7 +80,7 @@ namespace HorseRacingAPI.Services
                 throw new InvalidOperationException("Invalid bet type. Must be Win, Place, or Show.");
 
             if (req.BetAmount < MinBetAmount)
-                throw new InvalidOperationException($"Bet amount must be at least {MinBetAmount} coins.");
+                throw new InvalidOperationException($"Bet amount must be at least {MinBetAmount} VND.");
             bool profileExists = await _uow.GetRepository<UserProfile>().Entities
                 .AnyAsync(p => p.AccountId == spectatorId && !p.IsDeleted);
             if (!profileExists)
