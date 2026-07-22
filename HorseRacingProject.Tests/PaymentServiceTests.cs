@@ -44,8 +44,7 @@ public class PaymentServiceTests
             ["PayOS:ClientId"] = "test-client-id",
             ["PayOS:ApiKey"] = "test-api-key",
             ["PayOS:ChecksumKey"] = "test-checksum-key",
-            ["PayOS:ReturnUrl"] = "https://test.local/return",
-            ["PayOS:CancelUrl"] = "https://test.local/cancel"
+            ["PayOS:ReturnBaseUrl"] = "https://test.local"
         };
         return new ConfigurationBuilder().AddInMemoryCollection(configValues).Build();
     }
