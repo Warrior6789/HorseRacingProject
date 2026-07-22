@@ -52,18 +52,27 @@ namespace HorseRacingAPI.Services
             await _uow.GetRepository<Payment>().AddAsync(payment);
             await _uow.SaveAsync();
 
+            string walletUrl = _config["PayOS:ReturnBaseUrl"] + GetWalletPath(acctCheck.Role);
+
             CreatePaymentLinkRequest paymentData = new CreatePaymentLinkRequest
             {
                 OrderCode   = orderCode,
                 Amount      = (int)request.Amount,
                 Description = $"Nap tien {accountId.ToString("N")[..8]}",
-                ReturnUrl   = _config["PayOS:ReturnUrl"]!,
-                CancelUrl   = _config["PayOS:CancelUrl"]!
+                ReturnUrl   = walletUrl,
+                CancelUrl   = walletUrl
             };
 
             var result = await _payOS.PaymentRequests.CreateAsync(paymentData);
             return result.CheckoutUrl;
         }
+
+        private static string GetWalletPath(AccountRole role) => role switch
+        {
+            AccountRole.HorseOwner => "/owner/wallet",
+            AccountRole.Jockey     => "/jockey/wallet",
+            _                      => "/spectator/wallet"
+        };
 
         public async Task<PaymentResponse> ProcessWebhookAsync(Webhook webhookBody)
         {
