@@ -36,13 +36,6 @@ namespace HorseRacingAPI.Controllers
             return Ok(ApiResponse<object>.SuccessResponse("Account suspended successfully."));
         }
 
-        [HttpPut("{accountId}/ban")]
-        public async Task<IActionResult> BanAccount(Guid accountId)
-        {
-            await _accountService.BanAccountAsync(accountId);
-            return Ok(ApiResponse<object>.SuccessResponse("Account banned successfully."));
-        }
-
         [HttpPut("{accountId}/restore")]
         public async Task<IActionResult> RestoreAccount(Guid accountId)
         {

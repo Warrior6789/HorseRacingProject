@@ -137,20 +137,6 @@ public class AuthServiceTests
     }
 
     [Fact]
-    public async Task LoginAsync_BannedAccount_ThrowsInvalidOperation()
-    {
-        using HorseRacingDataContext db = CreateContext();
-        AuthService service = CreateService(db);
-        await service.RegisterAsync(NewRegisterDto("login2@test.com", "CorrectPass1"));
-        Account account = await db.Accounts.SingleAsync(a => a.Email == "login2@test.com");
-        account.Status = AccountStatus.Banned;
-        await db.SaveChangesAsync();
-
-        await Assert.ThrowsAsync<InvalidOperationException>(
-            () => service.LoginAsync(new LoginDto { Email = "login2@test.com", Password = "CorrectPass1" }));
-    }
-
-    [Fact]
     public async Task LoginAsync_SuspendedAccount_ReturnsNull()
     {
         using HorseRacingDataContext db = CreateContext();

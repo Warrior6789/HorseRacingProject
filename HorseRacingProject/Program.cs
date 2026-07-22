@@ -1,5 +1,6 @@
 using Guid = System.Guid;
 using HorseRacingAPI.Dtos;
+using HorseRacingAPI.Enums;
 using HorseRacingAPI.Hubs;
 using HorseRacingAPI.Middlewares;
 using HorseRacingAPI.Models;
@@ -10,6 +11,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -154,6 +156,22 @@ builder.Services.AddAuthentication(options =>
             if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/racehub"))
                 context.Token = accessToken;
             return Task.CompletedTask;
+        },
+        OnTokenValidated = async context =>
+        {
+            string? accountIdValue = context.Principal?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (!Guid.TryParse(accountIdValue, out Guid accountId))
+            {
+                context.Fail("Invalid token.");
+                return;
+            }
+
+            IUnitofWork uow = context.HttpContext.RequestServices.GetRequiredService<IUnitofWork>();
+            Account? account = await uow.GetRepository<Account>().Entities
+                .FirstOrDefaultAsync(a => a.Id == accountId && !a.IsDeleted);
+
+            if (account == null || account.Status != AccountStatus.Active)
+                context.Fail("This account is no longer active.");
         },
         OnChallenge = async context =>
         {

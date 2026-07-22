@@ -40,10 +40,6 @@ namespace HorseRacingAPI.Services
                 return null;
             }
             
-            if (acc.Status == AccountStatus.Banned)
-            {
-                throw new InvalidOperationException("Your account has been banned.");
-            }
             if (acc.Status != AccountStatus.Active)
             {
                 return null;

@@ -39,7 +39,22 @@ public class AccountServiceTests
     private static AccountService CreateService(HorseRacingDataContext db)
     {
         IUnitofWork uow = new UnitofWork(db);
-        return new AccountService(uow, CreateHubContext());
+        return new AccountService(uow, CreateHubContext(), CreateRegistrationServiceMock(), CreateRaceRefereeServiceMock());
+    }
+
+    private static IRegistrationService CreateRegistrationServiceMock()
+    {
+        var mock = new Mock<IRegistrationService>();
+        mock.Setup(s => s.ScratchHorseAsync(It.IsAny<Guid>())).Returns(Task.CompletedTask);
+        mock.Setup(s => s.AdminRejectRegistrationAsync(It.IsAny<Guid>())).Returns(Task.CompletedTask);
+        return mock.Object;
+    }
+
+    private static IRaceRefereeService CreateRaceRefereeServiceMock()
+    {
+        var mock = new Mock<IRaceRefereeService>();
+        mock.Setup(s => s.UnassignAsync(It.IsAny<Guid>())).Returns(Task.CompletedTask);
+        return mock.Object;
     }
 
     private static Account NewAccount(AccountRole role, AccountStatus status) => new Account
@@ -51,42 +66,6 @@ public class AccountServiceTests
         Status = status,
         CreateAt = DateTimeOffset.UtcNow
     };
-
-    [Fact]
-    public async Task BanAccountAsync_NotFound_ThrowsArgumentException()
-    {
-        using HorseRacingDataContext db = CreateContext();
-        AccountService service = CreateService(db);
-
-        await Assert.ThrowsAsync<ArgumentException>(() => service.BanAccountAsync(Guid.NewGuid()));
-    }
-
-    [Fact]
-    public async Task BanAccountAsync_AlreadyBanned_ThrowsInvalidOperation()
-    {
-        using HorseRacingDataContext db = CreateContext();
-        Account account = NewAccount(AccountRole.Spectator, AccountStatus.Banned);
-        db.Accounts.Add(account);
-        await db.SaveChangesAsync();
-        AccountService service = CreateService(db);
-
-        await Assert.ThrowsAsync<InvalidOperationException>(() => service.BanAccountAsync(account.Id));
-    }
-
-    [Fact]
-    public async Task BanAccountAsync_Valid_SetsStatusBanned()
-    {
-        using HorseRacingDataContext db = CreateContext();
-        Account account = NewAccount(AccountRole.Spectator, AccountStatus.Active);
-        db.Accounts.Add(account);
-        await db.SaveChangesAsync();
-        AccountService service = CreateService(db);
-
-        await service.BanAccountAsync(account.Id);
-
-        Account updated = await db.Accounts.AsNoTracking().SingleAsync(a => a.Id == account.Id);
-        Assert.Equal(AccountStatus.Banned, updated.Status);
-    }
 
     [Fact]
     public async Task RestoreAccountAsync_NotFound_ThrowsArgumentException()
@@ -137,7 +116,7 @@ public class AccountServiceTests
     public async Task SuspendAccountAsync_NotActive_ThrowsInvalidOperation()
     {
         using HorseRacingDataContext db = CreateContext();
-        Account account = NewAccount(AccountRole.Spectator, AccountStatus.Banned);
+        Account account = NewAccount(AccountRole.Spectator, AccountStatus.Suspended);
         db.Accounts.Add(account);
         await db.SaveChangesAsync();
         AccountService service = CreateService(db);

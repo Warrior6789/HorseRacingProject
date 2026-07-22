@@ -13,27 +13,15 @@ namespace HorseRacingAPI.Services
     {
         private readonly IUnitofWork _uow;
         private readonly IHubContext<RaceHub> _hubContext;
+        private readonly IRegistrationService _registrationService;
+        private readonly IRaceRefereeService _raceRefereeService;
 
-        public AccountService(IUnitofWork uow, IHubContext<RaceHub> hubContext)
+        public AccountService(IUnitofWork uow, IHubContext<RaceHub> hubContext, IRegistrationService registrationService, IRaceRefereeService raceRefereeService)
         {
             _uow = uow;
             _hubContext = hubContext;
-        }
-
-        public async Task BanAccountAsync(Guid id)
-        {
-            Account? account = await _uow.GetRepository<Account>().Entities.FirstOrDefaultAsync(a => a.Id == id && a.IsDeleted == false);
-            if(account == null)
-            {
-                throw new ArgumentException("Account not found");
-            }
-            if ((account.Status == AccountStatus.Banned))
-            {
-                throw new InvalidOperationException("Account is already banned.");
-            }
-            account.Status    = AccountStatus.Banned;
-            account.UpdatedAt = DateTimeOffset.UtcNow;
-            await _uow.SaveAsync();
+            _registrationService = registrationService;
+            _raceRefereeService = raceRefereeService;
         }
 
         public async Task<PagedResponse<AccountResponse>> GetAccountByStatusPagedAsync(string status, int page, int pageSize, string? role = null, string? search = null)
@@ -299,6 +287,29 @@ namespace HorseRacingAPI.Services
             account.Status    = AccountStatus.Suspended;
             account.UpdatedAt = DateTimeOffset.UtcNow;
             await _uow.SaveAsync();
+
+            var affectedRegistrations = await _uow.GetRepository<Registration>().Entities
+                .Where(r => (r.Horse.OwnerId == id || r.JockeyId == id)
+                    && r.Race.Status == RaceStatus.Scheduled
+                    && (r.Status == RegistrationStatus.Pending || r.Status == RegistrationStatus.Confirmed))
+                .Select(r => new { r.RegistrationId, r.Status })
+                .ToListAsync();
+
+            foreach (var registration in affectedRegistrations)
+            {
+                if (registration.Status == RegistrationStatus.Confirmed)
+                    await _registrationService.ScratchHorseAsync(registration.RegistrationId);
+                else
+                    await _registrationService.AdminRejectRegistrationAsync(registration.RegistrationId);
+            }
+
+            List<Guid> affectedRaceIds = await _uow.GetRepository<Race>().Entities
+                .Where(r => r.RefereeId == id && r.Status == RaceStatus.Scheduled)
+                .Select(r => r.RaceId)
+                .ToListAsync();
+
+            foreach (Guid raceId in affectedRaceIds)
+                await _raceRefereeService.UnassignAsync(raceId);
         }
     }
 }
