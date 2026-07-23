@@ -4,6 +4,6 @@ namespace HorseRacingAPI.Services
 {
     public interface IDashboardService
     {
-        Task<DashboardSummaryResponse> GetSummaryAsync(DateTimeOffset? from, DateTimeOffset? to);
+        Task<DashboardFinancialResponse> GetFinancialAsync(DateTimeOffset? from, DateTimeOffset? to, string bucket);
     }
 }

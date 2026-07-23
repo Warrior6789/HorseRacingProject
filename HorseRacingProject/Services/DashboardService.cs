@@ -16,26 +16,9 @@ namespace HorseRacingAPI.Services
             _uow = uow;
         }
 
-        public async Task<DashboardSummaryResponse> GetSummaryAsync(DateTimeOffset? from, DateTimeOffset? to)
+        public async Task<DashboardFinancialResponse> GetFinancialAsync(DateTimeOffset? from, DateTimeOffset? to, string bucket)
         {
-            var response = new DashboardSummaryResponse();
-
-            response.RacesByStatus = await _uow.GetRepository<Race>().Entities
-                .Where(r => !r.IsDeleted)
-                .GroupBy(r => r.Status)
-                .Select(g => new { Status = g.Key, Count = g.Count() })
-                .ToDictionaryAsync(x => x.Status.ToString(), x => x.Count);
-
-            response.AccountsByRole = await _uow.GetRepository<Account>().Entities
-                .Where(a => !a.IsDeleted)
-                .GroupBy(a => a.Role)
-                .Select(g => new { Role = g.Key, Count = g.Count() })
-                .ToDictionaryAsync(x => x.Role.ToString(), x => x.Count);
-
-            response.RegistrationsByStatus = await _uow.GetRepository<Registration>().Entities
-                .GroupBy(r => r.Status)
-                .Select(g => new { Status = g.Key, Count = g.Count() })
-                .ToDictionaryAsync(x => x.Status.ToString(), x => x.Count);
+            var response = new DashboardFinancialResponse();
 
             IQueryable<WalletTransaction> walletTxQuery = _uow.GetRepository<WalletTransaction>().Entities;
             if (from != null) walletTxQuery = walletTxQuery.Where(w => w.CreatedAt >= from);
@@ -56,27 +39,23 @@ namespace HorseRacingAPI.Services
 
             response.Financial.TotalTakeoutRevenue = await takeoutQuery.SumAsync(t => t.TakeoutAmount);
 
-            response.RevenueByDay = await takeoutQuery
-                .GroupBy(t => t.CreatedAt.Date)
-                .Select(g => new DailyRevenuePoint
-                {
-                    Date = DateOnly.FromDateTime(g.Key),
-                    TakeoutAmount = g.Sum(t => t.TakeoutAmount)
-                })
-                .OrderBy(p => p.Date)
+var deposits = await walletTxQuery
+                .Where(w => w.Type == WalletTransactionType.Deposit)
+                .Select(w => new { w.CreatedAt, w.Amount })
                 .ToListAsync();
 
-            response.TopHorses = await _uow.GetRepository<Horse>().Entities
-                .Where(h => !h.IsDeleted && h.RecordWins != null && h.RecordWins > 0)
-                .OrderByDescending(h => h.RecordWins)
-                .Take(5)
-                .Select(h => new TopHorseResponse
-                {
-                    HorseId = h.Id,
-                    HorseName = h.HorseName,
-                    RecordWins = h.RecordWins ?? 0
-                })
-                .ToListAsync();
+            Func<DateTimeOffset, DateTimeOffset> truncate = bucket?.ToLower() switch
+            {
+                "hour" => t => new DateTimeOffset(t.Year, t.Month, t.Day, t.Hour, 0, 0, t.Offset),
+                "month" => t => new DateTimeOffset(t.Year, t.Month, 1, 0, 0, 0, t.Offset),
+                _ => t => new DateTimeOffset(t.Year, t.Month, t.Day, 0, 0, 0, t.Offset)
+            };
+
+            response.DepositsByPeriod = deposits
+                .GroupBy(w => truncate(w.CreatedAt))
+                .Select(g => new DepositPoint { Timestamp = g.Key, Amount = g.Sum(w => (decimal)w.Amount) })
+                .OrderBy(p => p.Timestamp)
+                .ToList();
 
             return response;
         }

@@ -17,11 +17,11 @@ namespace HorseRacingAPI.Controllers
             _dashboardService = dashboardService;
         }
 
-        [HttpGet("summary")]
-        public async Task<IActionResult> GetSummary([FromQuery] DateTimeOffset? from, [FromQuery] DateTimeOffset? to)
+        [HttpGet("financial")]
+        public async Task<IActionResult> GetFinancial([FromQuery] DateTimeOffset? from, [FromQuery] DateTimeOffset? to, [FromQuery] string bucket = "day")
         {
-            DashboardSummaryResponse summary = await _dashboardService.GetSummaryAsync(from, to);
-            return Ok(ApiResponse<DashboardSummaryResponse>.SuccessResponse(summary, "Get dashboard summary successfully."));
+            DashboardFinancialResponse financial = await _dashboardService.GetFinancialAsync(from, to, bucket);
+            return Ok(ApiResponse<DashboardFinancialResponse>.SuccessResponse(financial, "Get dashboard financial summary successfully."));
         }
     }
 }
