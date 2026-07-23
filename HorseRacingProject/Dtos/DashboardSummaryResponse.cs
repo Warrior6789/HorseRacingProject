@@ -1,13 +1,9 @@
 namespace HorseRacingAPI.Dtos
 {
-    public class DashboardSummaryResponse
+    public class DashboardFinancialResponse
     {
-        public Dictionary<string, int> RacesByStatus { get; set; } = new();
-        public Dictionary<string, int> AccountsByRole { get; set; } = new();
-        public Dictionary<string, int> RegistrationsByStatus { get; set; } = new();
         public FinancialSummaryResponse Financial { get; set; } = new();
-        public List<DailyRevenuePoint> RevenueByDay { get; set; } = new();
-        public List<TopHorseResponse> TopHorses { get; set; } = new();
+        public List<DepositPoint> DepositsByPeriod { get; set; } = new();
     }
 
     public class FinancialSummaryResponse
@@ -20,16 +16,9 @@ namespace HorseRacingAPI.Dtos
         public decimal TotalTakeoutRevenue { get; set; }
     }
 
-    public class DailyRevenuePoint
+    public class DepositPoint
     {
-        public DateOnly Date { get; set; }
-        public decimal TakeoutAmount { get; set; }
-    }
-
-    public class TopHorseResponse
-    {
-        public Guid HorseId { get; set; }
-        public string HorseName { get; set; } = null!;
-        public int RecordWins { get; set; }
+        public DateTimeOffset Timestamp { get; set; }
+        public decimal Amount { get; set; }
     }
 }
