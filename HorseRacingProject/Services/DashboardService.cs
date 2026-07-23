@@ -52,12 +52,7 @@ var chartTypes = new[]
                 .Select(w => new { w.CreatedAt, w.Amount, w.Type })
                 .ToListAsync();
 
-            Func<DateTimeOffset, DateTimeOffset> truncate = bucket?.ToLower() switch
-            {
-                "hour" => t => new DateTimeOffset(t.Year, t.Month, t.Day, t.Hour, 0, 0, t.Offset),
-                "month" => t => new DateTimeOffset(t.Year, t.Month, 1, 0, 0, 0, t.Offset),
-                _ => t => new DateTimeOffset(t.Year, t.Month, t.Day, 0, 0, 0, t.Offset)
-            };
+            Func<DateTimeOffset, DateTimeOffset> truncate = GetTruncateFunc(bucket);
 
             var groupedByPeriod = chartTransactions
                 .GroupBy(w => truncate(w.CreatedAt))
@@ -116,5 +111,51 @@ var chartTypes = new[]
 
             return new BetTypeBreakdownResponse { ByType = byType };
         }
+
+        public async Task<TopHorsesResponse> GetTopHorsesAsync(int limit)
+        {
+            List<TopHorseEntry> horses = await _uow.GetRepository<Horse>().Entities
+                .Where(h => !h.IsDeleted)
+                .OrderByDescending(h => h.RecordWins)
+                .Take(limit)
+                .Select(h => new TopHorseEntry
+                {
+                    HorseId = h.Id,
+                    HorseName = h.HorseName,
+                    RecordWins = h.RecordWins ?? 0
+                })
+                .ToListAsync();
+
+            return new TopHorsesResponse { Horses = horses };
+        }
+
+        public async Task<SignupsResponse> GetSignupsAsync(DateTimeOffset? from, DateTimeOffset? to, string bucket)
+        {
+            IQueryable<Account> accountQuery = _uow.GetRepository<Account>().Entities
+                .Where(a => a.CreateAt != null);
+            if (from != null) accountQuery = accountQuery.Where(a => a.CreateAt >= from);
+            if (to != null) accountQuery = accountQuery.Where(a => a.CreateAt < to);
+
+            List<DateTimeOffset> signupTimestamps = await accountQuery
+                .Select(a => a.CreateAt!.Value)
+                .ToListAsync();
+
+            Func<DateTimeOffset, DateTimeOffset> truncate = GetTruncateFunc(bucket);
+
+            List<SignupPoint> signupsByPeriod = signupTimestamps
+                .GroupBy(t => truncate(t))
+                .Select(g => new SignupPoint { Timestamp = g.Key, Count = g.Count() })
+                .OrderBy(p => p.Timestamp)
+                .ToList();
+
+            return new SignupsResponse { SignupsByPeriod = signupsByPeriod };
+        }
+
+        private static Func<DateTimeOffset, DateTimeOffset> GetTruncateFunc(string bucket) => bucket?.ToLower() switch
+        {
+            "hour" => t => new DateTimeOffset(t.Year, t.Month, t.Day, t.Hour, 0, 0, t.Offset),
+            "month" => t => new DateTimeOffset(t.Year, t.Month, 1, 0, 0, 0, t.Offset),
+            _ => t => new DateTimeOffset(t.Year, t.Month, t.Day, 0, 0, 0, t.Offset)
+        };
     }
 }

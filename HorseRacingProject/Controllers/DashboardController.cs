@@ -37,5 +37,19 @@ namespace HorseRacingAPI.Controllers
             BetTypeBreakdownResponse breakdown = await _dashboardService.GetBetTypeBreakdownAsync();
             return Ok(ApiResponse<BetTypeBreakdownResponse>.SuccessResponse(breakdown, "Get bet type breakdown successfully."));
         }
+
+        [HttpGet("top-horses")]
+        public async Task<IActionResult> GetTopHorses([FromQuery] int limit = 10)
+        {
+            TopHorsesResponse topHorses = await _dashboardService.GetTopHorsesAsync(limit);
+            return Ok(ApiResponse<TopHorsesResponse>.SuccessResponse(topHorses, "Get top horses successfully."));
+        }
+
+        [HttpGet("signups")]
+        public async Task<IActionResult> GetSignups([FromQuery] DateTimeOffset? from, [FromQuery] DateTimeOffset? to, [FromQuery] string bucket = "day")
+        {
+            SignupsResponse signups = await _dashboardService.GetSignupsAsync(from, to, bucket);
+            return Ok(ApiResponse<SignupsResponse>.SuccessResponse(signups, "Get signups by period successfully."));
+        }
     }
 }
