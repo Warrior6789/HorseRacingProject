@@ -31,4 +31,16 @@ namespace HorseRacingAPI.Dtos
         public decimal BetPayout { get; set; }
         public decimal PrizePayout { get; set; }
     }
+
+    public class RaceStatusBreakdownResponse
+    {
+        public int TotalRaces { get; set; }
+        public List<RaceStatusCount> ByStatus { get; set; } = new();
+    }
+
+    public class RaceStatusCount
+    {
+        public string Status { get; set; } = string.Empty;
+        public int Count { get; set; }
+    }
 }

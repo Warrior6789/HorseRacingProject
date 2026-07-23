@@ -85,5 +85,19 @@ var chartTypes = new[]
 
             return response;
         }
+
+        public async Task<RaceStatusBreakdownResponse> GetRaceStatusBreakdownAsync()
+        {
+            List<RaceStatusCount> byStatus = await _uow.GetRepository<Race>().Entities
+                .GroupBy(r => r.Status)
+                .Select(g => new RaceStatusCount { Status = g.Key.ToString(), Count = g.Count() })
+                .ToListAsync();
+
+            return new RaceStatusBreakdownResponse
+            {
+                TotalRaces = byStatus.Sum(s => s.Count),
+                ByStatus = byStatus
+            };
+        }
     }
 }
