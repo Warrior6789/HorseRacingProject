@@ -80,4 +80,32 @@ public class DashboardServiceIntegrationTests
         Assert.Equal(300_000, result.Financial.TotalPrizePayouts);
         Assert.Equal(1_000_000, result.Financial.TotalBetsPlaced);
     }
+
+    [Fact]
+    public async Task GetRaceStatusBreakdownAsync_GroupsRacesByStatus()
+    {
+        await using HorseRacingDataContext db = await CreateContextAsync();
+
+        var racecourse = new Racecourse { Id = Guid.NewGuid(), RacecourseName = "Test Racecourse" };
+        db.Add(racecourse);
+
+        db.AddRange(
+            new Race { RaceId = Guid.NewGuid(), RacecourseId = racecourse.Id, Status = RaceStatus.Scheduled },
+            new Race { RaceId = Guid.NewGuid(), RacecourseId = racecourse.Id, Status = RaceStatus.Scheduled },
+            new Race { RaceId = Guid.NewGuid(), RacecourseId = racecourse.Id, Status = RaceStatus.Live },
+            new Race { RaceId = Guid.NewGuid(), RacecourseId = racecourse.Id, Status = RaceStatus.Finished },
+            new Race { RaceId = Guid.NewGuid(), RacecourseId = racecourse.Id, Status = RaceStatus.Cancelled }
+        );
+        await db.SaveChangesAsync();
+
+        var service = new DashboardService(new UnitofWork(db));
+        HorseRacingAPI.Dtos.RaceStatusBreakdownResponse result = await service.GetRaceStatusBreakdownAsync();
+
+        Assert.Equal(5, result.TotalRaces);
+        Assert.Equal(4, result.ByStatus.Count);
+        Assert.Equal(2, result.ByStatus.Single(s => s.Status == nameof(RaceStatus.Scheduled)).Count);
+        Assert.Equal(1, result.ByStatus.Single(s => s.Status == nameof(RaceStatus.Live)).Count);
+        Assert.Equal(1, result.ByStatus.Single(s => s.Status == nameof(RaceStatus.Finished)).Count);
+        Assert.Equal(1, result.ByStatus.Single(s => s.Status == nameof(RaceStatus.Cancelled)).Count);
+    }
 }

@@ -23,5 +23,12 @@ namespace HorseRacingAPI.Controllers
             DashboardFinancialResponse financial = await _dashboardService.GetFinancialAsync(from, to, bucket);
             return Ok(ApiResponse<DashboardFinancialResponse>.SuccessResponse(financial, "Get dashboard financial summary successfully."));
         }
+
+        [HttpGet("races-by-status")]
+        public async Task<IActionResult> GetRaceStatusBreakdown()
+        {
+            RaceStatusBreakdownResponse breakdown = await _dashboardService.GetRaceStatusBreakdownAsync();
+            return Ok(ApiResponse<RaceStatusBreakdownResponse>.SuccessResponse(breakdown, "Get race status breakdown successfully."));
+        }
     }
 }
