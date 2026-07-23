@@ -4,6 +4,7 @@ namespace HorseRacingAPI.Dtos
     {
         public FinancialSummaryResponse Financial { get; set; } = new();
         public List<DepositPoint> DepositsByPeriod { get; set; } = new();
+        public List<TransactionPeriodPoint> TransactionsByPeriod { get; set; } = new();
     }
 
     public class FinancialSummaryResponse
@@ -20,5 +21,14 @@ namespace HorseRacingAPI.Dtos
     {
         public DateTimeOffset Timestamp { get; set; }
         public decimal Amount { get; set; }
+    }
+
+    public class TransactionPeriodPoint
+    {
+        public DateTimeOffset Timestamp { get; set; }
+        public decimal Deposit { get; set; }
+        public decimal Withdrawal { get; set; }
+        public decimal BetPayout { get; set; }
+        public decimal PrizePayout { get; set; }
     }
 }

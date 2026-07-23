@@ -39,9 +39,17 @@ namespace HorseRacingAPI.Services
 
             response.Financial.TotalTakeoutRevenue = await takeoutQuery.SumAsync(t => t.TakeoutAmount);
 
-var deposits = await walletTxQuery
-                .Where(w => w.Type == WalletTransactionType.Deposit)
-                .Select(w => new { w.CreatedAt, w.Amount })
+var chartTypes = new[]
+            {
+                WalletTransactionType.Deposit,
+                WalletTransactionType.Withdrawal,
+                WalletTransactionType.BetPayout,
+                WalletTransactionType.PrizePayout
+            };
+
+            var chartTransactions = await walletTxQuery
+                .Where(w => chartTypes.Contains(w.Type))
+                .Select(w => new { w.CreatedAt, w.Amount, w.Type })
                 .ToListAsync();
 
             Func<DateTimeOffset, DateTimeOffset> truncate = bucket?.ToLower() switch
@@ -51,10 +59,28 @@ var deposits = await walletTxQuery
                 _ => t => new DateTimeOffset(t.Year, t.Month, t.Day, 0, 0, 0, t.Offset)
             };
 
-            response.DepositsByPeriod = deposits
+            var groupedByPeriod = chartTransactions
                 .GroupBy(w => truncate(w.CreatedAt))
-                .Select(g => new DepositPoint { Timestamp = g.Key, Amount = g.Sum(w => (decimal)w.Amount) })
-                .OrderBy(p => p.Timestamp)
+                .OrderBy(g => g.Key)
+                .ToList();
+
+            response.DepositsByPeriod = groupedByPeriod
+                .Select(g => new DepositPoint
+                {
+                    Timestamp = g.Key,
+                    Amount = g.Where(w => w.Type == WalletTransactionType.Deposit).Sum(w => (decimal)w.Amount)
+                })
+                .ToList();
+
+            response.TransactionsByPeriod = groupedByPeriod
+                .Select(g => new TransactionPeriodPoint
+                {
+                    Timestamp = g.Key,
+                    Deposit = g.Where(w => w.Type == WalletTransactionType.Deposit).Sum(w => (decimal)w.Amount),
+                    Withdrawal = g.Where(w => w.Type == WalletTransactionType.Withdrawal).Sum(w => (decimal)Math.Abs(w.Amount)),
+                    BetPayout = g.Where(w => w.Type == WalletTransactionType.BetPayout).Sum(w => (decimal)w.Amount),
+                    PrizePayout = g.Where(w => w.Type == WalletTransactionType.PrizePayout).Sum(w => (decimal)w.Amount)
+                })
                 .ToList();
 
             return response;
