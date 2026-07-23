@@ -84,6 +84,7 @@ namespace HorseRacingAPI.Services
             account.Status    = AccountStatus.Active;
             account.UpdatedAt = DateTimeOffset.UtcNow;
             await _uow.SaveAsync();
+            await _hubContext.Clients.All.SendAsync("AccountsUpdated", new { accountId = id, status = account.Status.ToString() });
         }
 
         public async Task<PagedResponse<UpgradeRequestResponse>> GetRoleUpgradeRequestsPagedAsync(int page, int pageSize)
@@ -310,6 +311,8 @@ namespace HorseRacingAPI.Services
 
             foreach (Guid raceId in affectedRaceIds)
                 await _raceRefereeService.UnassignAsync(raceId);
+
+            await _hubContext.Clients.All.SendAsync("AccountsUpdated", new { accountId = id, status = account.Status.ToString() });
         }
     }
 }
