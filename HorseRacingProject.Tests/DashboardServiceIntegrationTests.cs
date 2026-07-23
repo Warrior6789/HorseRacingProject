@@ -158,4 +158,53 @@ public class DashboardServiceIntegrationTests
         Assert.Equal(1, placeRow.Count);
         Assert.Equal(5_000, placeRow.TotalAmount);
     }
+
+    [Fact]
+    public async Task GetTopHorsesAsync_OrdersByRecordWinsAndExcludesDeleted()
+    {
+        await using HorseRacingDataContext db = await CreateContextAsync();
+
+        var owner = new Account { Id = Guid.NewGuid(), Email = "owner2@example.com", PasswordHash = "x", Role = AccountRole.HorseOwner, Status = AccountStatus.Active };
+        db.Add(owner);
+
+        db.AddRange(
+            new Horse { Id = Guid.NewGuid(), OwnerId = owner.Id, HorseName = "Bronze", Status = HorseStatus.Healthy, RecordWins = 3 },
+            new Horse { Id = Guid.NewGuid(), OwnerId = owner.Id, HorseName = "Gold",   Status = HorseStatus.Healthy, RecordWins = 10 },
+            new Horse { Id = Guid.NewGuid(), OwnerId = owner.Id, HorseName = "Silver", Status = HorseStatus.Healthy, RecordWins = 7 },
+            new Horse { Id = Guid.NewGuid(), OwnerId = owner.Id, HorseName = "Deleted", Status = HorseStatus.Healthy, RecordWins = 99, IsDeleted = true }
+        );
+        await db.SaveChangesAsync();
+
+        var service = new DashboardService(new UnitofWork(db));
+        HorseRacingAPI.Dtos.TopHorsesResponse result = await service.GetTopHorsesAsync(2);
+
+        Assert.Equal(2, result.Horses.Count);
+        Assert.Equal("Gold", result.Horses[0].HorseName);
+        Assert.Equal(10, result.Horses[0].RecordWins);
+        Assert.Equal("Silver", result.Horses[1].HorseName);
+        Assert.Equal(7, result.Horses[1].RecordWins);
+    }
+
+    [Fact]
+    public async Task GetSignupsAsync_BucketsAccountsByDay()
+    {
+        await using HorseRacingDataContext db = await CreateContextAsync();
+
+        var day1 = new DateTimeOffset(2026, 7, 20, 10, 0, 0, TimeSpan.Zero);
+        var day2 = new DateTimeOffset(2026, 7, 21, 10, 0, 0, TimeSpan.Zero);
+
+        db.AddRange(
+            new Account { Id = Guid.NewGuid(), Email = "a1@example.com", PasswordHash = "x", Role = AccountRole.Spectator, Status = AccountStatus.Active, CreateAt = day1 },
+            new Account { Id = Guid.NewGuid(), Email = "a2@example.com", PasswordHash = "x", Role = AccountRole.Spectator, Status = AccountStatus.Active, CreateAt = day1 },
+            new Account { Id = Guid.NewGuid(), Email = "a3@example.com", PasswordHash = "x", Role = AccountRole.Spectator, Status = AccountStatus.Active, CreateAt = day2 }
+        );
+        await db.SaveChangesAsync();
+
+        var service = new DashboardService(new UnitofWork(db));
+        HorseRacingAPI.Dtos.SignupsResponse result = await service.GetSignupsAsync(null, null, "day");
+
+        Assert.Equal(2, result.SignupsByPeriod.Count);
+        Assert.Equal(2, result.SignupsByPeriod[0].Count);
+        Assert.Equal(1, result.SignupsByPeriod[1].Count);
+    }
 }

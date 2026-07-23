@@ -55,4 +55,27 @@ namespace HorseRacingAPI.Dtos
         public int Count { get; set; }
         public decimal TotalAmount { get; set; }
     }
+
+    public class TopHorsesResponse
+    {
+        public List<TopHorseEntry> Horses { get; set; } = new();
+    }
+
+    public class TopHorseEntry
+    {
+        public Guid HorseId { get; set; }
+        public string HorseName { get; set; } = string.Empty;
+        public int RecordWins { get; set; }
+    }
+
+    public class SignupsResponse
+    {
+        public List<SignupPoint> SignupsByPeriod { get; set; } = new();
+    }
+
+    public class SignupPoint
+    {
+        public DateTimeOffset Timestamp { get; set; }
+        public int Count { get; set; }
+    }
 }
