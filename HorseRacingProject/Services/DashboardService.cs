@@ -89,6 +89,7 @@ var chartTypes = new[]
         public async Task<RaceStatusBreakdownResponse> GetRaceStatusBreakdownAsync()
         {
             List<RaceStatusCount> byStatus = await _uow.GetRepository<Race>().Entities
+                .Where(r => !r.IsDeleted)
                 .GroupBy(r => r.Status)
                 .Select(g => new RaceStatusCount { Status = g.Key.ToString(), Count = g.Count() })
                 .ToListAsync();
@@ -98,6 +99,22 @@ var chartTypes = new[]
                 TotalRaces = byStatus.Sum(s => s.Count),
                 ByStatus = byStatus
             };
+        }
+
+        public async Task<BetTypeBreakdownResponse> GetBetTypeBreakdownAsync()
+        {
+            List<BetTypeCount> byType = await _uow.GetRepository<Bet>().Entities
+                .Where(b => b.BetType != null)
+                .GroupBy(b => b.BetType)
+                .Select(g => new BetTypeCount
+                {
+                    BetType = g.Key!.ToString()!,
+                    Count = g.Count(),
+                    TotalAmount = g.Sum(b => b.BetAmount)
+                })
+                .ToListAsync();
+
+            return new BetTypeBreakdownResponse { ByType = byType };
         }
     }
 }
