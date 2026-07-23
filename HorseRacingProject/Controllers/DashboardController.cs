@@ -30,5 +30,12 @@ namespace HorseRacingAPI.Controllers
             RaceStatusBreakdownResponse breakdown = await _dashboardService.GetRaceStatusBreakdownAsync();
             return Ok(ApiResponse<RaceStatusBreakdownResponse>.SuccessResponse(breakdown, "Get race status breakdown successfully."));
         }
+
+        [HttpGet("bets-by-type")]
+        public async Task<IActionResult> GetBetTypeBreakdown()
+        {
+            BetTypeBreakdownResponse breakdown = await _dashboardService.GetBetTypeBreakdownAsync();
+            return Ok(ApiResponse<BetTypeBreakdownResponse>.SuccessResponse(breakdown, "Get bet type breakdown successfully."));
+        }
     }
 }

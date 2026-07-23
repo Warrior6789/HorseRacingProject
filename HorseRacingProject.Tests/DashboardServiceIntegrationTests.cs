@@ -94,7 +94,8 @@ public class DashboardServiceIntegrationTests
             new Race { RaceId = Guid.NewGuid(), RacecourseId = racecourse.Id, Status = RaceStatus.Scheduled },
             new Race { RaceId = Guid.NewGuid(), RacecourseId = racecourse.Id, Status = RaceStatus.Live },
             new Race { RaceId = Guid.NewGuid(), RacecourseId = racecourse.Id, Status = RaceStatus.Finished },
-            new Race { RaceId = Guid.NewGuid(), RacecourseId = racecourse.Id, Status = RaceStatus.Cancelled }
+            new Race { RaceId = Guid.NewGuid(), RacecourseId = racecourse.Id, Status = RaceStatus.Cancelled },
+            new Race { RaceId = Guid.NewGuid(), RacecourseId = racecourse.Id, Status = RaceStatus.Scheduled, IsDeleted = true }
         );
         await db.SaveChangesAsync();
 
@@ -107,5 +108,54 @@ public class DashboardServiceIntegrationTests
         Assert.Equal(1, result.ByStatus.Single(s => s.Status == nameof(RaceStatus.Live)).Count);
         Assert.Equal(1, result.ByStatus.Single(s => s.Status == nameof(RaceStatus.Finished)).Count);
         Assert.Equal(1, result.ByStatus.Single(s => s.Status == nameof(RaceStatus.Cancelled)).Count);
+    }
+
+    [Fact]
+    public async Task GetBetTypeBreakdownAsync_GroupsBetsByType()
+    {
+        await using HorseRacingDataContext db = await CreateContextAsync();
+
+        var owner    = new Account { Id = Guid.NewGuid(), Email = "owner@example.com",    PasswordHash = "x", Role = AccountRole.HorseOwner, Status = AccountStatus.Active };
+        var jockey   = new Account { Id = Guid.NewGuid(), Email = "jockey@example.com",   PasswordHash = "x", Role = AccountRole.Jockey,     Status = AccountStatus.Active };
+        var spectator = new Account { Id = Guid.NewGuid(), Email = "spectator@example.com", PasswordHash = "x", Role = AccountRole.Spectator, Status = AccountStatus.Active };
+        db.AddRange(owner, jockey, spectator);
+
+        var racecourse = new Racecourse { Id = Guid.NewGuid(), RacecourseName = "Test Racecourse" };
+        db.Add(racecourse);
+
+        var race = new Race { RaceId = Guid.NewGuid(), RacecourseId = racecourse.Id, Status = RaceStatus.Finished };
+        db.Add(race);
+
+        var horse = new Horse { Id = Guid.NewGuid(), OwnerId = owner.Id, HorseName = "Test Horse", Status = HorseStatus.Healthy };
+        db.Add(horse);
+
+        var registration = new Registration
+        {
+            RegistrationId = Guid.NewGuid(),
+            RaceId = race.RaceId,
+            HorseId = horse.Id,
+            JockeyId = jockey.Id,
+            Status = RegistrationStatus.Confirmed
+        };
+        db.Add(registration);
+
+        db.AddRange(
+            new Bet { BetId = Guid.NewGuid(), SpectatorId = spectator.Id, RegistrationId = registration.RegistrationId, BetAmount = 10_000, BetType = BetType.Win, Status = BetStatus.Won },
+            new Bet { BetId = Guid.NewGuid(), SpectatorId = spectator.Id, RegistrationId = registration.RegistrationId, BetAmount = 20_000, BetType = BetType.Win, Status = BetStatus.Lost },
+            new Bet { BetId = Guid.NewGuid(), SpectatorId = spectator.Id, RegistrationId = registration.RegistrationId, BetAmount = 5_000,  BetType = BetType.Place, Status = BetStatus.Won }
+        );
+        await db.SaveChangesAsync();
+
+        var service = new DashboardService(new UnitofWork(db));
+        HorseRacingAPI.Dtos.BetTypeBreakdownResponse result = await service.GetBetTypeBreakdownAsync();
+
+        Assert.Equal(2, result.ByType.Count);
+        HorseRacingAPI.Dtos.BetTypeCount winRow = result.ByType.Single(t => t.BetType == nameof(BetType.Win));
+        Assert.Equal(2, winRow.Count);
+        Assert.Equal(30_000, winRow.TotalAmount);
+
+        HorseRacingAPI.Dtos.BetTypeCount placeRow = result.ByType.Single(t => t.BetType == nameof(BetType.Place));
+        Assert.Equal(1, placeRow.Count);
+        Assert.Equal(5_000, placeRow.TotalAmount);
     }
 }

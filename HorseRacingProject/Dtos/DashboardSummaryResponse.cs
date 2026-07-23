@@ -43,4 +43,16 @@ namespace HorseRacingAPI.Dtos
         public string Status { get; set; } = string.Empty;
         public int Count { get; set; }
     }
+
+    public class BetTypeBreakdownResponse
+    {
+        public List<BetTypeCount> ByType { get; set; } = new();
+    }
+
+    public class BetTypeCount
+    {
+        public string BetType { get; set; } = string.Empty;
+        public int Count { get; set; }
+        public decimal TotalAmount { get; set; }
+    }
 }
