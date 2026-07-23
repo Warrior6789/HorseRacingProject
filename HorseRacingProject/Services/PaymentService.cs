@@ -207,6 +207,8 @@ namespace HorseRacingAPI.Services
 
             if (updated == 0)
                 return;
+
+            await _hubContext.Clients.All.SendAsync("PaymentsUpdated", new { orderCode, status = "Cancelled" });
         }
 
         public async Task<PagedResponse<PaymentResponse>> GetHistoryPagingAsync(Guid accountId, int page, int pageSize)
