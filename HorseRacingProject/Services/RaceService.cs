@@ -264,16 +264,20 @@ namespace HorseRacingAPI.Services
             if (race.Status == RaceStatus.Live)
                 throw new InvalidOperationException("Cannot delete a race that is currently Live.");
 
-            bool hasActiveRegistrations = await _uow.GetRepository<Registration>().Entities
-                .AnyAsync(r => r.RaceId == raceId
-                    && (r.Status == RegistrationStatus.Pending || r.Status == RegistrationStatus.Confirmed));
-            if (hasActiveRegistrations)
-                throw new InvalidOperationException("Cannot delete a race with active horse/jockey registrations. Reject or scratch them first.");
+            if (race.Status != RaceStatus.Finished && race.Status != RaceStatus.Cancelled)
+            {
+                bool hasActiveRegistrations = await _uow.GetRepository<Registration>().Entities
+                    .AnyAsync(r => r.RaceId == raceId
+                        && (r.Status == RegistrationStatus.Pending || r.Status == RegistrationStatus.Confirmed));
+                if (hasActiveRegistrations)
+                    throw new InvalidOperationException("Cannot delete a race with active horse/jockey registrations. Reject or scratch them first.");
+            }
 
             race.IsDeleted = true;
             race.DeletedAt = DateTimeOffset.UtcNow;
             await _uow.GetRepository<Race>().UpdateAsync(race);
             await _uow.SaveAsync();
+            await _hubContext.Clients.All.SendAsync("RacesUpdated");
         }
 
         public async Task<RegistrationResponse> RegisterHorseAsync(Guid raceId, Guid ownerId, RegisterHorseToRaceRequest request)
