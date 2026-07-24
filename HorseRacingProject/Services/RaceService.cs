@@ -1038,7 +1038,8 @@ namespace HorseRacingAPI.Services
 
             IQueryable<TakeoutLedger> query = _uow.GetRepository<TakeoutLedger>().Entities
                 .Include(t => t.Race)
-                .Where(t => (raceId == null || t.RaceId == raceId)
+                .Where(t => !t.Race.IsDeleted
+                         && (raceId == null || t.RaceId == raceId)
                          && (parsedBetType == null || t.BetType == parsedBetType));
 
             int totalCount = await query.CountAsync();

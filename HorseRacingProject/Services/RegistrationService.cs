@@ -231,7 +231,8 @@ namespace HorseRacingAPI.Services
                 .Where(j => j.JockeyId == jockeyAccountId
                     && j.Status == RegistrationStatus.Pending
                     && j.OwnerConfirmation == true
-                    && j.JockeyConfirmation == null)
+                    && j.JockeyConfirmation == null
+                    && !j.Race.IsDeleted)
                 .Select(r => new RegistrationResponse
                 {
                     RegistrationId = r.RegistrationId,
@@ -296,14 +297,16 @@ namespace HorseRacingAPI.Services
                 .Where(j => j.JockeyId == jockeyAccountId
                     && j.OwnerConfirmation == true
                     && ((j.Status == RegistrationStatus.Pending && j.JockeyConfirmation == null)
-                        || (j.Status == RegistrationStatus.Confirmed && j.JockeyConfirmation == true)))
+                        || (j.Status == RegistrationStatus.Confirmed && j.JockeyConfirmation == true))
+                    && !j.Race.IsDeleted)
                 .CountAsync();
 
             IEnumerable<RegistrationResponse> items = await registrationRepo.FindAsync<RegistrationResponse>(
                 predicate: j => j.JockeyId == jockeyAccountId
                     && j.OwnerConfirmation == true
                     && ((j.Status == RegistrationStatus.Pending && j.JockeyConfirmation == null)
-                        || (j.Status == RegistrationStatus.Confirmed && j.JockeyConfirmation == true)),
+                        || (j.Status == RegistrationStatus.Confirmed && j.JockeyConfirmation == true))
+                    && !j.Race.IsDeleted,
                 orderBy: null,
                 selector: r => new RegistrationResponse
                 {
@@ -738,7 +741,7 @@ namespace HorseRacingAPI.Services
             IGenericRepository<Registration> registrationRepo = _uow.GetRepository<Registration>();
 
             IQueryable<Registration> baseQuery = registrationRepo.Entities
-                .Where(r => raceId == null || r.RaceId == raceId);
+                .Where(r => !r.Race.IsDeleted && (raceId == null || r.RaceId == raceId));
 
             int totalCount = await baseQuery.CountAsync();
 

@@ -315,15 +315,16 @@ namespace HorseRacingAPI.Services
             IGenericRepository<Prize> prizeRepo = _uow.GetRepository<Prize>();
 
             int totalRaces = await regRepo.Entities
-                .CountAsync(r => r.HorseId == horseId && r.Status == RegistrationStatus.Confirmed);
+                .CountAsync(r => r.HorseId == horseId && r.Status == RegistrationStatus.Confirmed && !r.Race.IsDeleted);
 
             int totalWins = await _uow.GetRepository<RaceResult>().Entities
                 .CountAsync(rr => rr.Registration.HorseId == horseId
                     && rr.FinishPosition == 1
-                    && rr.IsDisqualified != true);
+                    && rr.IsDisqualified != true
+                    && !rr.Registration.Race.IsDeleted);
 
             decimal totalEarned = await prizeRepo.Entities
-                .Where(p => p.Registration.HorseId == horseId && p.PrizeType == PrizeType.Owner)
+                .Where(p => p.Registration.HorseId == horseId && p.PrizeType == PrizeType.Owner && !p.Registration.Race.IsDeleted)
                 .SumAsync(p => p.Amount ?? 0);
 
             return new HorsePerformanceSummaryResponse
@@ -345,7 +346,8 @@ namespace HorseRacingAPI.Services
             IQueryable<Registration> query = _uow.GetRepository<Registration>().Entities
                 .Where(r => r.Horse.OwnerId == ownerId
                     && r.Status == RegistrationStatus.Confirmed
-                    && r.Race.Status == RaceStatus.Finished);
+                    && r.Race.Status == RaceStatus.Finished
+                    && !r.Race.IsDeleted);
 
             int totalCount = await query.CountAsync();
 

@@ -388,7 +388,9 @@ namespace HorseRacingAPI.Services
 
             IGenericRepository<RefereeReport> reportRepo = _uow.GetRepository<RefereeReport>();
             IQueryable<RefereeReport> baseQuery = reportRepo.Entities
-                .Where(r => (raceId == null || r.RaceId == raceId) && (refereeId == null || r.RefereeId == refereeId));
+                .Where(r => !r.Race.IsDeleted
+                         && (raceId == null || r.RaceId == raceId)
+                         && (refereeId == null || r.RefereeId == refereeId));
 
             int total         = await baseQuery.CountAsync();
             int pendingCount  = await baseQuery.CountAsync(r => r.Status == RefereeReportStatus.Pending);
@@ -445,7 +447,7 @@ namespace HorseRacingAPI.Services
 
             IGenericRepository<RefereeReport> reportRepo = _uow.GetRepository<RefereeReport>();
             int total = await reportRepo.Entities
-                .CountAsync(r => r.RefereeId == refereeId);
+                .CountAsync(r => r.RefereeId == refereeId && !r.Race.IsDeleted);
             List<RefereeReportResponse> items = await reportRepo.Entities
                 .Include(r => r.Race)
                 .Include(r => r.Registration)
@@ -454,7 +456,7 @@ namespace HorseRacingAPI.Services
                     .ThenInclude(r => r.UserProfile)
                 .Include(r => r.Registration)
                     .ThenInclude(r => r.RaceResult)
-                .Where(r => r.RefereeId == refereeId)
+                .Where(r => r.RefereeId == refereeId && !r.Race.IsDeleted)
                 .OrderByDescending(r => r.CreatedAt)
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
