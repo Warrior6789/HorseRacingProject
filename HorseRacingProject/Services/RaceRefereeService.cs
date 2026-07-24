@@ -63,7 +63,7 @@ namespace HorseRacingAPI.Services
                     if (race.StartTime.HasValue && estimatedEnd.Add(TravelBuffer) > race.StartTime.Value)
                         throw new InvalidOperationException(
                             $"Referee cannot travel in time: Race #{other.RaceNumber} ends around " +
-                            $"{estimatedEnd:HH:mm}, plus 1h travel exceeds start time {race.StartTime.Value:HH:mm}.");
+                            $"{estimatedEnd.ToOffset(TimeSpan.FromHours(7)):HH:mm}, plus 1h travel exceeds start time {race.StartTime.Value.ToOffset(TimeSpan.FromHours(7)):HH:mm} (VN time).");
                 }
             }
 
