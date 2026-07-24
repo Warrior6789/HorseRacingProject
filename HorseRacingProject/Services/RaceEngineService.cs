@@ -119,15 +119,6 @@ namespace HorseRacingAPI.Services
                     if (startedRacecourses.Contains(r.RacecourseId))
                         continue;
 
-                    bool previousStillRunning = await uow.GetRepository<Race>().Entities
-                        .AnyAsync(other => other.RacecourseId == r.RacecourseId
-                                        && other.RaceId != r.RaceId
-                                        && other.Status == RaceStatus.Live
-                                        && !other.IsDeleted);
-
-                    if (previousStillRunning)
-                        continue;
-
                     int confirmedCount = await uow.GetRepository<Registration>().Entities
                         .CountAsync(reg => reg.RaceId == r.RaceId && reg.Status == RegistrationStatus.Confirmed);
 
@@ -144,7 +135,7 @@ namespace HorseRacingAPI.Services
                             ? previousEndTime.Value.AddMinutes(30)
                             : r.StartTime!.Value.AddMinutes(30);
 
-                        if (!previousStillRunning && now > cancelAfter)
+                        if (now > cancelAfter)
                         {
                             r.Status = RaceStatus.Cancelled;
                             cancelledRaceIds.Add(r.RaceId);
@@ -152,6 +143,15 @@ namespace HorseRacingAPI.Services
                         }
                         continue;
                     }
+
+                    bool previousStillRunning = await uow.GetRepository<Race>().Entities
+                        .AnyAsync(other => other.RacecourseId == r.RacecourseId
+                                        && other.RaceId != r.RaceId
+                                        && other.Status == RaceStatus.Live
+                                        && !other.IsDeleted);
+
+                    if (previousStillRunning)
+                        continue;
 
                     r.Status = RaceStatus.Live;
                     await uow.GetRepository<Race>().UpdateAsync(r);
