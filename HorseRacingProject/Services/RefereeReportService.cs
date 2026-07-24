@@ -45,8 +45,8 @@ namespace HorseRacingAPI.Services
             if (existing)
                 throw new InvalidOperationException("A report already exists for this horse in this race.");
 
-            if (dto.PenaltyType == PenaltyType.Fine && (!dto.FineAmount.HasValue || dto.FineAmount.Value <= 0))
-                throw new InvalidOperationException("FineAmount is required and must be greater than 0 when PenaltyType is Fine.");
+            if (dto.PenaltyType == PenaltyType.Fine)
+                throw new InvalidOperationException("Fine penalty is no longer supported. Use Warning or Disqualification.");
 
             var report = new RefereeReport
             {
@@ -57,7 +57,7 @@ namespace HorseRacingAPI.Services
                 IncidentDescription = dto.IncidentDescription,
                 PenaltyApplied      = dto.PenaltyApplied,
                 PenaltyType         = dto.PenaltyType,
-                FineAmount          = dto.PenaltyType == PenaltyType.Fine ? dto.FineAmount : null,
+                FineAmount          = null,
                 Status              = RefereeReportStatus.Pending,
                 CreatedAt           = DateTimeOffset.UtcNow
             };
@@ -485,13 +485,13 @@ namespace HorseRacingAPI.Services
             if (report.Status != RefereeReportStatus.Pending)
                 throw new InvalidOperationException("Only Pending reports can be edited.");
 
+            if (dto.PenaltyType == PenaltyType.Fine)
+                throw new InvalidOperationException("Fine penalty is no longer supported. Use Warning or Disqualification.");
+
             report.IncidentDescription = dto.IncidentDescription ?? report.IncidentDescription;
             report.PenaltyApplied      = dto.PenaltyApplied ?? report.PenaltyApplied;
             if (dto.PenaltyType.HasValue) report.PenaltyType = dto.PenaltyType.Value;
-            report.FineAmount = report.PenaltyType == PenaltyType.Fine ? (dto.FineAmount ?? report.FineAmount) : null;
-
-            if (report.PenaltyType == PenaltyType.Fine && (!report.FineAmount.HasValue || report.FineAmount.Value <= 0))
-                throw new InvalidOperationException("FineAmount is required and must be greater than 0 when PenaltyType is Fine.");
+            report.FineAmount = null;
 
             await _uow.GetRepository<RefereeReport>().UpdateAsync(report);
             await _uow.SaveAsync();
