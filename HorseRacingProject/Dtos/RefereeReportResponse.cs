@@ -5,6 +5,8 @@
         public Guid ReportId { get; set; }
         public Guid RaceId { get; set; }
         public int?  RaceNumber { get; set; }
+        public string? RaceName { get; set; }
+        public string? RacecourseName { get; set; }
         public Guid RefereeId { get; set; }
         public string? RefereeName { get; set; } = null!;
         public Guid RegistrationId { get; set; }
