@@ -570,10 +570,12 @@ namespace HorseRacingAPI.Services
                 .Include(r => r.Registration)
                     .ThenInclude(reg => reg.Horse)
                 .Where(r => r.Registration.RaceId == raceId)
-                .OrderBy(r => r.FinishPosition)
+                .OrderBy(r => r.IsDisqualified == true)
+                .ThenBy(r => r.FinishPosition)
                 .Select(r => new RaceResultResponse
                 {
                     Position = r.FinishPosition,
+                    IsDisqualified = r.IsDisqualified ?? false,
                     Horse = new RaceResultHorseDto
                     {
                         Id = r.Registration.Horse.Id,

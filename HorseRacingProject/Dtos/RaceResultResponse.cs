@@ -14,6 +14,7 @@ namespace HorseRacingAPI.Dtos
     public class RaceResultResponse
     {
         public int? Position { get; set; }
+        public bool IsDisqualified { get; set; }
         public RaceResultHorseDto Horse { get; set; } = new();
         public string? FinishedAt { get; set; }
     }
