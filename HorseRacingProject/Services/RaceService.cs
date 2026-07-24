@@ -464,7 +464,16 @@ namespace HorseRacingAPI.Services
             await _uow.SaveAsync();
 
             if (race.RegistrationFee > 0)
+            {
                 await BroadcastPrizePoolUpdateAsync(raceId, race.PrizePool);
+                await _hubContext.Clients.All.SendAsync("BalanceUpdated", new
+                {
+                    accountId  = ownerId,
+                    amount     = -(long)race.RegistrationFee,
+                    newBalance = ownerProfile!.Balance ?? 0,
+                    reason     = "RegistrationFeeCharged"
+                });
+            }
 
             int pendingCount = await _uow.GetRepository<Registration>().Entities
                 .CountAsync(r => r.Status == RegistrationStatus.Pending);
