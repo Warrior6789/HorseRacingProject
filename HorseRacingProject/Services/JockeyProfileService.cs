@@ -167,7 +167,8 @@ namespace HorseRacingAPI.Services
 
             IQueryable<Prize> query = _uow.GetRepository<Prize>().Entities
                 .Where(p => p.PrizeType == PrizeType.Jockey
-                    && p.Registration.JockeyId == accountId);
+                    && p.Registration.JockeyId == accountId
+                    && !p.Registration.Race.IsDeleted);
 
             int totalCount = await query.CountAsync();
             decimal totalAmount = await query.SumAsync(p => p.Amount ?? 0);
@@ -213,7 +214,8 @@ namespace HorseRacingAPI.Services
             IQueryable<Registration> query = _uow.GetRepository<Registration>().Entities
                 .Where(r => r.JockeyId == accountId
                     && r.Status == RegistrationStatus.Confirmed
-                    && r.Race.Status == RaceStatus.Finished);
+                    && r.Race.Status == RaceStatus.Finished
+                    && !r.Race.IsDeleted);
 
             int totalCount = await query.CountAsync();
 
