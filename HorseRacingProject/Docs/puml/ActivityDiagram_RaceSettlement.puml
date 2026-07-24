@@ -1,0 +1,37 @@
+@startuml ActivityDiagram_RaceSettlement
+skinparam Style strictuml
+
+start
+
+:Admin settle Race (Finished → Completed);
+
+:Lấy TakeoutConfig (% hoa hồng hệ thống);
+:Lấy PositionPrizeConfig (tỷ lệ thưởng vị trí 1-6);
+:Lấy JockeyRewardConfig (WinCut / PlaceCut);
+
+:Tính netPool = totalPool × (1 - takeout)\ncho từng BetType (Win / Place / Show);
+
+fork
+  :Xử lý Bet thắng;
+  note right: payoutRatio = Max(netPool / winningPool, 1.0)
+  :payout = BetAmount × payoutRatio;
+  :Cộng payout vào Balance người cược;
+  :Cập nhật Bet Status → Paid;
+fork again
+  :Xử lý Bet thua;
+  :Cập nhật Bet Status → Lost;
+end fork
+
+:Phân phối Prize theo vị trí\n(PrizePool × Pos1Ratio, Pos2Ratio...);
+
+:JockeyAmount = Prize × WinCut (vị trí 1)\nhoặc Prize × PlaceCut (vị trí 2);
+:OwnerAmount = Prize - JockeyAmount;
+
+:Cộng Balance Jockey;
+:Cộng Balance HorseOwner;
+
+:Cập nhật Race Status → Completed;
+
+stop
+
+@enduml

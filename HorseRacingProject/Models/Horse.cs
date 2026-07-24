@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using HorseRacingAPI.Enums;
 
 namespace HorseRacingAPI.Models;
 
@@ -17,19 +18,21 @@ public partial class Horse
 
     public float? Weight { get; set; }
 
-    public string? Status { get; set; }
+    public HorseStatus Status { get; set; }
 
     public int? RecordWins { get; set; }
 
     public string? Color { get; set; }
 
-    public DateTime? CreateAt { get; set; }
+    public string? ImageUrl { get; set; }
 
-    public DateTime? UpdatedAt { get; set; }
+    public DateTimeOffset? CreateAt { get; set; }
+
+    public DateTimeOffset? UpdatedAt { get; set; }
 
     public bool IsDeleted { get; set; }
 
-    public DateTime? DeletedAt { get; set; }
+    public DateTimeOffset? DeletedAt { get; set; }
 
     public virtual Account Owner { get; set; } = null!;
 

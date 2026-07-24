@@ -10,65 +10,12 @@ namespace HorseRacingAPI.Services
     public class UserProfileService : IUserProfileService
     {
         private readonly IUnitofWork _uow;
-        public UserProfileService(IUnitofWork uow)
+        private readonly ICloudinaryService _cloudinaryService;
+        public UserProfileService(IUnitofWork uow, ICloudinaryService cloudinaryService)
         {
             _uow = uow;
+            _cloudinaryService = cloudinaryService;
         }
-        public async Task<UserProfileResponse> CreateUserProfileAsync(Guid accountId, UserProfileCreateRequest req)
-        {
-            IGenericRepository<UserProfile> userProfileRepo = _uow.GetRepository<UserProfile>();
-
-            IGenericRepository<Account> accRepo = _uow.GetRepository<Account>();
-            bool accountExsit = await accRepo.Entities.AnyAsync(a => a.Id == accountId && !a.IsDeleted);
-            if (!accountExsit)
-            {
-                throw new Exception("Account does not exist.");
-            }
-            int existingCount = await userProfileRepo.Entities.CountAsync(p => p.AccountId == accountId);
-            if (existingCount > 0)
-            {
-                throw new InvalidOperationException("A profile already exists for this account.");
-            }
-            UserProfile userProfile = new UserProfile
-            {
-                ProfileId = Guid.NewGuid(),
-                AccountId = accountId,
-                FullName = req.FullName,
-                Phone = req.Phone,
-                Balance = 0,
-                CreateAt = DateTimeOffset.UtcNow,
-                UpdatedAt = DateTimeOffset.UtcNow,
-                IsDeleted = false
-            };
-            await userProfileRepo.AddAsync(userProfile);
-            await _uow.SaveAsync();
-            return new UserProfileResponse
-            {
-                ProfileId = userProfile.ProfileId,
-                AccountId = userProfile.AccountId,
-                FullName = userProfile.FullName,
-                Phone = userProfile.Phone,
-                Balance = userProfile.Balance,
-                CreateAt = userProfile.CreateAt,
-                UpdatedAt = userProfile.UpdatedAt
-            };
-        }
-
-        public async Task<List<UserProfileResponse>> GetAllUserProfilesAsync()
-        {
-            IGenericRepository<UserProfile> userProfileRepo = _uow.GetRepository<UserProfile>();
-            return await userProfileRepo.Entities.Select(u => new UserProfileResponse
-            {
-                ProfileId = u.ProfileId,
-                AccountId = u.AccountId,
-                FullName = u.FullName,
-                Phone = u.Phone,
-                Balance = u.Balance,
-                CreateAt = u.CreateAt,
-                UpdatedAt = u.UpdatedAt,
-            }).ToListAsync();
-        }
-
         public async Task<UserProfileResponse> GetUserProfileByIdAsync(Guid accountId)
         {
             IGenericRepository<UserProfile> userProfileRepo = _uow.GetRepository<UserProfile>();
@@ -85,6 +32,7 @@ namespace HorseRacingAPI.Services
                     FullName = u.FullName,
                     Phone = u.Phone,
                     Balance = u.Balance,
+                    ImageUrl = u.ImageUrl,
                     CreateAt = u.CreateAt,
                     UpdatedAt = u.UpdatedAt,
                 }).FirstOrDefaultAsync();
@@ -120,6 +68,22 @@ namespace HorseRacingAPI.Services
             }
 
             userProfile.UpdatedAt = DateTimeOffset.UtcNow;
+            await _uow.SaveAsync();
+        }
+
+        public async Task<string> UploadImageAsync(Guid accountId, IFormFile file)
+        {
+            IGenericRepository<UserProfile> userProfileRepo = _uow.GetRepository<UserProfile>();
+            UserProfile? userProfile = await userProfileRepo.Entities.FirstOrDefaultAsync(u => u.AccountId == accountId && !u.IsDeleted);
+            if (userProfile == null)
+            {
+                throw new KeyNotFoundException("User profile not found.");
+            }
+            string imageUrl = await _cloudinaryService.UploadImageAsync(file, "user-profiles");
+            userProfile.ImageUrl = imageUrl;
+            userProfile.UpdatedAt = DateTimeOffset.UtcNow;
+            await _uow.SaveAsync();
+            return imageUrl;
         }
     }
 }

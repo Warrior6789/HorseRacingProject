@@ -1,0 +1,22 @@
+namespace HorseRacingAPI.Dtos
+{
+    public class RaceResponse
+    {
+        public Guid RaceId { get; set; }
+        public int? RaceNumber { get; set; }
+        public string? RaceName { get; set; }
+        public DateTimeOffset? StartTime { get; set; }
+        public float? TrackLength { get; set; }
+        public int? MaxParticipants { get; set; }
+        public string? Status { get; set; }
+        public decimal RegistrationFee { get; set; }
+        public decimal PrizePool { get; set; }
+        public string? RacecourseName { get; set; }
+        public string? Location { get; set; }
+        public string? ImageUrl { get; set; }
+        public int RegistrationCount { get; set; }
+        public bool HasUnresolvedReports { get; set; }
+        public decimal TotalPoolAmount { get; set; }
+        public int BetCount { get; set; }
+    }
+}

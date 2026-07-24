@@ -1,3 +1,4 @@
+
 using HorseRacingAPI.Dtos;
 using HorseRacingAPI.Enums;
 using HorseRacingAPI.Models;
@@ -10,54 +11,25 @@ namespace HorseRacingAPI.Services
     public class JockeyProfileService : IJockeyProfileService
     {
         private readonly IUnitofWork _uow;
+        private readonly ICloudinaryService _cloudinaryService;
 
-        public JockeyProfileService(IUnitofWork uow)
+        public JockeyProfileService(IUnitofWork uow, ICloudinaryService cloudinaryService)
         {
             _uow = uow;
+            _cloudinaryService = cloudinaryService;
         }
 
-        public async Task<JockeyProfileResponse> CreateJockeyProfileAsync(Guid accountId, JockeyProfileCreateRequest req)
+        public async Task<PagedResponse<JockeyProfileResponse>> GetAllJockeyProfilesPagedAsync(int page, int pageSize)
         {
-            IGenericRepository<Account> accRepo = _uow.GetRepository<Account>();
-            Account? account = await accRepo.Entities
-                .FirstOrDefaultAsync(a => a.Id == accountId && !a.IsDeleted);
-            if (account == null)
-                throw new InvalidOperationException("Account does not exist.");
-
-            if (account.Role != AccountRole.Jockey)
-                throw new InvalidOperationException("Only accounts with role Jockey can have a JockeyProfile.");
-
+            if (page < 1) page = 1;
+            if (pageSize < 1) pageSize = 10;
+            if (pageSize > 100) pageSize = 100;
             IGenericRepository<JockeyProfile> repo = _uow.GetRepository<JockeyProfile>();
-            int existingCount = await repo.Entities.CountAsync(p => p.AccountId == accountId);
-            if (existingCount > 0)
-                throw new InvalidOperationException("A jockey profile already exists for this account.");
-
-            JockeyProfile jockeyProfile = new JockeyProfile
-            {
-                JockeyProfileId = Guid.NewGuid(),
-                AccountId = accountId,
-                FullName = req.FullName,
-                DateOfBirth = req.DateOfBirth,
-                Nationality = req.Nationality,
-                LicenseNumber = req.LicenseNumber,
-                TotalRaces = 0,
-                TotalWins = 0,
-                CreateAt = DateTimeOffset.UtcNow,
-                UpdatedAt = DateTimeOffset.UtcNow,
-                IsDeleted = false
-            };
-            await repo.AddAsync(jockeyProfile);
-            await _uow.SaveAsync();
-
-            return MapToResponse(jockeyProfile);
-        }
-
-        public async Task<List<JockeyProfileResponse>> GetAllJockeyProfilesAsync()
-        {
-            IGenericRepository<JockeyProfile> repo = _uow.GetRepository<JockeyProfile>();
-            return await repo.Entities
-                .Where(p => !p.IsDeleted)
-                .Select(p => new JockeyProfileResponse
+            int totalCount = await repo.Entities.CountAsync(p => !p.IsDeleted);
+            IEnumerable<JockeyProfileResponse> items = await repo.FindAsync<JockeyProfileResponse>(
+                predicate: p => !p.IsDeleted,
+                orderBy: q => q.OrderBy(p => p.CreateAt),
+                selector: p => new JockeyProfileResponse
                 {
                     JockeyProfileId = p.JockeyProfileId,
                     AccountId = p.AccountId,
@@ -65,11 +37,19 @@ namespace HorseRacingAPI.Services
                     DateOfBirth = p.DateOfBirth,
                     Nationality = p.Nationality,
                     LicenseNumber = p.LicenseNumber,
+                    Weight = p.Weight,
+                    Height = p.Height,
                     TotalRaces = p.TotalRaces,
                     TotalWins = p.TotalWins,
+                    Balance = p.Balance,
+                    ImageUrl = p.ImageUrl,
+                    CertificateImageUrl = p.CertificateImageUrl,
                     CreateAt = p.CreateAt,
                     UpdatedAt = p.UpdatedAt
-                }).ToListAsync();
+                },
+                pageIndex: page - 1,
+                pageSize: pageSize);
+            return new PagedResponse<JockeyProfileResponse> { Items = items.ToList(), Page = page, PageSize = pageSize, TotalCount = totalCount };
         }
 
         public async Task<JockeyProfileResponse> GetJockeyProfileByAccountIdAsync(Guid accountId)
@@ -88,8 +68,13 @@ namespace HorseRacingAPI.Services
                     DateOfBirth = p.DateOfBirth,
                     Nationality = p.Nationality,
                     LicenseNumber = p.LicenseNumber,
+                    Weight = p.Weight,
+                    Height = p.Height,
                     TotalRaces = p.TotalRaces,
                     TotalWins = p.TotalWins,
+                    Balance = p.Balance,
+                    ImageUrl = p.ImageUrl,
+                    CertificateImageUrl = p.CertificateImageUrl,
                     CreateAt = p.CreateAt,
                     UpdatedAt = p.UpdatedAt
                 }).FirstOrDefaultAsync();
@@ -123,22 +108,142 @@ namespace HorseRacingAPI.Services
             if (!string.IsNullOrEmpty(req.LicenseNumber))
                 jockeyProfile.LicenseNumber = req.LicenseNumber;
 
+            if (req.Weight.HasValue)
+                jockeyProfile.Weight = req.Weight;
+
+            if (req.Height.HasValue)
+                jockeyProfile.Height = req.Height;
+
             jockeyProfile.UpdatedAt = DateTimeOffset.UtcNow;
             await _uow.SaveAsync();
         }
 
-        private static JockeyProfileResponse MapToResponse(JockeyProfile p) => new JockeyProfileResponse
+        public async Task<string> UploadImageAsync(Guid accountId, IFormFile file)
         {
-            JockeyProfileId = p.JockeyProfileId,
-            AccountId = p.AccountId,
-            FullName = p.FullName,
-            DateOfBirth = p.DateOfBirth,
-            Nationality = p.Nationality,
-            LicenseNumber = p.LicenseNumber,
-            TotalRaces = p.TotalRaces,
-            TotalWins = p.TotalWins,
-            CreateAt = p.CreateAt,
-            UpdatedAt = p.UpdatedAt
-        };
+            IGenericRepository<JockeyProfile> jockeyProfileRepo = _uow.GetRepository<JockeyProfile>();
+            JockeyProfile? profile = await jockeyProfileRepo.Entities
+                .FirstOrDefaultAsync(p => p.AccountId == accountId && !p.IsDeleted);
+            if (profile == null)
+                throw new KeyNotFoundException("JockeyProfile not found.");
+
+            string? oldImageUrl = profile.ImageUrl;
+
+            string newImageUrl = await _cloudinaryService.UploadImageAsync(file, "jockey-profiles");
+
+            try
+            {
+                profile.ImageUrl = newImageUrl;
+                profile.UpdatedAt = DateTimeOffset.UtcNow;
+                await _uow.SaveAsync();
+            }
+            catch
+            {
+                string newPublicId = string.Join("/", new Uri(newImageUrl).AbsolutePath
+                    .TrimStart('/').Split('/').TakeLast(2)).Split('.')[0];
+                await _cloudinaryService.DeleteImageAsync(newPublicId);
+                throw;
+            }
+
+            if (oldImageUrl != null)
+            {
+                string oldPublicId = string.Join("/", new Uri(oldImageUrl).AbsolutePath
+                    .TrimStart('/').Split('/').TakeLast(2)).Split('.')[0];
+                await _cloudinaryService.DeleteImageAsync(oldPublicId);
+            }
+
+            return newImageUrl;
+        }
+
+        public async Task<JockeyRewardsResponse> GetJockeyRewardsAsync(Guid accountId, int page, int pageSize)
+        {
+            if (page < 1) page = 1;
+            if (pageSize < 1) pageSize = 10;
+            if (pageSize > 100) pageSize = 100;
+
+            JockeyProfile? profile = await _uow.GetRepository<JockeyProfile>().Entities
+                .FirstOrDefaultAsync(p => p.AccountId == accountId && !p.IsDeleted);
+            if (profile == null)
+                throw new KeyNotFoundException("Jockey profile not found.");
+
+            IQueryable<Prize> query = _uow.GetRepository<Prize>().Entities
+                .Where(p => p.PrizeType == PrizeType.Jockey
+                    && p.Registration.JockeyId == accountId);
+
+            int totalCount = await query.CountAsync();
+            decimal totalAmount = await query.SumAsync(p => p.Amount ?? 0);
+
+            List<HorseRewardItemResponse> items = await query
+                .OrderByDescending(p => p.DistributedAt ?? DateTimeOffset.MinValue)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(p => new HorseRewardItemResponse
+                {
+                    PrizeId = p.PrizeId,
+                    RegistrationId = p.RegistrationId,
+                    RaceId = p.Registration.RaceId,
+                    RaceNumber = p.Registration.Race.RaceNumber,
+                    PrizeType = p.PrizeType.ToString(),
+                    Amount = p.Amount,
+                    DistributedAt = p.DistributedAt
+                })
+                .ToListAsync();
+
+            return new JockeyRewardsResponse
+            {
+                JockeyAccountId = accountId,
+                FullName = profile.FullName ?? string.Empty,
+                TotalRewardAmount = totalAmount,
+                RewardCount = totalCount,
+                Rewards = new PagedResponse<HorseRewardItemResponse>
+                {
+                    Items = items,
+                    Page = page,
+                    PageSize = pageSize,
+                    TotalCount = totalCount
+                }
+            };
+        }
+
+        public async Task<PagedResponse<JockeyRaceHistoryItemResponse>> GetJockeyRaceHistoryAsync(Guid accountId, int page, int pageSize)
+        {
+            if (page < 1) page = 1;
+            if (pageSize < 1) pageSize = 10;
+            if (pageSize > 100) pageSize = 100;
+
+            IQueryable<Registration> query = _uow.GetRepository<Registration>().Entities
+                .Where(r => r.JockeyId == accountId
+                    && r.Status == RegistrationStatus.Confirmed
+                    && r.Race.Status == RaceStatus.Finished);
+
+            int totalCount = await query.CountAsync();
+
+            List<JockeyRaceHistoryItemResponse> items = await query
+                .OrderByDescending(r => r.Race.StartTime)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(r => new JockeyRaceHistoryItemResponse
+                {
+                    RegistrationId = r.RegistrationId,
+                    RaceId = r.RaceId,
+                    Date = r.Race.StartTime,
+                    RaceName = r.Race.RaceName,
+                    RaceNumber = r.Race.RaceNumber,
+                    HorseName = r.Horse.HorseName,
+                    HorseImageUrl = r.Horse.ImageUrl,
+                    RacecourseName = r.Race.Racecourse.RacecourseName,
+                    TrackType = r.Race.Racecourse.TrackType,
+                    Position = r.RaceResult != null ? r.RaceResult.FinishPosition : null,
+                    Earnings = r.Prizes.Where(p => p.PrizeType == PrizeType.Jockey).Select(p => (decimal?)p.Amount).FirstOrDefault()
+                })
+                .ToListAsync();
+
+            return new PagedResponse<JockeyRaceHistoryItemResponse>
+            {
+                Items = items,
+                Page = page,
+                PageSize = pageSize,
+                TotalCount = totalCount
+            };
+        }
     }
 }

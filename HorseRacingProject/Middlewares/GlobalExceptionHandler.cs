@@ -21,6 +21,10 @@ namespace HorseRacingAPI.Middlewares
 
             switch (exception)
             {
+                case ForbiddenAccessException:
+                    statusCode = HttpStatusCode.Forbidden;
+                    message = exception.Message;
+                    break;
                 case InvalidOperationException:
                     statusCode = HttpStatusCode.BadRequest;
                     message = exception.Message;
@@ -35,7 +39,7 @@ namespace HorseRacingAPI.Middlewares
                     break;
                 case UnauthorizedAccessException:
                     statusCode = HttpStatusCode.Unauthorized;
-                    message = "Session has expired. Please log in again.";
+                    message = exception.Message;
                     break;
                 case Microsoft.EntityFrameworkCore.DbUpdateException:
                     statusCode = HttpStatusCode.InternalServerError;

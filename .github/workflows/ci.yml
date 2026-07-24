@@ -1,0 +1,42 @@
+name: Build & Test
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: [main, dev]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    permissions:
+      checks: write
+      pull-requests: write
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Restore dependencies
+        run: dotnet restore HorseRacingProject.Tests/HorseRacingProject.Tests.csproj
+
+      - name: Build
+        run: dotnet build HorseRacingProject.Tests/HorseRacingProject.Tests.csproj --no-restore --configuration Release
+
+      - name: Run unit tests
+        run: dotnet test HorseRacingProject.Tests/HorseRacingProject.Tests.csproj --no-build --configuration Release --verbosity normal --logger "trx;LogFileName=test-results.trx" --results-directory ./TestResults
+
+      - name: Publish test report
+        uses: dorny/test-reporter@v1
+        if: always()
+        with:
+          name: Test Results
+          path: "TestResults/*.trx"
+          reporter: dotnet-trx

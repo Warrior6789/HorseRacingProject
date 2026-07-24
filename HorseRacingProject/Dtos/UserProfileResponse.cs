@@ -11,6 +11,7 @@
 
         public long? Balance { get; set; }
 
+        public string? ImageUrl { get; set; }
         public DateTimeOffset? CreateAt { get; set; }
         public DateTimeOffset? UpdatedAt { get; set; }
     }

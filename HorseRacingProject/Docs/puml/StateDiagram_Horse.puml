@@ -1,0 +1,21 @@
+@startuml StateDiagram_Horse
+skinparam Style strictuml
+
+[*] --> Healthy : HorseOwner tạo ngựa
+
+Healthy --> Injury : Bị chấn thương
+Healthy --> Resting : Cho nghỉ ngơi
+Healthy --> Retired : Về hưu
+
+Injury --> Healthy : Hồi phục
+Injury --> Resting : Chuyển sang nghỉ
+Injury --> Retired : Về hưu
+
+Resting --> Healthy : Trở lại thi đấu
+Resting --> Retired : Về hưu
+
+Retired --> [*]
+
+note right of Healthy : Chỉ Healthy\nmới đăng ký race được
+
+@enduml

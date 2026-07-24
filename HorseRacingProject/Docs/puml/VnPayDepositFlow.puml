@@ -1,0 +1,74 @@
+@startuml
+autonumber
+skinparam Style strictuml
+
+actor Client
+participant "PaymentsController" as Controller
+participant "PaymentService" as Service
+participant "VnPayHelper" as Helper
+participant "UnitOfWork" as UOW
+database "PostgreSQL (Neon)" as DB
+entity "VNPAY Gateway" as VNPay
+
+== Tạo URL thanh toán ==
+
+Client -> Controller : POST /api/payments/deposit\n{ amount, currency }
+activate Controller
+
+Controller -> Service : CreateDepositUrlAsync(accountId, request, ipAddress)
+activate Service
+
+Service -> DB : Lưu bản ghi Payment (Status = Pending)
+DB --> Service : Xác nhận lưu thành công
+
+Service -> Helper : BuildPaymentUrl(tmnCode, hashSecret, params)
+activate Helper
+Helper -> Helper : Tạo chuỗi query & ký HMAC-SHA512
+Helper --> Service : Trả về URL thanh toán VNPAY
+deactivate Helper
+
+Service --> Controller : URL thanh toán
+deactivate Service
+
+Controller --> Client : HTTP 200 { paymentUrl }
+deactivate Controller
+
+== Người dùng thanh toán trên VNPAY ==
+
+Client -> VNPay : Redirect tới paymentUrl
+VNPay --> Client : Hiển thị trang thanh toán
+Client -> VNPay : Nhập thông tin thẻ & xác nhận OTP
+VNPay --> Client : Redirect về ReturnUrl?vnp_ResponseCode=00&...
+
+== Xử lý callback ==
+
+Client -> Controller : GET /api/payments/deposit/callback?vnp_*
+activate Controller
+
+Controller -> Service : ProcessCallbackAsync(queryParams)
+activate Service
+
+Service -> Helper : VerifySignature(queryParams, hashSecret)
+activate Helper
+Helper --> Service : Kết quả xác thực (hợp lệ / không hợp lệ)
+deactivate Helper
+
+alt Chữ ký không hợp lệ
+    Service --> Controller : Throw Exception
+    Controller --> Client : HTTP 400 (Invalid signature)
+else Giao dịch thất bại (ResponseCode != 00)
+    Service -> DB : Cập nhật Payment Status = Failed
+    DB --> Service : Xác nhận
+    Service --> Controller : PaymentResponse (Failed)
+    Controller --> Client : HTTP 200 { status: Failed }
+else Giao dịch thành công
+    Service -> DB : Cập nhật Payment Status = Completed\nCộng số dư tài khoản
+    DB --> Service : Xác nhận
+    Service --> Controller : PaymentResponse (Completed)
+    Controller --> Client : HTTP 200 { status: Completed, currentBalance }
+end
+
+deactivate Service
+deactivate Controller
+
+@enduml

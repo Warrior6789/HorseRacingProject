@@ -1,25 +1,64 @@
 using Guid = System.Guid;
 using HorseRacingAPI.Dtos;
+using HorseRacingAPI.Enums;
+using HorseRacingAPI.Hubs;
 using HorseRacingAPI.Middlewares;
 using HorseRacingAPI.Models;
 using HorseRacingAPI.Repository;
 using HorseRacingAPI.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
 
+AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
+
+System.Globalization.CultureInfo.DefaultThreadCurrentCulture = System.Globalization.CultureInfo.InvariantCulture;
+System.Globalization.CultureInfo.DefaultThreadCurrentUICulture = System.Globalization.CultureInfo.InvariantCulture;
+
 var builder = WebApplication.CreateBuilder(args);
+
+var allowedOrigins = (Environment.GetEnvironmentVariable("AllowedOrigins") ?? "http://localhost:3000,http://localhost:5173")
+    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("FrontendPolicy", policy =>
+    {
+        policy.WithOrigins(allowedOrigins)
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials();
+    });
+});
+
+builder.Services.AddSignalR();
 
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
     });
+
+builder.Services.Configure<ApiBehaviorOptions>(options =>
+{
+    options.InvalidModelStateResponseFactory = context =>
+    {
+        string message = string.Join(" ", context.ModelState.Values
+            .SelectMany(v => v.Errors)
+            .Select(e => e.ErrorMessage)
+            .Where(m => !string.IsNullOrWhiteSpace(m)));
+        if (string.IsNullOrWhiteSpace(message))
+            message = "Invalid request.";
+        return new BadRequestObjectResult(ApiResponse<object>.FailResponse(message));
+    };
+});
 
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddProblemDetails();
@@ -55,14 +94,37 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
-builder.Services.AddDbContext<DbContext, HorseRacingDataContext>(options =>
+var connectionString = Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection")
+    ?? builder.Configuration.GetConnectionString("DefaultConnection");
+builder.Services.AddDbContext<HorseRacingDataContext>(options =>
     options.UseNpgsql(connectionString));
+builder.Services.AddScoped<DbContext>(provider => provider.GetRequiredService<HorseRacingDataContext>());
 
 builder.Services.AddScoped<IUnitofWork, UnitofWork>();
+builder.Services.AddScoped<ICloudinaryService, CloudinaryService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IUserProfileService, UserProfileService>();
 builder.Services.AddScoped<IJockeyProfileService, JockeyProfileService>();
+builder.Services.AddScoped<IAccountService, AccountService>();
+builder.Services.AddScoped<IRegistrationService, RegistrationService>();
+builder.Services.AddScoped<IRegistrationFeeConfigService, RegistrationFeeConfigService>();
+builder.Services.AddScoped<IRacecourseService, RacecourseService>();
+builder.Services.AddScoped<IRaceService, RaceService>();
+builder.Services.AddScoped<IHorseService, HorseService>();
+builder.Services.AddScoped<IPaymentService, PaymentService>();
+builder.Services.AddScoped<IBetService, BetService>();
+builder.Services.AddScoped<ITakeoutConfigService, TakeoutConfigService>();
+builder.Services.AddScoped<IPositionPrizeConfigService, PositionPrizeConfigService>();
+builder.Services.AddScoped<IJockeyRewardConfigService, JockeyRewardConfigService>();
+builder.Services.AddScoped<IRefereeReportService, RefereeReportService>();
+builder.Services.AddScoped<IRaceRefereeService, RaceRefereeService>();
+
+builder.Services.AddScoped<IWithdrawalService, WithdrawalService>();
+builder.Services.AddScoped<IWalletTransactionService, WalletTransactionService>();
+builder.Services.AddScoped<IDashboardService, DashboardService>();
+builder.Services.AddSingleton<IRaceSettlementService, RaceSettlementService>();
+builder.Services.AddSingleton<RaceEngineService>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<RaceEngineService>());
 
 var jwtKey = builder.Configuration["Jwt:Key"]
     ?? throw new Exception("Missing System Config: Jwt:Key in appsettings.json");
@@ -88,6 +150,30 @@ builder.Services.AddAuthentication(options =>
 
     options.Events = new JwtBearerEvents
     {
+        OnMessageReceived = context =>
+        {
+            string? accessToken = context.Request.Query["access_token"];
+            PathString path = context.HttpContext.Request.Path;
+            if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/racehub"))
+                context.Token = accessToken;
+            return Task.CompletedTask;
+        },
+        OnTokenValidated = async context =>
+        {
+            string? accountIdValue = context.Principal?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (!Guid.TryParse(accountIdValue, out Guid accountId))
+            {
+                context.Fail("Invalid token.");
+                return;
+            }
+
+            IUnitofWork uow = context.HttpContext.RequestServices.GetRequiredService<IUnitofWork>();
+            Account? account = await uow.GetRepository<Account>().Entities
+                .FirstOrDefaultAsync(a => a.Id == accountId && !a.IsDeleted);
+
+            if (account == null || account.Status != AccountStatus.Active)
+                context.Fail("This account is no longer active.");
+        },
         OnChallenge = async context =>
         {
             context.HandleResponse();
@@ -123,11 +209,15 @@ if (app.Environment.IsDevelopment())
     });
 }
 
-app.UseHttpsRedirection();
+app.UseCors("FrontendPolicy");
+
+if (!app.Environment.IsDevelopment())
+    app.UseHttpsRedirection();
 
 app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapHub<RaceHub>("/racehub");
 
 app.Run();

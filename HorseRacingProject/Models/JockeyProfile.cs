@@ -25,9 +25,19 @@ public partial class JockeyProfile
 
     public string? LicenseNumber { get; set; }
 
+    public float? Weight { get; set; }
+
+    public float? Height { get; set; }
+
     public int? TotalRaces { get; set; }
 
     public int? TotalWins { get; set; }
+
+    public long? Balance { get; set; }
+
+    public string? ImageUrl { get; set; }
+
+    public string? CertificateImageUrl { get; set; }
 
     public virtual Account Account { get; set; } = null!;
 }

@@ -1,0 +1,127 @@
+using HorseRacingAPI.Dtos;
+using HorseRacingAPI.Enums;
+using HorseRacingAPI.Services;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
+
+namespace HorseRacingAPI.Controllers
+{
+    [Route("api/horses")]
+    [ApiController]
+    [Authorize(Roles = "Admin,HorseOwner")]
+    public class HorsesController : ControllerBase
+    {
+        private readonly IHorseService _horseService;
+
+        public HorsesController(IHorseService horseService)
+        {
+            _horseService = horseService;
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> GetHorses([FromQuery] HorseQueryRequest query)
+        {
+            Guid accountId = GetAccountIdFromToken();
+            bool isAdmin = IsAdmin();
+
+            PagedResponse<HorseDetailResponse> horses = await _horseService.GetHorsesAsync(accountId, isAdmin, query);
+            return Ok(ApiResponse<PagedResponse<HorseDetailResponse>>.SuccessResponse(horses, "Get horses successfully."));
+        }
+
+        [HttpGet("active/paged")]
+        public async Task<IActionResult> GetActiveHorsesPaged([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
+        {
+            Guid accountId = GetAccountIdFromToken();
+            bool isAdmin = IsAdmin();
+
+            PagedResponse<HorseResponse> horses = await _horseService.GetActiveHorsesPagedAsync(accountId, isAdmin, page, pageSize);
+            return Ok(ApiResponse<PagedResponse<HorseResponse>>.SuccessResponse(horses, "Get active horses successfully."));
+        }
+
+        [HttpGet("{id:guid}")]
+        public async Task<IActionResult> GetHorseById(Guid id)
+        {
+            Guid accountId = GetAccountIdFromToken();
+            bool isAdmin = IsAdmin();
+
+            HorseDetailResponse horse = await _horseService.GetHorseByIdAsync(id, accountId, isAdmin);
+            return Ok(ApiResponse<HorseDetailResponse>.SuccessResponse(horse, "Get horse successfully."));
+        }
+
+        [HttpPost]
+        [Consumes("multipart/form-data")]
+        public async Task<IActionResult> CreateHorse([FromForm] HorseCreateRequest request)
+        {
+            Guid accountId = GetAccountIdFromToken();
+            bool isAdmin = IsAdmin();
+
+            HorseDetailResponse horse = await _horseService.CreateHorseAsync(accountId, isAdmin, request);
+            return StatusCode(StatusCodes.Status201Created, ApiResponse<HorseDetailResponse>.SuccessResponse(horse, "Horse created successfully."));
+        }
+
+        [HttpPut("{id:guid}")]
+        public async Task<IActionResult> UpdateHorse(Guid id, [FromBody] HorseUpdateRequest request)
+        {
+            Guid accountId = GetAccountIdFromToken();
+            bool isAdmin = IsAdmin();
+
+            HorseDetailResponse horse = await _horseService.UpdateHorseAsync(id, accountId, isAdmin, request);
+            return Ok(ApiResponse<HorseDetailResponse>.SuccessResponse(horse, "Horse updated successfully."));
+        }
+
+        [HttpPut("{id:guid}/image")]
+        [Consumes("multipart/form-data")]
+        public async Task<IActionResult> UploadHorseImage(Guid id, IFormFile file)
+        {
+            Guid accountId = GetAccountIdFromToken();
+            bool isAdmin = IsAdmin();
+
+            string imageUrl = await _horseService.UploadImageAsync(id, accountId, isAdmin, file);
+            return Ok(ApiResponse<string>.SuccessResponse(imageUrl, "Horse image uploaded successfully."));
+        }
+
+        [HttpDelete("{id:guid}")]
+        public async Task<IActionResult> DeleteHorse(Guid id)
+        {
+            Guid accountId = GetAccountIdFromToken();
+            bool isAdmin = IsAdmin();
+
+            await _horseService.DeleteHorseAsync(id, accountId, isAdmin);
+            return Ok(ApiResponse<object>.SuccessResponse("Horse deleted successfully."));
+        }
+
+        [HttpGet("{horseId:guid}/performance-summary")]
+        public async Task<IActionResult> GetPerformanceSummary(Guid horseId)
+        {
+            Guid accountId = GetAccountIdFromToken();
+            bool isAdmin = IsAdmin();
+
+            HorsePerformanceSummaryResponse summary = await _horseService.GetPerformanceSummaryAsync(horseId, accountId, isAdmin);
+            return Ok(ApiResponse<HorsePerformanceSummaryResponse>.SuccessResponse(summary, "Get horse performance summary successfully."));
+        }
+
+        [HttpGet("race-history")]
+        public async Task<IActionResult> GetOwnerRaceHistory([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
+        {
+            Guid accountId = GetAccountIdFromToken();
+
+            PagedResponse<OwnerRaceHistoryItemResponse> history = await _horseService.GetOwnerRaceHistoryAsync(accountId, page, pageSize);
+            return Ok(ApiResponse<PagedResponse<OwnerRaceHistoryItemResponse>>.SuccessResponse(history, "Get owner race history successfully."));
+        }
+
+        private Guid GetAccountIdFromToken()
+        {
+            string? value = HttpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (!Guid.TryParse(value, out Guid accountId))
+                throw new UnauthorizedAccessException("Invalid token.");
+            return accountId;
+        }
+
+        private bool IsAdmin()
+        {
+            string role = HttpContext.User.FindFirst(ClaimTypes.Role)?.Value ?? string.Empty;
+            return role == AccountRole.Admin.ToString();
+        }
+    }
+}

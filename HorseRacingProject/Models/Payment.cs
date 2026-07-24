@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using HorseRacingAPI.Enums;
 
 namespace HorseRacingAPI.Models;
 
@@ -9,13 +10,17 @@ public partial class Payment
 
     public Guid AccountId { get; set; }
 
-    public Guid ConversionRateId { get; set; }
-
     public decimal Amount { get; set; }
 
-    public string? Status { get; set; }
+    public long? OrderCode { get; set; }
 
-    public DateTime? CreateAt { get; set; }
+    public PaymentStatus Status { get; set; }
 
-    public virtual ConversionRate ConversionRate { get; set; } = null!;
+    public DateTimeOffset? CreateAt { get; set; }
+
+    public long? BalanceChanged { get; set; }
+
+    public long? CurrentBalance { get; set; }
+
+    public virtual Account Account { get; set; } = null!;
 }

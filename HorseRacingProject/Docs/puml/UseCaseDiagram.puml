@@ -1,0 +1,109 @@
+@startuml UseCaseDiagram
+skinparam Style strictuml
+left to right direction
+
+actor Admin
+actor HorseOwner
+actor Jockey
+actor Referee
+actor Spectator
+
+rectangle "Horse Racing System" {
+
+  package "Xác thực" {
+    usecase "Đăng ký tài khoản" as UC_Register
+    usecase "Đăng nhập" as UC_Login
+    usecase "Yêu cầu nâng cấp vai trò" as UC_RoleUpgrade
+    usecase "Cập nhật hồ sơ" as UC_Profile
+  }
+
+  package "Quản lý Ngựa" {
+    usecase "Thêm / Sửa / Xóa ngựa" as UC_Horse
+    usecase "Xem danh sách ngựa" as UC_ViewHorse
+  }
+
+  package "Cuộc đua" {
+    usecase "Quản lý Racecourse" as UC_Racecourse
+    usecase "Tạo / Sửa / Xóa Race" as UC_ManageRace
+    usecase "Chuyển trạng thái Race" as UC_AdvanceRace
+    usecase "Xem danh sách Race" as UC_ViewRace
+    usecase "Settle Race" as UC_Settle
+  }
+
+  package "Đăng ký thi đấu" {
+    usecase "Đăng ký ngựa vào Race" as UC_Register_Horse
+    usecase "Xác nhận đăng ký (Jockey)" as UC_ConfirmJockey
+    usecase "Duyệt / Từ chối đăng ký" as UC_ApproveReg
+  }
+
+  package "Cá cược" {
+    usecase "Đặt cược" as UC_Bet
+    usecase "Xem lịch sử cược" as UC_ViewBet
+  }
+
+  package "Tài chính" {
+    usecase "Nạp tiền (VNPay)" as UC_Deposit
+    usecase "Rút tiền" as UC_Withdraw
+    usecase "Duyệt / Từ chối rút tiền" as UC_ProcessWithdraw
+  }
+
+  package "Referee" {
+    usecase "Nộp kết quả đua" as UC_Results
+    usecase "Tạo báo cáo vi phạm" as UC_Report
+  }
+
+  package "Cấu hình hệ thống" {
+    usecase "Quản lý TakeoutConfig" as UC_Takeout
+    usecase "Quản lý JockeyRewardConfig" as UC_JockeyReward
+    usecase "Quản lý PositionPrizeConfig" as UC_PositionPrize
+    usecase "Quản lý RegistrationFeeConfig" as UC_RegFee
+    usecase "Quản lý tài khoản" as UC_Accounts
+    usecase "Duyệt yêu cầu nâng cấp vai trò" as UC_ApproveRole
+  }
+}
+
+Spectator --> UC_Register
+Spectator --> UC_Login
+Spectator --> UC_Profile
+Spectator --> UC_RoleUpgrade
+Spectator --> UC_ViewRace
+Spectator --> UC_Bet
+Spectator --> UC_ViewBet
+Spectator --> UC_Deposit
+Spectator --> UC_Withdraw
+
+HorseOwner --> UC_Login
+HorseOwner --> UC_Profile
+HorseOwner --> UC_Horse
+HorseOwner --> UC_ViewHorse
+HorseOwner --> UC_Register_Horse
+HorseOwner --> UC_ViewRace
+HorseOwner --> UC_Deposit
+HorseOwner --> UC_Withdraw
+
+Jockey --> UC_Login
+Jockey --> UC_Profile
+Jockey --> UC_ConfirmJockey
+Jockey --> UC_ViewRace
+
+Referee --> UC_Login
+Referee --> UC_Profile
+Referee --> UC_ViewRace
+Referee --> UC_Results
+Referee --> UC_Report
+
+Admin --> UC_Login
+Admin --> UC_Racecourse
+Admin --> UC_ManageRace
+Admin --> UC_AdvanceRace
+Admin --> UC_Settle
+Admin --> UC_ApproveReg
+Admin --> UC_ProcessWithdraw
+Admin --> UC_Accounts
+Admin --> UC_ApproveRole
+Admin --> UC_Takeout
+Admin --> UC_JockeyReward
+Admin --> UC_PositionPrize
+Admin --> UC_RegFee
+
+@enduml

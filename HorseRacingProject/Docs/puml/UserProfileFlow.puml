@@ -1,0 +1,34 @@
+@startuml
+autonumber
+skinparam Style strictuml
+
+actor Client
+participant "UserProfilesController" as Controller
+participant "UserProfileService" as Service
+participant "UnitOfWork" as UOW
+database "PostgreSQL (Neon)" as DB
+
+Client -> Controller : PUT /api/UserProfiles/{accountId} (Request)
+activate Controller
+
+Controller -> Service : UpdateUserProfileAsync(accountId, req)
+activate Service
+
+Service -> DB : Quét tìm UserProfile theo AccountId
+DB --> Service : Trả về đối tượng UserProfile hiện tại
+
+Service -> Service : Cập nhật FullName / Phone & UpdatedAt
+
+Service -> UOW : SaveAsync()
+activate UOW
+UOW -> DB : SaveChangesAsync()
+DB --> UOW : Xác nhận lưu thành công
+UOW --> Service : Hoàn tất 
+deactivate UOW
+
+Service --> Controller : Hoàn tất tác vụ
+deactivate Service
+
+Controller --> Client : Phản hồi HTTP 200 (Success Response)
+deactivate Controller
+@enduml

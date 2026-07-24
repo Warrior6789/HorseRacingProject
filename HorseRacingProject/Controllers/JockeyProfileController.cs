@@ -18,31 +18,21 @@ namespace HorseRacingAPI.Controllers
             _jockeyProfileService = jockeyProfileService;
         }
 
-        [Authorize]
-        [HttpPost]
-        public async Task<IActionResult> CreateJockeyProfile([FromBody] JockeyProfileCreateRequest req)
+        [Authorize(Roles = "Admin,HorseOwner")]
+        [HttpGet("paged")]
+        public async Task<IActionResult> GetAllJockeyProfilesPaged([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
         {
-            string tokenAccountId = HttpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? string.Empty;
-            if (!Guid.TryParse(tokenAccountId, out Guid accountId))
-            {
-                ApiResponse<object> errorResponse = ApiResponse<object>.FailResponse("Invalid token.");
-                return StatusCode(StatusCodes.Status401Unauthorized, errorResponse);
-            }
-
-            JockeyProfileResponse response = await _jockeyProfileService.CreateJockeyProfileAsync(accountId, req);
-
-            ApiResponse<JockeyProfileResponse> apiResponse = ApiResponse<JockeyProfileResponse>.SuccessResponse(response, "Create jockey profile successfully.");
-            return StatusCode(StatusCodes.Status201Created, apiResponse);
+            PagedResponse<JockeyProfileResponse> result = await _jockeyProfileService.GetAllJockeyProfilesPagedAsync(page, pageSize);
+            return Ok(ApiResponse<PagedResponse<JockeyProfileResponse>>.SuccessResponse(result, "Get all jockey profiles successfully."));
         }
 
-        [Authorize(Roles = "Admin")]
-        [HttpGet]
-        public async Task<IActionResult> GetAllJockeyProfiles()
+        [Authorize]
+        [HttpGet("my")]
+        public async Task<IActionResult> GetMyProfile()
         {
-            List<JockeyProfileResponse> profiles = await _jockeyProfileService.GetAllJockeyProfilesAsync();
-
-            ApiResponse<List<JockeyProfileResponse>> apiResponse = ApiResponse<List<JockeyProfileResponse>>.SuccessResponse(profiles, "Get all jockey profiles successfully.");
-            return Ok(apiResponse);
+            Guid accountId = GetAccountIdFromToken();
+            JockeyProfileResponse response = await _jockeyProfileService.GetJockeyProfileByAccountIdAsync(accountId);
+            return Ok(ApiResponse<JockeyProfileResponse>.SuccessResponse(response, "Get my profile successfully."));
         }
 
         [Authorize]
@@ -50,8 +40,35 @@ namespace HorseRacingAPI.Controllers
         public async Task<IActionResult> GetJockeyProfileByAccountId(Guid accountId)
         {
             JockeyProfileResponse response = await _jockeyProfileService.GetJockeyProfileByAccountIdAsync(accountId);
-
             ApiResponse<JockeyProfileResponse> apiResponse = ApiResponse<JockeyProfileResponse>.SuccessResponse(response, "Get jockey profile details successfully.");
+            return Ok(apiResponse);
+        }
+
+        [Authorize(Roles = "Jockey")]
+        [HttpGet("my/rewards")]
+        public async Task<IActionResult> GetMyRewards([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
+        {
+            Guid accountId = GetAccountIdFromToken();
+            JockeyRewardsResponse result = await _jockeyProfileService.GetJockeyRewardsAsync(accountId, page, pageSize);
+            return Ok(ApiResponse<JockeyRewardsResponse>.SuccessResponse(result, "Get jockey rewards successfully."));
+        }
+
+        [Authorize(Roles = "Jockey")]
+        [HttpGet("my/race-history")]
+        public async Task<IActionResult> GetMyRaceHistory([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
+        {
+            Guid accountId = GetAccountIdFromToken();
+            PagedResponse<JockeyRaceHistoryItemResponse> result = await _jockeyProfileService.GetJockeyRaceHistoryAsync(accountId, page, pageSize);
+            return Ok(ApiResponse<PagedResponse<JockeyRaceHistoryItemResponse>>.SuccessResponse(result, "Get jockey race history successfully."));
+        }
+
+        [Authorize(Roles = "Jockey")]
+        [HttpPut("image")]
+        public async Task<IActionResult> UploadImage(IFormFile file)
+        {
+            Guid accountId = GetAccountIdFromToken();
+            string imageUrl = await _jockeyProfileService.UploadImageAsync(accountId, file);
+            ApiResponse<object> apiResponse = ApiResponse<object>.SuccessResponse(new { imageUrl }, "Upload image successfully.");
             return Ok(apiResponse);
         }
 
@@ -62,18 +79,23 @@ namespace HorseRacingAPI.Controllers
             string userRole = HttpContext.User.FindFirst(ClaimTypes.Role)?.Value ?? string.Empty;
             if (userRole == AccountRole.Jockey.ToString())
             {
-                string tokenAccountId = HttpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? string.Empty;
-                if (tokenAccountId != accountId.ToString())
+                if (GetAccountIdFromToken() != accountId)
                 {
                     ApiResponse<object> forbiddenResponse = ApiResponse<object>.FailResponse("You do not have permission to modify this profile.");
                     return StatusCode(StatusCodes.Status403Forbidden, forbiddenResponse);
                 }
             }
-
             await _jockeyProfileService.UpdateJockeyProfileAsync(accountId, req);
-
             ApiResponse<object> apiResponse = ApiResponse<object>.SuccessResponse(null!, "Update jockey profile successfully.");
             return Ok(apiResponse);
+        }
+
+        private Guid GetAccountIdFromToken()
+        {
+            string? value = HttpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (!Guid.TryParse(value, out Guid accountId))
+                throw new UnauthorizedAccessException("Invalid token.");
+            return accountId;
         }
     }
 }

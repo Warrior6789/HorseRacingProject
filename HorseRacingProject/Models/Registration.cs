@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using HorseRacingAPI.Enums;
 
 namespace HorseRacingAPI.Models;
 
@@ -19,11 +20,11 @@ public partial class Registration
 
     public bool? JockeyConfirmation { get; set; }
 
-    public string? Status { get; set; }
+    public RegistrationStatus Status { get; set; }
 
-    public DateTime? CreateAt { get; set; }
+    public DateTimeOffset? CreateAt { get; set; }
 
-    public DateTime? UpdatedAt { get; set; }
+    public DateTimeOffset? UpdatedAt { get; set; }
 
     public virtual ICollection<Bet> Bets { get; set; } = new List<Bet>();
 
@@ -35,5 +36,5 @@ public partial class Registration
 
     public virtual Race Race { get; set; } = null!;
 
-    public virtual ICollection<RaceResult> RaceResults { get; set; } = new List<RaceResult>();
+    public virtual RaceResult? RaceResult { get; set; }
 }
