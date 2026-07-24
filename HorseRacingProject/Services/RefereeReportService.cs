@@ -136,6 +136,14 @@ namespace HorseRacingAPI.Services
                     ReferenceId = report.ReportId,
                     CreatedAt = DateTimeOffset.UtcNow
                 });
+
+                await _hubContext.Clients.All.SendAsync("BalanceUpdated", new
+                {
+                    accountId  = report.Registration.Horse.OwnerId,
+                    amount     = -fine,
+                    newBalance = ownerProfile.Balance ?? 0,
+                    reason     = "Fine"
+                });
             }
 
             await _uow.GetRepository<Prize>().AddAsync(new Prize
