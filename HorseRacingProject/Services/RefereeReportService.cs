@@ -184,6 +184,7 @@ namespace HorseRacingAPI.Services
             ];
 
             disqualifiedResult.IsDisqualified = true;
+            disqualifiedResult.FinishPosition = null;
             await _uow.GetRepository<RaceResult>().UpdateAsync(disqualifiedResult);
 
             var disqualifiedPrizes = await _uow.GetRepository<Prize>().Entities

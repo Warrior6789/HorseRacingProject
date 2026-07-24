@@ -172,6 +172,14 @@ namespace HorseRacingAPI.Services
                         })
                     });
 
+                await _hubContext.Clients.All.SendAsync("BalanceUpdated", new
+                {
+                    accountId  = spectatorId,
+                    amount     = -(long)req.BetAmount,
+                    newBalance = balanceAfterBet,
+                    reason     = "BetPlaced"
+                });
+
                 return MapToResponse(bet, registration);
             }
             catch
