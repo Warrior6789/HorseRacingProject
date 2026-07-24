@@ -7,6 +7,7 @@ using HorseRacingAPI.Services;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 
 namespace HorseRacingProject.Tests;
@@ -74,7 +75,7 @@ public class RaceEngineServiceTests
     private static RaceEngineService CreateEngine(HorseRacingDataContext db)
     {
         IUnitofWork uow = new UnitofWork(db);
-        return new RaceEngineService(CreateHubContext(), CreateScopeFactory(uow), Mock.Of<IRaceSettlementService>());
+        return new RaceEngineService(CreateHubContext(), CreateScopeFactory(uow), Mock.Of<IRaceSettlementService>(), NullLogger<RaceEngineService>.Instance);
     }
 
     [Fact]

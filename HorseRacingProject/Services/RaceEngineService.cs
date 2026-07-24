@@ -21,18 +21,23 @@ namespace HorseRacingAPI.Services
         private readonly Dictionary<Guid, double> _raceStyle = new();
         private readonly Dictionary<Guid, Dictionary<Guid, int>> _pendingOverrides = new();
         private readonly Random _random = new();
+        private readonly ILogger<RaceEngineService> _logger;
 
-        public RaceEngineService(IHubContext<RaceHub> hubContext, IServiceScopeFactory factory, IRaceSettlementService settlementService)
+        public RaceEngineService(IHubContext<RaceHub> hubContext, IServiceScopeFactory factory, IRaceSettlementService settlementService, ILogger<RaceEngineService> logger)
         {
             _hubContext = hubContext;
             _factory = factory;
             _settlementService = settlementService;
+            _logger = logger;
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             while (!stoppingToken.IsCancellationRequested)
             {
+                int delayMs = 5000;
+                try
+                {
                 using var scope = _factory.CreateScope();
                 var uow = scope.ServiceProvider.GetRequiredService<IUnitofWork>();
 
@@ -303,7 +308,13 @@ namespace HorseRacingAPI.Services
                     }
                 }
 
-                int delayMs = liveRaces.Count > 0 ? 100 : 5000;
+                delayMs = liveRaces.Count > 0 ? 100 : 5000;
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    _logger.LogError(ex, "RaceEngineService iteration failed; will retry on next tick.");
+                }
+
                 await Task.Delay(delayMs, stoppingToken);
             }
         }
