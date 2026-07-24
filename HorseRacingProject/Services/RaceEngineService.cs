@@ -77,7 +77,6 @@ namespace HorseRacingAPI.Services
                 List<Race> toOpen = await uow.GetRepository<Race>().Entities
                     .Where(r => r.Status == RaceStatus.Scheduled
                                 && r.StartTime <= now.AddMinutes(30)
-                                && r.StartTime > now.AddMinutes(5)
                                 && !r.IsDeleted)
                     .ToListAsync();
 
@@ -90,7 +89,6 @@ namespace HorseRacingAPI.Services
                 List<Race> toClose = await uow.GetRepository<Race>().Entities
                     .Where(r => r.Status == RaceStatus.BettingOpen
                                 && r.StartTime <= now.AddMinutes(5)
-                                && r.StartTime > now
                                 && !r.IsDeleted)
                     .ToListAsync();
 
@@ -358,7 +356,7 @@ namespace HorseRacingAPI.Services
         {
             Race? race = await uow.GetRepository<Race>().Entities
                 .FirstOrDefaultAsync(r => r.RaceId == raceId);
-            if (race == null || race.RegistrationFee <= 0) return;
+            if (race == null) return;
 
             List<Registration> registrations = await uow.GetRepository<Registration>().Entities
                 .Include(r => r.Horse)
@@ -366,30 +364,40 @@ namespace HorseRacingAPI.Services
                     && (r.Status == RegistrationStatus.Confirmed || r.Status == RegistrationStatus.Pending))
                 .ToListAsync();
 
+            if (registrations.Count == 0) return;
+
             var refunds = new List<(Guid accountId, long amount, long newBalance)>();
 
             foreach (Registration reg in registrations)
             {
-                UserProfile? profile = await uow.GetRepository<UserProfile>().Entities
-                    .FirstOrDefaultAsync(p => p.AccountId == reg.Horse.OwnerId && !p.IsDeleted);
-                if (profile != null)
+                if (race.RegistrationFee > 0)
                 {
-                    profile.Balance = (profile.Balance ?? 0) + (long)race.RegistrationFee;
-                    profile.UpdatedAt = DateTimeOffset.UtcNow;
-                    await uow.GetRepository<UserProfile>().UpdateAsync(profile);
-                    refunds.Add((reg.Horse.OwnerId, (long)race.RegistrationFee, profile.Balance ?? 0));
-
-                    await uow.GetRepository<WalletTransaction>().AddAsync(new WalletTransaction
+                    UserProfile? profile = await uow.GetRepository<UserProfile>().Entities
+                        .FirstOrDefaultAsync(p => p.AccountId == reg.Horse.OwnerId && !p.IsDeleted);
+                    if (profile != null)
                     {
-                        WalletTransactionId = Guid.NewGuid(),
-                        AccountId = reg.Horse.OwnerId,
-                        Type = WalletTransactionType.RegistrationFeeRefund,
-                        Amount = (long)race.RegistrationFee,
-                        BalanceAfter = profile.Balance ?? 0,
-                        ReferenceId = reg.RegistrationId,
-                        CreatedAt = DateTimeOffset.UtcNow
-                    });
+                        profile.Balance = (profile.Balance ?? 0) + (long)race.RegistrationFee;
+                        profile.UpdatedAt = DateTimeOffset.UtcNow;
+                        await uow.GetRepository<UserProfile>().UpdateAsync(profile);
+                        refunds.Add((reg.Horse.OwnerId, (long)race.RegistrationFee, profile.Balance ?? 0));
+
+                        await uow.GetRepository<WalletTransaction>().AddAsync(new WalletTransaction
+                        {
+                            WalletTransactionId = Guid.NewGuid(),
+                            AccountId = reg.Horse.OwnerId,
+                            Type = WalletTransactionType.RegistrationFeeRefund,
+                            Amount = (long)race.RegistrationFee,
+                            BalanceAfter = profile.Balance ?? 0,
+                            ReferenceId = reg.RegistrationId,
+                            CreatedAt = DateTimeOffset.UtcNow
+                        });
+                    }
                 }
+
+                reg.Status = RegistrationStatus.Rejected;
+                reg.JockeyConfirmation = false;
+                reg.UpdatedAt = DateTimeOffset.UtcNow;
+                await uow.GetRepository<Registration>().UpdateAsync(reg);
             }
 
             race.PrizePool = 0;
@@ -404,6 +412,8 @@ namespace HorseRacingAPI.Services
                     newBalance,
                     reason = "RefundRegistrationFee"
                 });
+
+            await _hubContext.Clients.All.SendAsync("RegistrationsUpdated");
         }
 
         private async Task AutoRejectPendingRegistrationsAsync(IServiceScope scope, Guid raceId)
