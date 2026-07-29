@@ -45,8 +45,8 @@ namespace HorseRacingAPI.Services
             if (existing)
                 throw new InvalidOperationException("A report already exists for this horse in this race.");
 
-            if (dto.PenaltyType == PenaltyType.Fine && (!dto.FineAmount.HasValue || dto.FineAmount.Value <= 0))
-                throw new InvalidOperationException("FineAmount is required and must be greater than 0 when PenaltyType is Fine.");
+            if (dto.PenaltyType == PenaltyType.Fine)
+                throw new InvalidOperationException("Fine penalty is no longer supported. Use Warning or Disqualification.");
 
             var report = new RefereeReport
             {
@@ -57,7 +57,7 @@ namespace HorseRacingAPI.Services
                 IncidentDescription = dto.IncidentDescription,
                 PenaltyApplied      = dto.PenaltyApplied,
                 PenaltyType         = dto.PenaltyType,
-                FineAmount          = dto.PenaltyType == PenaltyType.Fine ? dto.FineAmount : null,
+                FineAmount          = null,
                 Status              = RefereeReportStatus.Pending,
                 CreatedAt           = DateTimeOffset.UtcNow
             };
@@ -136,6 +136,14 @@ namespace HorseRacingAPI.Services
                     ReferenceId = report.ReportId,
                     CreatedAt = DateTimeOffset.UtcNow
                 });
+
+                await _hubContext.Clients.All.SendAsync("BalanceUpdated", new
+                {
+                    accountId  = report.Registration.Horse.OwnerId,
+                    amount     = -fine,
+                    newBalance = ownerProfile.Balance ?? 0,
+                    reason     = "Fine"
+                });
             }
 
             await _uow.GetRepository<Prize>().AddAsync(new Prize
@@ -176,6 +184,7 @@ namespace HorseRacingAPI.Services
             ];
 
             disqualifiedResult.IsDisqualified = true;
+            disqualifiedResult.FinishPosition = null;
             await _uow.GetRepository<RaceResult>().UpdateAsync(disqualifiedResult);
 
             var disqualifiedPrizes = await _uow.GetRepository<Prize>().Entities
@@ -379,7 +388,9 @@ namespace HorseRacingAPI.Services
 
             IGenericRepository<RefereeReport> reportRepo = _uow.GetRepository<RefereeReport>();
             IQueryable<RefereeReport> baseQuery = reportRepo.Entities
-                .Where(r => (raceId == null || r.RaceId == raceId) && (refereeId == null || r.RefereeId == refereeId));
+                .Where(r => !r.Race.IsDeleted
+                         && (raceId == null || r.RaceId == raceId)
+                         && (refereeId == null || r.RefereeId == refereeId));
 
             int total         = await baseQuery.CountAsync();
             int pendingCount  = await baseQuery.CountAsync(r => r.Status == RefereeReportStatus.Pending);
@@ -402,6 +413,8 @@ namespace HorseRacingAPI.Services
                     ReportId            = r.ReportId,
                     RaceId              = r.RaceId,
                     RaceNumber          = r.Race.RaceNumber,
+                    RaceName            = r.Race.RaceName,
+                    RacecourseName      = r.Race.Racecourse.RacecourseName,
                     RefereeId           = r.RefereeId,
                     RefereeName         = (r.Referee.UserProfile != null ? r.Referee.UserProfile.FullName : null) ?? r.Referee.Email ?? "",
                     RegistrationId      = r.RegistrationId,
@@ -434,7 +447,7 @@ namespace HorseRacingAPI.Services
 
             IGenericRepository<RefereeReport> reportRepo = _uow.GetRepository<RefereeReport>();
             int total = await reportRepo.Entities
-                .CountAsync(r => r.RefereeId == refereeId);
+                .CountAsync(r => r.RefereeId == refereeId && !r.Race.IsDeleted);
             List<RefereeReportResponse> items = await reportRepo.Entities
                 .Include(r => r.Race)
                 .Include(r => r.Registration)
@@ -443,7 +456,7 @@ namespace HorseRacingAPI.Services
                     .ThenInclude(r => r.UserProfile)
                 .Include(r => r.Registration)
                     .ThenInclude(r => r.RaceResult)
-                .Where(r => r.RefereeId == refereeId)
+                .Where(r => r.RefereeId == refereeId && !r.Race.IsDeleted)
                 .OrderByDescending(r => r.CreatedAt)
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
@@ -452,6 +465,8 @@ namespace HorseRacingAPI.Services
                     ReportId            = r.ReportId,
                     RaceId              = r.RaceId,
                     RaceNumber          = r.Race.RaceNumber,
+                    RaceName            = r.Race.RaceName,
+                    RacecourseName      = r.Race.Racecourse.RacecourseName,
                     RefereeId           = r.RefereeId,
                     RefereeName         = (r.Referee.UserProfile != null ? r.Referee.UserProfile.FullName : null) ?? r.Referee.Email ?? "",
                     RegistrationId      = r.RegistrationId,
@@ -485,13 +500,13 @@ namespace HorseRacingAPI.Services
             if (report.Status != RefereeReportStatus.Pending)
                 throw new InvalidOperationException("Only Pending reports can be edited.");
 
+            if (dto.PenaltyType == PenaltyType.Fine)
+                throw new InvalidOperationException("Fine penalty is no longer supported. Use Warning or Disqualification.");
+
             report.IncidentDescription = dto.IncidentDescription ?? report.IncidentDescription;
             report.PenaltyApplied      = dto.PenaltyApplied ?? report.PenaltyApplied;
             if (dto.PenaltyType.HasValue) report.PenaltyType = dto.PenaltyType.Value;
-            report.FineAmount = report.PenaltyType == PenaltyType.Fine ? (dto.FineAmount ?? report.FineAmount) : null;
-
-            if (report.PenaltyType == PenaltyType.Fine && (!report.FineAmount.HasValue || report.FineAmount.Value <= 0))
-                throw new InvalidOperationException("FineAmount is required and must be greater than 0 when PenaltyType is Fine.");
+            report.FineAmount = null;
 
             await _uow.GetRepository<RefereeReport>().UpdateAsync(report);
             await _uow.SaveAsync();

@@ -140,7 +140,7 @@ namespace HorseRacingAPI.Services
             if (conflictingRace != null)
             {
                 DateTimeOffset conflictEnd = (conflictingRace.EndTime ?? conflictingRace.StartTime!.Value.AddMinutes(5)).AddMinutes(5);
-                throw new InvalidOperationException($"Time slot conflicts with an existing race at this racecourse. Next available slot after {conflictEnd:yyyy-MM-dd HH:mm} UTC.");
+                throw new InvalidOperationException($"Time slot conflicts with an existing race at this racecourse. Next available slot after {conflictEnd.ToOffset(TimeSpan.FromHours(7)):yyyy-MM-dd HH:mm} (VN time).");
             }
 
             string? imageUrl = null;
@@ -234,7 +234,7 @@ namespace HorseRacingAPI.Services
                 if (conflictingRace != null)
                 {
                     DateTimeOffset conflictEnd = (conflictingRace.EndTime ?? conflictingRace.StartTime!.Value.AddMinutes(5)).AddMinutes(5);
-                    throw new InvalidOperationException($"Time slot conflicts with an existing race at this racecourse. Next available slot after {conflictEnd:yyyy-MM-dd HH:mm} UTC.");
+                    throw new InvalidOperationException($"Time slot conflicts with an existing race at this racecourse. Next available slot after {conflictEnd.ToOffset(TimeSpan.FromHours(7)):yyyy-MM-dd HH:mm} (VN time).");
                 }
 
                 race.StartTime = request.StartTime;
@@ -372,7 +372,7 @@ namespace HorseRacingAPI.Services
             {
                 DateTimeOffset earliestDate = lastRaceEnd.Value.AddDays(7);
                 int daysRemaining = Math.Max(0, (int)Math.Ceiling((earliestDate - DateTimeOffset.UtcNow).TotalDays));
-                throw new InvalidOperationException($"Horse needs 7 days rest after last race. {daysRemaining} day(s) remaining. Earliest registration date: {earliestDate:yyyy-MM-dd}.");
+                throw new InvalidOperationException($"Horse needs 7 days rest after last race. {daysRemaining} day(s) remaining. Earliest registration date: {earliestDate.ToOffset(TimeSpan.FromHours(7)):yyyy-MM-dd}.");
             }
 
             bool ownerAlreadyRegistered = await (
@@ -464,7 +464,16 @@ namespace HorseRacingAPI.Services
             await _uow.SaveAsync();
 
             if (race.RegistrationFee > 0)
+            {
                 await BroadcastPrizePoolUpdateAsync(raceId, race.PrizePool);
+                await _hubContext.Clients.All.SendAsync("BalanceUpdated", new
+                {
+                    accountId  = ownerId,
+                    amount     = -(long)race.RegistrationFee,
+                    newBalance = ownerProfile!.Balance ?? 0,
+                    reason     = "RegistrationFeeCharged"
+                });
+            }
 
             int pendingCount = await _uow.GetRepository<Registration>().Entities
                 .CountAsync(r => r.Status == RegistrationStatus.Pending);
@@ -561,10 +570,12 @@ namespace HorseRacingAPI.Services
                 .Include(r => r.Registration)
                     .ThenInclude(reg => reg.Horse)
                 .Where(r => r.Registration.RaceId == raceId)
-                .OrderBy(r => r.FinishPosition)
+                .OrderBy(r => r.IsDisqualified == true)
+                .ThenBy(r => r.FinishPosition)
                 .Select(r => new RaceResultResponse
                 {
                     Position = r.FinishPosition,
+                    IsDisqualified = r.IsDisqualified ?? false,
                     Horse = new RaceResultHorseDto
                     {
                         Id = r.Registration.Horse.Id,
@@ -1027,7 +1038,8 @@ namespace HorseRacingAPI.Services
 
             IQueryable<TakeoutLedger> query = _uow.GetRepository<TakeoutLedger>().Entities
                 .Include(t => t.Race)
-                .Where(t => (raceId == null || t.RaceId == raceId)
+                .Where(t => !t.Race.IsDeleted
+                         && (raceId == null || t.RaceId == raceId)
                          && (parsedBetType == null || t.BetType == parsedBetType));
 
             int totalCount = await query.CountAsync();

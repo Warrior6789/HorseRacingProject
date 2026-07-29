@@ -36,9 +36,9 @@ namespace HorseRacingAPI.Services
             }
 
             IGenericRepository<Bet> repo = _uow.GetRepository<Bet>();
-            int totalCount = await repo.Entities.CountAsync(b => b.SpectatorId == spectatorId && (parsedStatus == null || b.Status == parsedStatus));
+            int totalCount = await repo.Entities.CountAsync(b => b.SpectatorId == spectatorId && (parsedStatus == null || b.Status == parsedStatus) && !b.Registration.Race.IsDeleted);
             IEnumerable<BetResponse> items = await repo.FindAsync<BetResponse>(
-                predicate: b => b.SpectatorId == spectatorId && (parsedStatus == null || b.Status == parsedStatus),
+                predicate: b => b.SpectatorId == spectatorId && (parsedStatus == null || b.Status == parsedStatus) && !b.Registration.Race.IsDeleted,
                 orderBy: q => q.OrderByDescending(b => b.CreatedAt),
                 selector: b => new BetResponse
                 {
@@ -171,6 +171,14 @@ namespace HorseRacingAPI.Services
                             totalAmount = p.TotalAmount
                         })
                     });
+
+                await _hubContext.Clients.All.SendAsync("BalanceUpdated", new
+                {
+                    accountId  = spectatorId,
+                    amount     = -(long)req.BetAmount,
+                    newBalance = balanceAfterBet,
+                    reason     = "BetPlaced"
+                });
 
                 return MapToResponse(bet, registration);
             }
